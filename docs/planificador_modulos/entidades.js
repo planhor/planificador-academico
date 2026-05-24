@@ -1488,7 +1488,7 @@
             const headers=['Nombre','Apellido','Especialidad','Tipo contrato','Horas homólogo','Asignaturas que dicta'];
             const filas=[
                 headers,
-                ['Cristian','Ramos','Electricidad','indefinido',720,'EEA401, EEA402, ELAR31']
+                ['Docente','Referencia','Electricidad','indefinido',720,'EEA401, EEA402, ELAR31']
             ];
             if(window.XLSX?.utils?.book_new&&window.XLSX?.writeFile){
                 const wb=window.XLSX.utils.book_new();
@@ -1500,8 +1500,8 @@
                 add('Docentes',filas,[18,18,24,16,16,44]);
                 add('Ayuda',[
                     ['Campo','Qué escribir','Ejemplo','Notas'],
-                    ['Nombre','Nombre del docente','cristian','La app lo corrige a Cristian.'],
-                    ['Apellido','Apellido del docente','ramos','La app lo corrige a Ramos.'],
+                    ['Nombre','Nombre del docente','docente','La app lo corrige a Docente.'],
+                    ['Apellido','Apellido del docente','referencia','La app lo corrige a Referencia.'],
                     ['Especialidad','Una de las especialidades configuradas','Electricidad','Si coincide en minúsculas/mayúsculas, usa la versión de la app.'],
                     ['Tipo contrato','indefinido o fijo','indefinido','También acepta planta, fija o plazo fijo.'],
                     ['Horas homólogo','Horas semestrales referenciales','720','Debe ser número.'],
@@ -1535,8 +1535,8 @@
                 {nombre:'Docentes',matriz:filas,cols:[18,18,24,16,16,44]},
                 {nombre:'Ayuda',matriz:[
                     ['Campo','Qué escribir','Ejemplo','Notas'],
-                    ['Nombre','Nombre del docente','cristian','La app lo corrige a Cristian.'],
-                    ['Apellido','Apellido del docente','ramos','La app lo corrige a Ramos.'],
+                    ['Nombre','Nombre del docente','docente','La app lo corrige a Docente.'],
+                    ['Apellido','Apellido del docente','referencia','La app lo corrige a Referencia.'],
                     ['Especialidad','Una de las especialidades configuradas','Electricidad','Si coincide en minúsculas/mayúsculas, usa la versión de la app.'],
                     ['Tipo contrato','indefinido o fijo','indefinido','También acepta planta, fija o plazo fijo.'],
                     ['Horas homólogo','Horas semestrales referenciales','720','Debe ser número.'],
