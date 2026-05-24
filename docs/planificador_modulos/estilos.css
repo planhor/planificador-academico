@@ -240,8 +240,11 @@ body { font-family:var(--font); background:var(--bg); color:var(--text); min-hei
 .schedule-grid-export .grid-cell small { font-size:0.68rem; }
 .selection-panel, .vista-selector { display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; padding:16px 20px; background:var(--surface); border-radius:var(--radius); border:1px solid var(--border); margin-bottom:16px; }
 .vista-selector .form-group { flex:1; min-width:150px; max-width:250px; }
-.toast-container { position:fixed; top:20px; right:20px; z-index:9999; display:flex; flex-direction:column; gap:8px; }
-.toast { padding:12px 18px; border-radius:var(--radius-sm); color:#fff; font-weight:500; font-size:0.85rem; box-shadow:var(--shadow-lg); max-width:380px; animation:slideIn 0.3s ease; transition: opacity 0.3s ease, transform 0.3s ease; }
+.toast-container { position:fixed; top:14px; right:14px; z-index:9999; display:flex; flex-direction:column; gap:6px; pointer-events:none; }
+.toast { min-height:34px; padding:7px 8px 7px 12px; border-radius:var(--radius-sm); color:#fff; font-weight:500; font-size:0.78rem; line-height:1.25; box-shadow:var(--shadow); width:max-content; max-width:320px; animation:slideIn 0.22s ease; transition:opacity 0.22s ease, transform 0.22s ease; display:flex; align-items:flex-start; gap:8px; pointer-events:auto; }
+.toast-text { min-width:0; overflow-wrap:anywhere; }
+.toast-close { flex:0 0 auto; width:20px; height:20px; border:0; border-radius:50%; background:rgba(255,255,255,0.18); color:#fff; cursor:pointer; font-size:1rem; line-height:18px; display:flex; align-items:center; justify-content:center; opacity:0.9; }
+.toast-close:hover { background:rgba(255,255,255,0.3); opacity:1; }
 .toast.success { background:#2e7d32; } .toast.error { background:#c62828; } .toast.info { background:#1565c0; }
 @keyframes slideIn { from{opacity:0;transform:translateX(40px);} to{opacity:1;transform:translateX(0);} }
 .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:200; display:flex; align-items:center; justify-content:center; }

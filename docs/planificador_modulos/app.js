@@ -720,8 +720,29 @@ window._appRuntimeInicializada = true;
         });
     }
     function toast(msg,tipo='info'){
-        const c=document.getElementById('toastContainer'); const t=document.createElement('div'); t.className=`toast ${tipo}`; t.textContent=msg;
-        c.appendChild(t); setTimeout(()=>{t.style.opacity='0';setTimeout(()=>t.remove(),300);},3000);
+        const c=document.getElementById('toastContainer');
+        if(!c) return;
+        const t=document.createElement('div');
+        t.className=`toast ${tipo}`;
+        const texto=document.createElement('span');
+        texto.className='toast-text';
+        texto.textContent=msg;
+        const cerrar=document.createElement('button');
+        cerrar.className='toast-close';
+        cerrar.type='button';
+        cerrar.setAttribute('aria-label','Cerrar aviso');
+        cerrar.textContent='×';
+        const quitar=()=>{
+            if(t.dataset.closing) return;
+            t.dataset.closing='1';
+            t.style.opacity='0';
+            t.style.transform='translateX(24px)';
+            setTimeout(()=>t.remove(),220);
+        };
+        cerrar.addEventListener('click',quitar);
+        t.append(texto,cerrar);
+        c.appendChild(t);
+        setTimeout(quitar, tipo==='error' ? 5200 : 2600);
     }
 
     function refrescarTodo(){ construirGrilla(); actualizarSelectoresPlan(); renderCarreras(); renderAsignaturas(); renderDocentes(); renderSalas(); actualizarVista(); actualizarReporte(); actualizarProgresoPlan(); renderDashboard(); detectarConflictos(); renderHistorial(); actualizarFichaDocentes(); renderFichaDocente(); renderGestorSecciones(); }
