@@ -61,6 +61,16 @@
             return String(a.nombre||'').localeCompare(String(b.nombre||''),undefined,{numeric:true,sensitivity:'base'});
         }
 
+        function areaCarrera(carrera={}){
+            return String(carrera.area||carrera.especialidad||'Sin área').trim()||'Sin área';
+        }
+
+        function areasCarrera(){
+            const data=getData();
+            return [...new Set(data.carreras.map(areaCarrera).map(a=>String(a||'').trim()).filter(Boolean))]
+                .sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:'base'}));
+        }
+
         function eliminarEntidad(tipo,id){
             const data = getData();
             if(data.configuracion.confirmarEliminacion && !confirm(`¿Eliminar ${tipo}?`)) return;
@@ -88,6 +98,12 @@
         function renderCarreras(){
             const data = getData();
             const cont=document.getElementById('listaCarreras');
+            const filtroArea=document.getElementById('seccionesFiltroArea');
+            const areaActual=filtroArea?.value||'';
+            if(filtroArea){
+                filtroArea.innerHTML='<option value="">Todas</option>'+areasCarrera().map(a=>ctx.optionHTML(a,a,areaActual===a)).join('');
+                filtroArea.value=areaActual&&areasCarrera().includes(areaActual)?areaActual:'';
+            }
             const renderPanelAlertas=()=>{
                 const items=[
                     ...data.carreras.filter(x=>Array.isArray(x.alertasImportacion)&&x.alertasImportacion.length).map(x=>({tipo:'Carrera',id:x.id,nombre:`${x.codigo} - ${x.nombre}`,detalle:x.alertasImportacion.join(' · '),btn:'btn-editar-carrera'})),
@@ -105,11 +121,14 @@
                     </div>
                 </div>`;
             };
-            const contenido=data.carreras.map(c=>{
+            const carrerasFiltradas=data.carreras
+                .filter(c=>!filtroArea?.value||areaCarrera(c)===filtroArea.value)
+                .sort((a,b)=>areaCarrera(a).localeCompare(areaCarrera(b),undefined,{sensitivity:'base'})||String(a.nombre||'').localeCompare(String(b.nombre||''),undefined,{numeric:true,sensitivity:'base'}));
+            const renderCarrera=c=>{
                 const niveles=data.niveles.filter(n=>n.carreraId===c.id).sort(ordenarNivelesDesc);
                 const alerta=c.alertasImportacion?.length?` <small class="import-warning-chip">${c.alertasImportacion.length} alerta(s)</small>`:'';
                 return `<div style="margin-bottom:8px;">
-                    <div class="career-header" data-tipo="carrera" data-id="${ctx.escapeAttr(c.id)}"><span class="arrow">▶</span> <strong>${ctx.escapeHTML(c.codigo)} - ${ctx.escapeHTML(c.nombre)}</strong>${c.especialidad?` <small style="font-size:0.7rem;color:var(--text-secondary)">[${ctx.escapeHTML(c.especialidad)}]</small>`:''}${alerta}
+                    <div class="career-header" data-tipo="carrera" data-id="${ctx.escapeAttr(c.id)}"><span class="arrow">▶</span> <strong>${ctx.escapeHTML(c.codigo)} - ${ctx.escapeHTML(c.nombre)}</strong>${c.especialidad&&c.especialidad!==areaCarrera(c)?` <small style="font-size:0.7rem;color:var(--text-secondary)">Especialidad: ${ctx.escapeHTML(c.especialidad)}</small>`:''}${alerta}
                         <button class="btn btn-xs btn-editar-carrera" data-id="${ctx.escapeAttr(c.id)}">✎</button> <button class="btn btn-xs btn-eliminar" data-tipo="carrera" data-id="${ctx.escapeAttr(c.id)}">🗑️</button>
                     </div>
                     <div class="nested" id="niveles_${ctx.escapeAttr(c.id)}">
@@ -137,8 +156,20 @@
                         }).join('')}
                     </div>
                 </div>`;
-            }).join('');
-            cont.innerHTML=renderPanelAlertas()+contenido;
+            };
+            const gruposArea=new Map();
+            carrerasFiltradas.forEach(c=>{
+                const area=areaCarrera(c);
+                if(!gruposArea.has(area)) gruposArea.set(area,[]);
+                gruposArea.get(area).push(c);
+            });
+            const contenido=[...gruposArea.entries()].map(([area,items])=>`
+                <section class="area-section-group">
+                    <div class="area-section-header"><strong>${ctx.escapeHTML(area)}</strong><span>${items.length} carrera(s)</span></div>
+                    <div class="area-section-content">${items.map(renderCarrera).join('')}</div>
+                </section>
+            `).join('');
+            cont.innerHTML=renderPanelAlertas()+(contenido||'<p class="auto-plan-empty">No hay carreras para el área seleccionada.</p>');
             acordeonAbierto.forEach(id=>{document.getElementById(id)?.classList.add('open');});
         }
 
@@ -371,6 +402,12 @@
             document.getElementById('modalContainer').innerHTML=`
             <div class="modal-overlay" id="modalOverlay"><div class="modal">
                 <h3>${c?'Editar':'Nueva'} Carrera</h3>
+                <div class="form-group">
+                    <label class="form-label">Área</label>
+                    <input class="form-input" id="areaCarrera" list="areasCarreraList" value="${ctx.escapeAttr(c?areaCarrera(c):'')}" placeholder="Selecciona o escribe un área">
+                    <datalist id="areasCarreraList">${areasCarrera().map(a=>`<option value="${ctx.escapeAttr(a)}"></option>`).join('')}</datalist>
+                    <small style="color:var(--text-secondary);font-size:0.72rem;">Agrupa carreras en Secciones y Planificación. Si escribes una nueva, quedará disponible para futuros ingresos.</small>
+                </div>
                 <div class="form-group"><label class="form-label">Código</label><input class="form-input" id="codCarr" value="${ctx.escapeAttr(c?.codigo||'')}"></div>
                 <div class="form-group"><label class="form-label">Nombre</label><input class="form-input" id="nomCarr" value="${ctx.escapeAttr(c?.nombre||'')}"></div>
                 <div class="form-group"><label class="form-label">Especialidad</label><select class="form-select" id="especialidadCarrera"><option value="">-- Sin especialidad --</option>${(data.configuracion.especialidades||[]).map(e=>ctx.optionHTML(e,e,c?.especialidad===e)).join('')}</select></div>
@@ -383,12 +420,15 @@
 
         function guardarCarrera(id){
             const data = getData();
-            const cod=document.getElementById('codCarr').value.trim(), nom=document.getElementById('nomCarr').value.trim(), esp=document.getElementById('especialidadCarrera').value, tipo=document.getElementById('tipoCarrera').value;
+            const area=document.getElementById('areaCarrera').value.trim(), cod=document.getElementById('codCarr').value.trim(), nom=document.getElementById('nomCarr').value.trim(), esp=document.getElementById('especialidadCarrera').value, tipo=document.getElementById('tipoCarrera').value;
+            if(!area) return ctx.toast('El área de carrera es obligatoria','error');
             if(!cod) return ctx.toast('El código de carrera es obligatorio','error');
             if(!nom) return ctx.toast('El nombre de carrera es obligatorio','error');
             const duplicado = data.carreras.find(c=>c.codigo.toLowerCase()===cod.toLowerCase() && c.id!==id);
             if(duplicado) return ctx.toast(`Ya existe una carrera con el código "${cod}"`, 'error');
-            if(id){const c=data.carreras.find(c=>c.id===id);c.codigo=cod;c.nombre=nom;c.especialidad=esp;c.tipo=tipo;} else data.carreras.push({id:ctx.genId(),codigo:cod,nombre:nom,especialidad:esp,tipo:tipo});
+            if(!Array.isArray(data.configuracion.especialidades)) data.configuracion.especialidades=[];
+            if(!data.configuracion.especialidades.some(e=>limpiarClave(e)===limpiarClave(area))) data.configuracion.especialidades.push(area);
+            if(id){const c=data.carreras.find(c=>c.id===id);c.codigo=cod;c.nombre=nom;c.area=area;c.especialidad=esp;c.tipo=tipo;} else data.carreras.push({id:ctx.genId(),codigo:cod,nombre:nom,area,especialidad:esp,tipo:tipo});
             ctx.guardar(); ctx.cerrarModal(); ctx.refrescarTodo(); ctx.toast('Carrera guardada','success');
         }
 
@@ -520,11 +560,11 @@
             const filas=[['Código carrera','Nombre carrera','Área / especialidad','Tipo carrera','Nivel','Tiene Online','Jornada','Sección','Tipo sección']];
             data.carreras.forEach(c=>{
                 const niveles=data.niveles.filter(n=>n.carreraId===c.id).sort(ordenarNivelesDesc);
-                if(!niveles.length) filas.push([c.codigo,c.nombre,c.especialidad||'',c.tipo||'', '', '', '', '', '']);
+                if(!niveles.length) filas.push([c.codigo,c.nombre,areaCarrera(c),c.tipo||'', '', '', '', '', '']);
                 niveles.forEach(n=>{
                     const secciones=data.secciones.filter(s=>s.nivelId===n.id).sort(ordenarSecciones);
-                    if(!secciones.length) filas.push([c.codigo,c.nombre,c.especialidad||'',c.tipo||'',n.nombre,n.tieneOnline?'Sí':'No','','','']);
-                    secciones.forEach(s=>filas.push([c.codigo,c.nombre,c.especialidad||'',c.tipo||'',n.nombre,n.tieneOnline?'Sí':'No',etiquetaJornada(jornadaSeccion(s)),s.nombre,s.tipoSeccion||'regular']));
+                    if(!secciones.length) filas.push([c.codigo,c.nombre,areaCarrera(c),c.tipo||'',n.nombre,n.tieneOnline?'Sí':'No','','','']);
+                    secciones.forEach(s=>filas.push([c.codigo,c.nombre,areaCarrera(c),c.tipo||'',n.nombre,n.tieneOnline?'Sí':'No',etiquetaJornada(jornadaSeccion(s)),s.nombre,s.tipoSeccion||'regular']));
                 });
             });
             exportarWorkbookCatalogo('Secciones_exportadas.xlsx',[
@@ -588,7 +628,7 @@
             const txt=capitalizarPalabras(valor);
             if(!txt) return {valor:'',alerta:''};
             const existente=(getData().configuracion.especialidades||[]).find(e=>limpiarClave(e)===limpiarClave(txt));
-            return existente?{valor:existente,alerta:''}:{valor:'',alerta:`Área/especialidad no existe en configuración: ${txt}`};
+            return existente?{valor:existente,alerta:''}:{valor:capitalizarPalabras(txt),alerta:''};
         }
 
         function importarSeccionesDesdeFilas(rows){
@@ -629,11 +669,12 @@
                 let carrera=carrerasPorCodigo.get(limpiarClave(codigo));
                 const alertasCarrera=esp.alerta?[`Fila ${fila}: ${esp.alerta}`]:[];
                 if(carrera){
-                    carrera.codigo=codigo; carrera.nombre=nombre; carrera.tipo=tipoCarrera; carrera.especialidad=esp.valor||carrera.especialidad||''; carrera.alertasImportacion=alertasCarrera; resumen.actualizadas++;
+                    carrera.codigo=codigo; carrera.nombre=nombre; carrera.tipo=tipoCarrera; carrera.area=esp.valor||carrera.area||carrera.especialidad||'Sin área'; carrera.especialidad=esp.valor||carrera.especialidad||''; carrera.alertasImportacion=alertasCarrera; resumen.actualizadas++;
                 }else{
-                    carrera={id:ctx.genId(),codigo,nombre,especialidad:esp.valor,tipo:tipoCarrera,alertasImportacion:alertasCarrera};
+                    carrera={id:ctx.genId(),codigo,nombre,area:esp.valor||'Sin área',especialidad:esp.valor,tipo:tipoCarrera,alertasImportacion:alertasCarrera};
                     data.carreras.push(carrera); carrerasPorCodigo.set(limpiarClave(codigo),carrera); resumen.carreras++;
                 }
+                if(esp.valor&&!data.configuracion.especialidades.some(e=>limpiarClave(e)===limpiarClave(esp.valor))) data.configuracion.especialidades.push(esp.valor);
                 if(alertasCarrera.length) resumen.alertas.push({fila,item:codigo,detalle:alertasCarrera.join(' · '),tipo:'carrera',id:carrera.id});
                 const nivelKey=`${carrera.id}|${limpiarClave(nivelNombre)}`;
                 let nivel=nivelesPorClave.get(nivelKey);
@@ -2059,6 +2100,7 @@
             });
             const btnCarrera=document.getElementById('btnNuevaCarrera');
             if(btnCarrera) btnCarrera.addEventListener('click',()=>abrirModalCarrera());
+            document.getElementById('seccionesFiltroArea')?.addEventListener('change',renderCarreras);
             document.getElementById('btnCrearPlantillaSecciones')?.addEventListener('click',crearPlantillaImportacionSecciones);
             document.getElementById('btnImportarSecciones')?.addEventListener('click',abrirImportacionSecciones);
             document.getElementById('btnExportarArchivoSecciones')?.addEventListener('click',exportarArchivoSecciones);

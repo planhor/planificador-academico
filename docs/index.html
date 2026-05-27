@@ -14,7 +14,7 @@
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <link rel="stylesheet" href="planificador_modulos/estilos.css?v=20260526-fluid-width">
+    <link rel="stylesheet" href="planificador_modulos/estilos.css?v=20260526-area-staircase">
 </head>
 <body>
 <div id="appRoot" style="display:none;">
@@ -68,7 +68,7 @@
 </nav>
     <div class="main-content">
     <div class="tab-panel active" id="panelSecciones">
-        <div class="card"><div class="card-header"><span class="card-title">📋 Secciones</span><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><button class="btn btn-sm" id="btnCrearPlantillaSecciones">📄 Crear archivo de importación</button><button class="btn btn-sm" id="btnImportarSecciones">📥 Importar archivo secciones</button><button class="btn btn-sm" id="btnExportarArchivoSecciones">📤 Exportar archivo</button><input type="file" id="inputImportarSecciones" accept=".xlsx,.xls,.csv" style="display:none;"><button class="btn btn-primary btn-sm" id="btnNuevaCarrera">+ Nueva Carrera</button></div></div><div id="listaCarreras"></div></div>
+        <div class="card"><div class="card-header"><span class="card-title">📋 Secciones</span><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><button class="btn btn-sm" id="btnCrearPlantillaSecciones">📄 Crear archivo de importación</button><button class="btn btn-sm" id="btnImportarSecciones">📥 Importar archivo secciones</button><button class="btn btn-sm" id="btnExportarArchivoSecciones">📤 Exportar archivo</button><input type="file" id="inputImportarSecciones" accept=".xlsx,.xls,.csv" style="display:none;"><button class="btn btn-primary btn-sm" id="btnNuevaCarrera">+ Nueva Carrera</button></div></div><div class="section-area-toolbar"><label for="seccionesFiltroArea">Ver área</label><select class="form-select form-select-sm" id="seccionesFiltroArea"><option value="">Todas</option></select><span>Organiza el listado por Área → Carrera → Nivel → Jornada → Sección.</span></div><div id="listaCarreras"></div></div>
     </div>
     <div class="tab-panel" id="panelAsignaturas">
         <div class="card"><div class="card-header"><span class="card-title">📚 Asignaturas</span><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><button class="btn btn-sm" id="btnCrearPlantillaAsignaturas">📄 Crear archivo de importación</button><button class="btn btn-sm" id="btnImportarAsignaturas">📥 Importar archivo asignaturas</button><button class="btn btn-sm" id="btnExportarArchivoAsignaturas">📤 Exportar archivo</button><input type="file" id="inputImportarAsignaturas" accept=".xlsx,.xls,.csv" style="display:none;"><button class="btn btn-primary btn-sm" id="btnNuevaAsignatura">+ Nueva</button></div></div><div id="listaAsignaturas"></div></div>
@@ -81,14 +81,15 @@
     </div>
     <div class="tab-panel" id="panelPlanificacion">
         <div class="selection-panel">
+            <div class="form-group"><label class="form-label">Área</label><select class="form-select" id="planArea"></select></div>
             <div class="form-group"><label class="form-label">Carrera</label><select class="form-select" id="planCarrera"></select></div>
             <div class="form-group"><label class="form-label">Nivel</label><select class="form-select" id="planNivel" disabled></select></div>
             <div class="form-group"><label class="form-label">Jornada</label><select class="form-select" id="planJornada" disabled></select></div>
             <div class="form-group"><label class="form-label">Sección</label><select class="form-select" id="planSeccion" disabled></select></div>
-            <div class="form-group"><label class="form-label">Asignatura</label><select class="form-select" id="planAsignatura" disabled></select></div>
-            <div class="form-group"><label class="form-label">Docente</label><select class="form-select" id="planDocente" disabled></select></div>
-            <div class="form-group"><label class="form-label">Sala</label><select class="form-select" id="planSala" disabled></select></div>
-            <div class="form-group"><label class="form-label">Tipo</label><select class="form-select" id="planTipo"><option value="presencial">Presencial</option><option value="virtual">Virtual</option></select></div>
+            <div class="form-group plan-work-control"><label class="form-label">Asignatura</label><select class="form-select" id="planAsignatura" disabled></select></div>
+            <div class="form-group plan-work-control"><label class="form-label">Docente</label><select class="form-select" id="planDocente" disabled></select></div>
+            <div class="form-group plan-work-control"><label class="form-label">Sala</label><select class="form-select" id="planSala" disabled></select></div>
+            <div class="form-group plan-work-control"><label class="form-label">Tipo</label><select class="form-select" id="planTipo"><option value="presencial">Presencial</option><option value="virtual">Virtual</option></select></div>
             <button class="btn btn-primary" id="btnModoPlanificar">🎯 Modo Planificación</button>
             <button class="btn" id="btnAutoAsignatura" style="display:none;">🤖 Auto-asignatura</button>
             <button class="btn" id="btnAutoSeccion" style="display:none;">🤖 Auto-sección</button>
@@ -390,9 +391,9 @@ onAuthStateChanged(auth, async (user) => {
 <script src="planificador_modulos/vista-horario.js"></script>
 <script src="planificador_modulos/reportes.js"></script>
 <script src="planificador_modulos/ficha-docente.js"></script>
-<script src="planificador_modulos/entidades.js?v=20260523-privacy-texts"></script>
-<script src="planificador_modulos/planificacion.js"></script>
-<script src="planificador_modulos/configuracion.js?v=20260523-privacy-texts"></script>
-<script src="planificador_modulos/app.js?v=20260524-compact-toast"></script>
+<script src="planificador_modulos/entidades.js?v=20260526-area-staircase"></script>
+<script src="planificador_modulos/planificacion.js?v=20260526-area-staircase"></script>
+<script src="planificador_modulos/configuracion.js?v=20260526-config-draft"></script>
+<script src="planificador_modulos/app.js?v=20260526-area-staircase"></script>
 </body>
 </html>

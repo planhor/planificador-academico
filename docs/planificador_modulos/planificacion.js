@@ -208,6 +208,16 @@
             return String(a.nombre||'').localeCompare(String(b.nombre||''),undefined,{numeric:true,sensitivity:'base'});
         }
 
+        function areaCarrera(carrera={}){
+            return String(carrera.area||carrera.especialidad||'Sin área').trim()||'Sin área';
+        }
+
+        function areasCarrera(){
+            const data=getData();
+            return [...new Set(data.carreras.map(areaCarrera).map(a=>String(a||'').trim()).filter(Boolean))]
+                .sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:'base'}));
+        }
+
         function gruposVinculadosDeSeccion(seccionId){
             const grupos=ctx.getGruposDictacionSeccion?.(seccionId)||[];
             return grupos.filter(g=>g.seccionMadreId!==seccionId && g.seccionesVinculadasIds?.includes(seccionId));
@@ -330,6 +340,8 @@
                 data.sel.nivelId=madre.nivelId;
                 const nivel=data.niveles.find(n=>n.id===madre.nivelId);
                 data.sel.carreraId=nivel?.carreraId||data.sel.carreraId;
+                const carrera=data.carreras.find(c=>c.id===data.sel.carreraId);
+                data.sel.area=carrera?areaCarrera(carrera):data.sel.area;
                 actualizarSelectoresPlan();
                 construirGrilla();
                 actualizarProgresoPlan();
@@ -416,6 +428,48 @@
             else if(disp.sug) cell.classList.add('available');
         }
 
+        function numeroSeguro(valor){
+            if(typeof valor==='number') return Number.isFinite(valor)?valor:0;
+            const limpio=String(valor??'').replace(',','.').replace(/[^\d.-]/g,'');
+            const n=Number(limpio);
+            return Number.isFinite(n)?n:0;
+        }
+
+        function bloquesDesdeHoras(horas){
+            const h=numeroSeguro(horas);
+            return h>0?Math.max(1,Math.round(h/18)):0;
+        }
+
+        function bloquesRequeridosAsignatura(asig,tipo){
+            if(!asig) return 0;
+            const hv=numeroSeguro(asig.horasVirtuales);
+            const hpDeclaradas=numeroSeguro(asig.horasPresenciales);
+            const ht=numeroSeguro(asig.horasTotales);
+            const hp=hpDeclaradas>0?hpDeclaradas:Math.max(0,ht-hv);
+            const fallback=tipo==='virtual'?bloquesDesdeHoras(hv):bloquesDesdeHoras(hp);
+            const declarado=numeroSeguro(tipo==='virtual'?asig.bloquesVirtuales:asig.bloquesPresenciales);
+            if(declarado>0) return Math.round(declarado);
+            return fallback;
+        }
+
+        function validarSeleccionManual(opciones={}){
+            const data=getData();
+            const s=data.sel||{};
+            const avisar=(msg,tipo='error')=>{
+                if(!opciones.silencioso) ctx.toast(msg,tipo);
+                return false;
+            };
+            if(opciones.requiereModo && !data.modoPlan) return avisar('Active Modo Planificación para modificar bloques','info');
+            if(!s.seccionId||!s.asignaturaId||!s.docenteId) return avisar('Seleccione sección, asignatura y docente','error');
+            if(esAsignaturaVinculada(s.asignaturaId,s.seccionId)){
+                return avisar(`Esta asignatura está vinculada desde ${nombreMadreAsignatura(s.asignaturaId,s.seccionId)}. Planifícala en la sección madre.`,'info');
+            }
+            if((s.tipo||'presencial')==='presencial' && !s.salaId){
+                return avisar('Seleccione una sala para planificar bloques presenciales','error');
+            }
+            return true;
+        }
+
         function actualizarCelda(dia,bloque){
             const data = getData();
             const indicePlan = ctx.getIndicePlan();
@@ -463,17 +517,22 @@
 
         function asignarBloque(dia,bloque){
             const data = getData();
-            const s=data.sel; if(!data.modoPlan||!s.seccionId||!s.asignaturaId||!s.docenteId) return false;
-            if(esAsignaturaVinculada(s.asignaturaId,s.seccionId)){
-                ctx.toast(`Esta asignatura está vinculada desde ${nombreMadreAsignatura(s.asignaturaId,s.seccionId)}. Planifícala en la sección madre.`,'info');
-                return false;
-            }
+            const s=data.sel;
+            if(!validarSeleccionManual({requiereModo:true})) return false;
             const disp=checkDisponibilidad(s.docenteId,dia,bloque,s.seccionId); if(!disp.ok) return false;
             const asig=data.asignaturas.find(a=>a.id===s.asignaturaId);
             if(asig){
-                const planesTipo=data.planificaciones.filter(p=>p.asignaturaId===asig.id && p.seccionId===s.seccionId && ((s.tipo==='presencial'&&p.tipoPresencial!==false)||(s.tipo==='virtual'&&p.tipoPresencial===false)));
-                const maxPermitido=s.tipo==='presencial'?(asig.horasTotales-asig.horasVirtuales)/18:asig.horasVirtuales/18;
-                if(planesTipo.length>=maxPermitido) return false;
+                const tipo=s.tipo==='virtual'?'virtual':'presencial';
+                const planesTipo=planesVisiblesAsignaturaSeccion(asig.id,s.seccionId).filter(p=>(tipo==='presencial'&&p.tipoPresencial!==false)||(tipo==='virtual'&&p.tipoPresencial===false));
+                const maxPermitido=bloquesRequeridosAsignatura(asig,tipo);
+                if(maxPermitido<=0){
+                    ctx.toast(tipo==='virtual'?'Esta asignatura no tiene bloques virtuales pendientes':'Esta asignatura no tiene bloques presenciales pendientes','info');
+                    return false;
+                }
+                if(planesTipo.length>=maxPermitido){
+                    ctx.toast(tipo==='virtual'?'Ya se completaron los bloques virtuales de esta asignatura':'Ya se completaron los bloques presenciales de esta asignatura','info');
+                    return false;
+                }
             }
             ctx.pushUndo();
             const plan={id:ctx.genId(),seccionId:s.seccionId,asignaturaId:s.asignaturaId,docenteId:s.docenteId,salaId:s.tipo==='virtual'?ctx.SALA_VIRTUAL_ID:s.salaId,dia,bloque,tipoPresencial:s.tipo==='presencial'};
@@ -526,11 +585,17 @@
             const popup = document.createElement('div'); popup.className = 'action-popup';
             popup.innerHTML = `
                 ${plan.explicacionAuto?`<div class="action-popup-note"><strong>Explicación</strong><span>${ctx.escapeHTML(textoExplicacionAuto(plan.explicacionAuto))}</span></div>`:''}
-                <button id="popupToggleFijo">${plan.fijo?'🔓 Desbloquear bloque':'🔒 Fijar bloque'}</button>
-                <button id="popupMoverAsignatura">🔄 Mover asignatura</button>
-                <button id="popupCambiarDocente">Cambiar docente</button>
-                <button id="popupCambiarSala">Cambiar sala</button>
-                ${data.modoPlan?'<button id="popupEliminarBloque">Eliminar este bloque</button><button id="popupEliminarTodos">Eliminar todos</button>':''}`;
+                ${data.modoPlan?`
+                    <button id="popupToggleFijo">${plan.fijo?'🔓 Desbloquear bloque':'🔒 Fijar bloque'}</button>
+                    <button id="popupMoverAsignatura">🔄 Mover asignatura</button>
+                    <button id="popupCambiarDocente">Cambiar docente</button>
+                    <button id="popupCambiarSala">Cambiar sala</button>
+                    <button id="popupEliminarBloque">Eliminar este bloque</button>
+                    <button id="popupEliminarTodos">Eliminar todos</button>
+                `:`
+                    <div class="action-popup-note"><strong>Solo consulta</strong><span>Activa Modo Planificación para mover, cambiar docente, cambiar sala, fijar o eliminar este bloque.</span></div>
+                    <button id="popupPrepararBloque">Seleccionar este bloque</button>
+                `}`;
             const rect = cell.getBoundingClientRect();
             const popupHeight = 220;
             const spaceBelow = window.innerHeight - rect.bottom;
@@ -538,13 +603,35 @@
             popup.style.top = (spaceBelow >= popupHeight ? rect.bottom + 5 : Math.max(5, rect.top - popupHeight)) + 'px';
             document.body.appendChild(popup); popupState._popupAbierto = popup; popupState._popupCell = cell;
             requestAnimationFrame(()=>{ if(window._kbInitPopup) window._kbInitPopup(); });
-            popup.querySelector('#popupToggleFijo').onclick = () => { alternarBloqueFijo(plan); cerrarPopupAccion(); };
-            popup.querySelector('#popupMoverAsignatura').onclick = () => { iniciarModoMovimiento(plan); cerrarPopupAccion(); };
-            popup.querySelector('#popupCambiarDocente').onclick = () => { cambiarDocenteAsignatura(plan); cerrarPopupAccion(); };
-            popup.querySelector('#popupCambiarSala').onclick = () => { cambiarSalaAsignatura(plan); cerrarPopupAccion(); };
             if(data.modoPlan){
+                popup.querySelector('#popupToggleFijo').onclick = () => { alternarBloqueFijo(plan); cerrarPopupAccion(); };
+                popup.querySelector('#popupMoverAsignatura').onclick = () => { iniciarModoMovimiento(plan); cerrarPopupAccion(); };
+                popup.querySelector('#popupCambiarDocente').onclick = () => { cambiarDocenteAsignatura(plan); cerrarPopupAccion(); };
+                popup.querySelector('#popupCambiarSala').onclick = () => { cambiarSalaAsignatura(plan); cerrarPopupAccion(); };
                 popup.querySelector('#popupEliminarBloque').onclick = () => { if(confirm('¿Eliminar este bloque?')) eliminarBloque(plan); cerrarPopupAccion(); actualizarSelectoresPlan(); };
                 popup.querySelector('#popupEliminarTodos').onclick = () => { if(confirm('¿Eliminar todos los bloques no fijos de esta asignatura?')){ ctx.pushUndo(); const eliminados=data.planificaciones.filter(p => !p.fijo && p.asignaturaId === plan.asignaturaId && p.seccionId === plan.seccionId); data.planificaciones = data.planificaciones.filter(p => p.fijo || !(p.asignaturaId === plan.asignaturaId && p.seccionId === plan.seccionId)); ctx.auditoria?.('bloques_eliminados_asignatura',{cantidad:eliminados.length,seccionId:plan.seccionId,asignaturaId:plan.asignaturaId,bloques:eliminados,respetaFijos:true}); ctx.guardar(); ctx.reconstruirIndices(); construirGrilla(); actualizarSelectoresPlan(); refrescarDespuesCambioPlanificacion(); } cerrarPopupAccion(); };
+            } else {
+                popup.querySelector('#popupPrepararBloque').onclick=()=>{
+                    data.sel.seccionId=plan.seccionId;
+                    const sec=data.secciones.find(s=>s.id===plan.seccionId);
+                    if(sec){
+                        data.sel.nivelId=sec.nivelId;
+                        const nivel=data.niveles.find(n=>n.id===sec.nivelId);
+                        data.sel.carreraId=nivel?.carreraId||data.sel.carreraId;
+                        const carrera=data.carreras.find(c=>c.id===data.sel.carreraId);
+                        data.sel.area=carrera?areaCarrera(carrera):data.sel.area;
+                        data.sel.jornada=jornadaSeccion(sec);
+                    }
+                    data.sel.asignaturaId=plan.asignaturaId;
+                    data.sel.docenteId=plan.docenteId;
+                    data.sel.tipo=plan.tipoPresencial===false?'virtual':'presencial';
+                    data.sel.salaId=plan.tipoPresencial===false?ctx.SALA_VIRTUAL_ID:plan.salaId;
+                    actualizarSelectoresPlan();
+                    construirGrilla();
+                    actualizarProgresoPlan();
+                    cerrarPopupAccion();
+                    ctx.toast('Bloque seleccionado. Activa Modo Planificación para modificarlo.','info');
+                };
             }
         }
 
@@ -580,6 +667,8 @@
                     data.sel.nivelId=madre.nivelId;
                     const nivel=data.niveles.find(n=>n.id===madre.nivelId);
                     data.sel.carreraId=nivel?.carreraId||data.sel.carreraId;
+                    const carrera=data.carreras.find(c=>c.id===data.sel.carreraId);
+                    data.sel.area=carrera?areaCarrera(carrera):data.sel.area;
                 }
                 actualizarSelectoresPlan();
                 construirGrilla();
@@ -830,9 +919,18 @@
         function actualizarSelectoresPlan(){
             const data = getData();
             const contadorDocente = ctx.getContadorDocente();
-            const carr=document.getElementById('planCarrera'); const niv=document.getElementById('planNivel'); const jor=document.getElementById('planJornada'); const sec=document.getElementById('planSeccion');
+            const area=document.getElementById('planArea'); const carr=document.getElementById('planCarrera'); const niv=document.getElementById('planNivel'); const jor=document.getElementById('planJornada'); const sec=document.getElementById('planSeccion');
             const asig=document.getElementById('planAsignatura'); const doc=document.getElementById('planDocente'); const sala=document.getElementById('planSala');
-            carr.innerHTML='<option value="">-- Carrera --</option>'+data.carreras.map(c=>ctx.optionHTML(c.id, `${c.nombre||''}${c.especialidad?` [${c.especialidad}]`:''}`)).join(''); carr.value=data.sel.carreraId||'';
+            const tipoSel=document.getElementById('planTipo');
+            if(!['presencial','virtual'].includes(data.sel.tipo)) data.sel.tipo='presencial';
+            if(tipoSel) tipoSel.value=data.sel.tipo;
+            const areas=areasCarrera();
+            if(data.sel.area&&!areas.includes(data.sel.area)) data.sel.area=null;
+            area.innerHTML='<option value="">Todas las áreas</option>'+areas.map(a=>ctx.optionHTML(a,a,data.sel.area===a)).join('');
+            area.value=data.sel.area||'';
+            const carrerasFiltradas=data.carreras.filter(c=>!data.sel.area||areaCarrera(c)===data.sel.area).sort((a,b)=>String(a.nombre||'').localeCompare(String(b.nombre||''),undefined,{numeric:true,sensitivity:'base'}));
+            if(data.sel.carreraId&&!carrerasFiltradas.some(c=>c.id===data.sel.carreraId)) data.sel.carreraId=null;
+            carr.innerHTML='<option value="">-- Carrera --</option>'+carrerasFiltradas.map(c=>ctx.optionHTML(c.id, `${c.nombre||''} [${areaCarrera(c)}]${c.especialidad&&c.especialidad!==areaCarrera(c)?` · ${c.especialidad}`:''}`)).join(''); carr.value=data.sel.carreraId||'';
             niv.innerHTML='<option value="">-- Nivel --</option>'+(data.sel.carreraId?data.niveles.filter(n=>n.carreraId===data.sel.carreraId).sort(ordenarNivelesDesc).map(n=>ctx.optionHTML(n.id,n.nombre)).join(''):''); niv.value=data.sel.nivelId||''; niv.disabled=!data.sel.carreraId;
             const seccionesNivel=data.sel.nivelId?data.secciones.filter(s=>s.nivelId===data.sel.nivelId):[];
             const jornadas=[...new Set(seccionesNivel.map(jornadaSeccion))].sort((a,b)=>a==='diurna'?-1:b==='diurna'?1:0);
@@ -862,7 +960,19 @@
                     return ctx.optionHTML(d.id, `${d.nombre} ${d.apellido}${d.especialidad?` [${d.especialidad}]`:''} (${usados}/${data.configuracion.bloquesSemestralesMax} · ${usados*18}h)${matchEsp?' ★':''}`, false, !d.autorizadoExceder&&usados>=data.configuracion.bloquesSemestralesMax);
                 }).join('');
             })():''); doc.value=data.sel.docenteId||''; doc.disabled=!data.sel.asignaturaId;
-            sala.innerHTML='<option value="">-- Sala --</option>'+data.salas.map(s=>ctx.optionHTML(s.id,s.nombre)).join(''); sala.value=data.sel.salaId||''; sala.disabled=!data.sel.docenteId;
+            if(data.sel.tipo==='virtual'){
+                data.sel.salaId=ctx.SALA_VIRTUAL_ID;
+                const virtual=data.salas.find(s=>s.id===ctx.SALA_VIRTUAL_ID);
+                sala.innerHTML=ctx.optionHTML(ctx.SALA_VIRTUAL_ID,virtual?.nombre||'Virtual');
+                sala.value=ctx.SALA_VIRTUAL_ID;
+                sala.disabled=true;
+            } else {
+                if(data.sel.salaId===ctx.SALA_VIRTUAL_ID) data.sel.salaId=null;
+                const salasPresenciales=data.salas.filter(s=>s.id!==ctx.SALA_VIRTUAL_ID);
+                sala.innerHTML='<option value="">-- Sala --</option>'+salasPresenciales.map(s=>ctx.optionHTML(s.id,s.nombre)).join('');
+                sala.value=data.sel.salaId||'';
+                sala.disabled=!data.sel.docenteId;
+            }
         }
 
         function actualizarProgresoPlan(){
@@ -876,7 +986,7 @@
             const visibles=planesVisiblesAsignaturaSeccion(asig.id,data.sel.seccionId);
             const planesP=visibles.filter(p=>p.tipoPresencial!==false);
             const planesV=visibles.filter(p=>p.tipoPresencial===false);
-            const reqP=asig.bloquesPresenciales, reqV=asig.bloquesVirtuales;
+            const reqP=bloquesRequeridosAsignatura(asig,'presencial'), reqV=bloquesRequeridosAsignatura(asig,'virtual');
             const pctP=reqP?Math.round(planesP.length/reqP*100):0, pctV=reqV?Math.round(planesV.length/reqV*100):0;
             const totalReq=reqP+reqV, totalPlan=planesP.length+planesV.length;
             const colorP=pctP>=100?'var(--success)':pctP>0?'var(--warning)':'var(--text-secondary)';
@@ -1879,6 +1989,7 @@
             const sec=data.secciones.find(s=>s.id===secId);
             const ctxSec=contextoSeccion(sec);
             if(!ctxSec.sec||!ctxSec.nivel||!ctxSec.carrera) return null;
+            data.sel.area=areaCarrera(ctxSec.carrera);
             data.sel.carreraId=ctxSec.carrera.id;
             data.sel.nivelId=ctxSec.nivel.id;
             data.sel.seccionId=ctxSec.sec.id;
@@ -3688,6 +3799,7 @@
                 omitidas+=plan.omitidas||0;
                 pendientes+=plan.pendientes.length;
                 const {nivel,carrera}=contextoSeccion(sec);
+                data.sel.area=areaCarrera(carrera);
                 data.sel.carreraId=carrera.id;
                 data.sel.nivelId=nivel.id;
                 data.sel.seccionId=sec.id;
@@ -3862,18 +3974,26 @@
             });
             document.addEventListener('click',(e)=>{if(!e.target.closest('.action-popup')&&!e.target.closest('.grid-cell'))cerrarPopupAccion();});
 
-            ['planCarrera','planNivel','planJornada','planSeccion','planAsignatura','planDocente','planSala','planTipo'].forEach(id=>document.getElementById(id).addEventListener('change',function(){
+            ['planArea','planCarrera','planNivel','planJornada','planSeccion','planAsignatura','planDocente','planSala','planTipo'].forEach(id=>document.getElementById(id).addEventListener('change',function(){
                 const data = getData();
-                const map={planCarrera:'carreraId',planNivel:'nivelId',planJornada:'jornada',planSeccion:'seccionId',planAsignatura:'asignaturaId',planDocente:'docenteId',planSala:'salaId',planTipo:'tipo'};
+                const map={planArea:'area',planCarrera:'carreraId',planNivel:'nivelId',planJornada:'jornada',planSeccion:'seccionId',planAsignatura:'asignaturaId',planDocente:'docenteId',planSala:'salaId',planTipo:'tipo'};
                 if(map[id]) data.sel[map[id]]=this.value||null;
-                if(['planCarrera','planNivel','planJornada','planSeccion','planAsignatura','planDocente'].includes(id)){
+                if(id==='planTipo'){
+                    if(data.sel.tipo==='virtual') data.sel.salaId=ctx.SALA_VIRTUAL_ID;
+                    else if(data.sel.salaId===ctx.SALA_VIRTUAL_ID) data.sel.salaId=null;
+                }
+                if(['planArea','planCarrera','planNivel','planJornada','planSeccion','planAsignatura','planDocente'].includes(id)){
+                    if(id==='planArea'){data.sel.carreraId=null;data.sel.nivelId=null;data.sel.jornada=null;data.sel.seccionId=null;data.sel.asignaturaId=null;data.sel.docenteId=null;}
                     if(id==='planCarrera'){data.sel.nivelId=null;data.sel.jornada=null;data.sel.seccionId=null;data.sel.asignaturaId=null;data.sel.docenteId=null;}
                     if(id==='planNivel'){data.sel.jornada=null;data.sel.seccionId=null;data.sel.asignaturaId=null;data.sel.docenteId=null;}
                     if(id==='planJornada'){data.sel.seccionId=null;data.sel.asignaturaId=null;data.sel.docenteId=null;}
                     if(id==='planSeccion'){data.sel.asignaturaId=null;data.sel.docenteId=null;}
                     if(id==='planAsignatura') data.sel.docenteId=null;
+                }
+                if(['planArea','planCarrera','planNivel','planJornada','planSeccion','planAsignatura','planDocente','planTipo'].includes(id)){
                     actualizarSelectoresPlan();
-                    if(data.modoPlan||id==='planJornada'||id==='planSeccion') construirGrilla();
+                    actualizarProgresoPlan();
+                    if(data.modoPlan||id==='planJornada'||id==='planSeccion'||id==='planTipo') construirGrilla();
                 }
             }));
             document.getElementById('btnAutoAsignatura').onclick=autoAsignarAsignaturaActual;
@@ -3902,6 +4022,7 @@
             hayMovimiento,
             actualizarSelectoresPlan,
             actualizarProgresoPlan,
+            validarSeleccionManual,
             init
         };
     }

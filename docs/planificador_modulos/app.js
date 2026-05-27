@@ -94,7 +94,7 @@ window._appRuntimeInicializada = true;
         horasPorBloque:18, autoguardadoIntervalo:30, confirmarEliminacion:true, sensibilidadArrastre:5,
         umbralCargaDocente:80, porcentajesHomologo:[{desde:0,hasta:200,porcentaje:50},{desde:201,hasta:500,porcentaje:30},{desde:501,hasta:9999,porcentaje:20}],
         exportacionExcel:'xlsx', fuenteApp:'segoe',
-        especialidades:['Electricidad','Automatización','Electrónicos','Transversales'],
+        especialidades:[],
         autoPlanificacion:{
             usarPrioridadDocente:true,
             balancearDias:true,
@@ -136,7 +136,7 @@ window._appRuntimeInicializada = true;
         carreras:[], niveles:[], secciones:[], asignaturas:[], docentes:[], salas:[],
         asignaturaCarreraNivel:[], asignaturaSeccion:[], planificaciones:[], gruposDictacion:[], configuracion:JSON.parse(JSON.stringify(CONFIG_DEFAULT)),
         gestorSecciones:{cargas:[],ids:[],ultimaCargaId:null},
-        modoPlan:false, temporadas:[], auditoria:[], ultimoAutoGeneral:null, ultimaAutoEjecucion:null, autoEjecuciones:[], temporadaData:{}, sel:{temporadaId:null,carreraId:null,nivelId:null,seccionId:null,asignaturaId:null,docenteId:null,salaId:null,tipo:'presencial'}
+        modoPlan:false, temporadas:[], auditoria:[], ultimoAutoGeneral:null, ultimaAutoEjecucion:null, autoEjecuciones:[], temporadaData:{}, sel:{temporadaId:null,area:null,carreraId:null,nivelId:null,seccionId:null,asignaturaId:null,docenteId:null,salaId:null,tipo:'presencial'}
     };
     let indicePlan = {}, contadorDocente = {}, contadorDocenteDia = {}, ocupacionSala = {};
 
@@ -417,6 +417,7 @@ window._appRuntimeInicializada = true;
     const hayMovimiento = Planificacion.hayMovimiento;
     const actualizarSelectoresPlan = Planificacion.actualizarSelectoresPlan;
     const actualizarProgresoPlan = Planificacion.actualizarProgresoPlan;
+    const validarSeleccionManual = Planificacion.validarSeleccionManual;
 
     const Configuracion = window.PlanificadorConfiguracion.create({
         getData: () => data,
@@ -457,7 +458,7 @@ window._appRuntimeInicializada = true;
         if(!data.salas.find(s=>s.id===SALA_VIRTUAL_ID)) data.salas.push({id:SALA_VIRTUAL_ID,nombre:'Sala Virtual',capacidad:9999,tipoSala:'Virtual',esVirtual:true,fija:true});
         if(!data.salas.find(s=>s.id===SALA_TRO2_ID)) data.salas.push({id:SALA_TRO2_ID,nombre:'TRO2 (Terreno)',capacidad:9999,tipoSala:'Terreno',esVirtual:false,fija:true,ilimitada:true});
         asegurarDocenteNN();
-        data.sel.carreraId=null; data.sel.nivelId=null; data.sel.seccionId=null; data.sel.asignaturaId=null; data.sel.docenteId=null; data.sel.salaId=null;
+        data.sel.area=null; data.sel.carreraId=null; data.sel.nivelId=null; data.sel.seccionId=null; data.sel.asignaturaId=null; data.sel.docenteId=null; data.sel.salaId=null;
         data.modoPlan=false; normalizarDatos();
     }
     function getTemporadaLabel() {
@@ -647,6 +648,14 @@ window._appRuntimeInicializada = true;
         if(!['xlsx','html'].includes(data.configuracion.exportacionExcel)) data.configuracion.exportacionExcel='xlsx';
         if(!Array.isArray(data.gruposDictacion)) data.gruposDictacion=[];
         if(!Array.isArray(data.asignaturaSeccion)) data.asignaturaSeccion=[];
+        data.sel=Object.assign({temporadaId:null,area:null,carreraId:null,nivelId:null,seccionId:null,asignaturaId:null,docenteId:null,salaId:null,tipo:'presencial'},data.sel||{});
+        const defaultsArea=new Set(['electricidad','automatización','automatizacion','electrónicos','electronicos','transversales']);
+        const areasEnUso=new Set(data.carreras.map(c=>limpiarTexto(c.area||c.especialidad).toLowerCase()).filter(Boolean));
+        data.configuracion.especialidades=(data.configuracion.especialidades||[]).filter(e=>!defaultsArea.has(limpiarTexto(e).toLowerCase())||areasEnUso.has(limpiarTexto(e).toLowerCase()));
+        data.carreras.forEach(c=>{
+            if(!c.area) c.area=c.especialidad||'Sin área';
+            if(c.area&&!data.configuracion.especialidades.some(e=>limpiarTexto(e).toLowerCase()===limpiarTexto(c.area).toLowerCase())) data.configuracion.especialidades.push(c.area);
+        });
         data.salas.forEach(s=>{
             if(!s.tipoSala) s.tipoSala=s.esVirtual?'Virtual':(s.id===SALA_TRO2_ID?'Terreno':'Sala de Clases');
             if(!Array.isArray(s.alertasImportacion)) s.alertasImportacion=[];
@@ -660,8 +669,13 @@ window._appRuntimeInicializada = true;
             }
         });
         data.asignaturas.forEach(a=>{
-            if(a.bloquesPresenciales===undefined) a.bloquesPresenciales=(a.horasTotales-a.horasVirtuales)/18;
-            if(a.bloquesVirtuales===undefined) a.bloquesVirtuales=a.horasVirtuales/18;
+            a.horasTotales=Number(a.horasTotales)||0;
+            a.horasVirtuales=Number(a.horasVirtuales)||0;
+            a.horasPresenciales=Number(a.horasPresenciales)||Math.max(0,a.horasTotales-a.horasVirtuales);
+            const bloquesPresencialesCalc=a.horasPresenciales>0?Math.max(1,Math.round(a.horasPresenciales/18)):0;
+            const bloquesVirtualesCalc=a.horasVirtuales>0?Math.max(1,Math.round(a.horasVirtuales/18)):0;
+            a.bloquesPresenciales=Number(a.bloquesPresenciales)>0?Math.round(Number(a.bloquesPresenciales)):bloquesPresencialesCalc;
+            a.bloquesVirtuales=Number(a.bloquesVirtuales)>0?Math.round(Number(a.bloquesVirtuales)):bloquesVirtualesCalc;
             if(!['especialidad','transversal','electiva'].includes(a.area)) a.area='especialidad';
             if(!['lectiva','practica','semipresencial','online-teams'].includes(a.modalidad)) a.modalidad='lectiva';
             if(!['normal','alta-reprobacion','requiere-ayudantia','alta-reprobacion-ayudantia'].includes(a.condicion)) a.condicion='normal';
@@ -745,7 +759,7 @@ window._appRuntimeInicializada = true;
         setTimeout(quitar, tipo==='error' ? 5200 : 2600);
     }
 
-    function refrescarTodo(){ construirGrilla(); actualizarSelectoresPlan(); renderCarreras(); renderAsignaturas(); renderDocentes(); renderSalas(); actualizarVista(); actualizarReporte(); actualizarProgresoPlan(); renderDashboard(); detectarConflictos(); renderHistorial(); actualizarFichaDocentes(); renderFichaDocente(); renderGestorSecciones(); }
+    function refrescarTodo(){ construirGrilla(); actualizarSelectoresPlan(); actualizarModoPlanificacionUI(); renderCarreras(); renderAsignaturas(); renderDocentes(); renderSalas(); actualizarVista(); actualizarReporte(); actualizarProgresoPlan(); renderDashboard(); detectarConflictos(); renderHistorial(); actualizarFichaDocentes(); renderFichaDocente(); renderGestorSecciones(); }
 
     function createHeader(){
         const frag=document.createDocumentFragment();
@@ -757,15 +771,31 @@ window._appRuntimeInicializada = true;
         const t=document.createElement('div'); t.className='grid-time'; t.innerHTML=`B${b.n}<br>${b.inicio}-${b.fin}`; return t;
     }
 
+    function actualizarModoPlanificacionUI(){
+        const activo=!!data.modoPlan;
+        document.querySelector('#panelPlanificacion .selection-panel')?.classList.toggle('plan-mode-active',activo);
+        document.getElementById('btnModoPlanificar').style.display=activo?'none':'inline-flex';
+        ['btnAutoAsignatura','btnAutoSeccion','btnAutoGeneral','btnOptimizarHorario','btnRevertirAutoRapido','btnCancelarModo'].forEach(id=>{
+            const el=document.getElementById(id);
+            if(el) el.style.display=activo?'inline-flex':'none';
+        });
+        document.getElementById('scheduleContainer').classList.toggle('modo-activo',activo);
+        if(!activo) document.getElementById('planProgreso').style.display='none';
+    }
+
     document.getElementById('btnModoPlanificar').onclick=()=>{
-        if(!data.sel.seccionId||!data.sel.asignaturaId||!data.sel.docenteId) return toast('Seleccione sección, asignatura y docente','error');
-        data.modoPlan=true; document.getElementById('btnModoPlanificar').style.display='none'; document.getElementById('btnAutoAsignatura').style.display='inline-flex'; document.getElementById('btnAutoSeccion').style.display='inline-flex'; document.getElementById('btnAutoGeneral').style.display='inline-flex'; document.getElementById('btnOptimizarHorario').style.display='inline-flex'; document.getElementById('btnRevertirAutoRapido').style.display='inline-flex'; document.getElementById('btnCancelarModo').style.display='inline-flex';
-        document.getElementById('scheduleContainer').classList.add('modo-activo'); construirGrilla(); actualizarProgresoPlan();
+        if(!data.sel.seccionId) return toast('Seleccione una sección para entrar al modo planificación','error');
+        data.modoPlan=true;
+        actualizarModoPlanificacionUI();
+        actualizarSelectoresPlan();
+        construirGrilla();
+        actualizarProgresoPlan();
     };
     document.getElementById('btnCancelarModo').onclick=()=>{
         if(hayMovimiento()){ cancelarMovimiento(); return; }
-        data.modoPlan=false; document.getElementById('btnModoPlanificar').style.display='inline-flex'; document.getElementById('btnAutoAsignatura').style.display='none'; document.getElementById('btnAutoSeccion').style.display='none'; document.getElementById('btnAutoGeneral').style.display='none'; document.getElementById('btnOptimizarHorario').style.display='none'; document.getElementById('btnRevertirAutoRapido').style.display='none'; document.getElementById('btnCancelarModo').style.display='none';
-        document.getElementById('scheduleContainer').classList.remove('modo-activo'); document.getElementById('planProgreso').style.display='none'; construirGrilla();
+        data.modoPlan=false;
+        actualizarModoPlanificacionUI();
+        construirGrilla();
     };
 
     function descargarTablaExcel(nombreArchivo, hojas){
@@ -873,8 +903,11 @@ window._appRuntimeInicializada = true;
         })) : [];
         limpio.auditoria = Array.isArray(limpio.auditoria) ? limpio.auditoria.slice(-500) : [];
         limpio.temporadaData = (limpio.temporadaData && typeof limpio.temporadaData === 'object' && !Array.isArray(limpio.temporadaData)) ? limpio.temporadaData : {};
-        limpio.sel = Object.assign({temporadaId:null,carreraId:null,nivelId:null,seccionId:null,asignaturaId:null,docenteId:null,salaId:null,tipo:'presencial'}, limpio.sel || {});
-        limpio.carreras = limpio.carreras.map(c=>({id:limpiarTexto(c.id)||genId(), codigo:limpiarTexto(c.codigo,50), nombre:limpiarTexto(c.nombre), especialidad:limpiarTexto(c.especialidad), tipo:limpiarTexto(c.tipo,40), alertasImportacion:Array.isArray(c.alertasImportacion)?c.alertasImportacion.map(x=>limpiarTexto(x,160)).filter(Boolean):[]})).filter(c=>c.codigo&&c.nombre);
+        limpio.sel = Object.assign({temporadaId:null,area:null,carreraId:null,nivelId:null,seccionId:null,asignaturaId:null,docenteId:null,salaId:null,tipo:'presencial'}, limpio.sel || {});
+        limpio.carreras = limpio.carreras.map(c=>{
+            const especialidad=limpiarTexto(c.especialidad);
+            return {id:limpiarTexto(c.id)||genId(), codigo:limpiarTexto(c.codigo,50), nombre:limpiarTexto(c.nombre), area:limpiarTexto(c.area)||especialidad||'Sin área', especialidad, tipo:limpiarTexto(c.tipo,40), alertasImportacion:Array.isArray(c.alertasImportacion)?c.alertasImportacion.map(x=>limpiarTexto(x,160)).filter(Boolean):[]};
+        }).filter(c=>c.codigo&&c.nombre);
         limpio.niveles = limpio.niveles.map(n=>({id:limpiarTexto(n.id)||genId(), carreraId:limpiarTexto(n.carreraId), nombre:limpiarTexto(n.nombre), tieneOnline:!!n.tieneOnline, alertasImportacion:Array.isArray(n.alertasImportacion)?n.alertasImportacion.map(x=>limpiarTexto(x,160)).filter(Boolean):[]})).filter(n=>n.carreraId&&n.nombre);
         limpio.secciones = limpio.secciones.map(s=>({
             id:limpiarTexto(s.id)||genId(),
@@ -943,7 +976,7 @@ window._appRuntimeInicializada = true;
             asignaturaCarreraNivel:[], asignaturaSeccion:[], planificaciones:[], gruposDictacion:[], configuracion:JSON.parse(JSON.stringify(CONFIG_DEFAULT)),
             gestorSecciones:{cargas:[],ids:[],ultimaCargaId:null},
             modoPlan:false, temporadas:[], auditoria:[], temporadaData:{},
-            sel:{temporadaId:null,carreraId:null,nivelId:null,seccionId:null,asignaturaId:null,docenteId:null,salaId:null,tipo:'presencial'}
+            sel:{temporadaId:null,area:null,carreraId:null,nivelId:null,seccionId:null,asignaturaId:null,docenteId:null,salaId:null,tipo:'presencial'}
         };
         Object.keys(data).forEach(k=>delete data[k]);
         Object.assign(data, base, imported);
@@ -1476,8 +1509,9 @@ window._appRuntimeInicializada = true;
             const carreraKey=plan||codigoCarrera||nombreCarrera;
             const codigoCarreraPlan=plan||codigoCarrera;
             const nombreCarreraPlan=nombreCarreraConPlanGestor(nombreCarrera,plan);
+            const areaCarreraPlan=especialidadGestor(r.area);
             if(carreraKey&&!carreras.has(carreraKey)){
-                carreras.set(carreraKey,{codigo:codigoCarreraPlan,nombre:nombreCarreraPlan,plan,codigoBase:codigoCarrera,existe:existentes.carreras.has(codigoCarreraPlan)});
+                carreras.set(carreraKey,{codigo:codigoCarreraPlan,nombre:nombreCarreraPlan,plan,codigoBase:codigoCarrera,area:areaCarreraPlan,existe:existentes.carreras.has(codigoCarreraPlan)});
             }
             const nivelNombre=nivelGestor(r.nivel);
             const nivelKey=`${carreraKey}|${nivelNombre}`;
@@ -2337,10 +2371,16 @@ window._appRuntimeInicializada = true;
             let id=carreraIds.get(key);
             if(!id){
                 id=genId();
-                data.carreras.push({id,codigo:c.codigo,nombre:c.nombre,especialidad:'',tipo:''});
+                data.carreras.push({id,codigo:c.codigo,nombre:c.nombre,area:c.area||'',especialidad:c.area||'',tipo:''});
                 carreraIds.set(key,id);
                 resumen.carreras++;
                 resumen.detalle.carreras.push(`${c.codigo} - ${c.nombre}`);
+            } else {
+                const carrera=data.carreras.find(x=>x.id===id);
+                if(carrera&&c.area){
+                    carrera.area=c.area;
+                    if(!carrera.especialidad) carrera.especialidad=c.area;
+                }
             }
         });
 
@@ -2944,7 +2984,7 @@ window._appRuntimeInicializada = true;
         const btn=document.querySelector(`.tab-btn[data-tab="${tab}"]`);
         if(!btn) return false;
         if(data.modoPlan && !confirm('Estás en modo planificación. ¿Salir sin guardar los cambios pendientes?')) return false;
-        if(data.modoPlan){ data.modoPlan=false; document.getElementById('btnModoPlanificar').style.display='inline-flex'; document.getElementById('btnAutoAsignatura').style.display='none'; document.getElementById('btnAutoSeccion').style.display='none'; document.getElementById('btnAutoGeneral').style.display='none'; document.getElementById('btnOptimizarHorario').style.display='none'; document.getElementById('btnRevertirAutoRapido').style.display='none'; document.getElementById('btnCancelarModo').style.display='none'; document.getElementById('scheduleContainer').classList.remove('modo-activo'); document.getElementById('planProgreso').style.display='none'; }
+        if(data.modoPlan){ data.modoPlan=false; actualizarModoPlanificacionUI(); }
         if(document.querySelector('.tab-panel.active')?.id==='panelFichaDocente'){
             document.getElementById('fichaDocente').value=''; document.getElementById('fichaContenido').style.display='none';
         }
@@ -2967,6 +3007,7 @@ window._appRuntimeInicializada = true;
         const carrera=data.carreras.find(c=>c.id===nivel.carreraId);
         if(!carrera) return toast('No se encontró la carrera de la sección','error');
         if(activarTab('planificacion')===false) return;
+        data.sel.area=carrera.area||carrera.especialidad||null;
         data.sel.carreraId=carrera.id;
         data.sel.nivelId=nivel.id;
         data.sel.jornada=sec.jornada||jornadaGestor('',sec.nombre);

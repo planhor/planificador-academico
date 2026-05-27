@@ -456,9 +456,10 @@ La interfaz debe ser profesional, sobria, modular, con desplazamiento horizontal
 
         function abrirConfiguracion(){
             const data = getData();
-            const cfg=data.configuracion;
+            const cfg=JSON.parse(JSON.stringify(data.configuracion||{}));
             const emailActual=window._fb?.auth?.currentUser?.email || window._usuarioActual || '';
             cfg.perfilesUsuarios=cfg.perfilesUsuarios||{};
+            cfg.especialidades=Array.isArray(cfg.especialidades)?cfg.especialidades:[];
             cfg.memoriaPlanificacion=Object.assign({activa:true,usarEnAuto:false,fuerza:'baja',senales:[],maxSenales:500},cfg.memoriaPlanificacion||{});
             const solverDefault={
                 topesDuros:'muy-alto',
@@ -675,49 +676,50 @@ La interfaz debe ser profesional, sobria, modular, con desplazamiento horizontal
             document.getElementById('btnAbrirDesarrolloApp')?.addEventListener('click',abrirDesarrolloApp);
             function renderCfgEspecialidades(){
                 const cont=document.getElementById('cfgEspecialidades'); if(!cont) return;
-                cont.innerHTML=(data.configuracion.especialidades||[]).map((e,i)=>`<span class="item-chip">${ctx.escapeHTML(e)} <button class="btn btn-xs btn-eliminar-esp" data-idx="${i}" title="Eliminar especialidad">x</button></span>`).join('');
+                cont.innerHTML=(cfg.especialidades||[]).map((e,i)=>`<span class="item-chip">${ctx.escapeHTML(e)} <button class="btn btn-xs btn-eliminar-esp" data-idx="${i}" title="Eliminar especialidad">x</button></span>`).join('');
                 cont.querySelectorAll('.btn-eliminar-esp').forEach(btn=>btn.addEventListener('click',function(){
                     const idx=parseInt(this.dataset.idx);
-                    data.configuracion.especialidades.splice(idx,1);
+                    cfg.especialidades.splice(idx,1);
                     renderCfgEspecialidades();
                 }));
             }
             renderCfgEspecialidades();
             document.getElementById('cfgAgregarEspecialidad').addEventListener('click',()=>{
                 const nombre=prompt('Nombre de la nueva especialidad:');
-                if(nombre&&nombre.trim()){ data.configuracion.especialidades.push(nombre.trim()); renderCfgEspecialidades(); }
+                if(nombre&&nombre.trim()){ cfg.especialidades.push(nombre.trim()); renderCfgEspecialidades(); }
             });
             document.querySelectorAll('.btn-limpiar-memoria-asig').forEach(btn=>btn.addEventListener('click',()=>{
                 const asigId=btn.dataset.asignatura;
                 if(!confirm('¿Limpiar la memoria de esta asignatura?')) return;
-                data.configuracion.memoriaPlanificacion.senales=(data.configuracion.memoriaPlanificacion.senales||[]).filter(s=>(s.asignaturaId||'')!==asigId);
-                abrirConfiguracion();
+                cfg.memoriaPlanificacion.senales=(cfg.memoriaPlanificacion.senales||[]).filter(s=>(s.asignaturaId||'')!==asigId);
+                btn.closest('.memory-row')?.remove();
             }));
             document.getElementById('cfgLimpiarMemoria')?.addEventListener('click',()=>{
                 if(!confirm('¿Limpiar toda la memoria de planificación?')) return;
-                data.configuracion.memoriaPlanificacion.senales=[];
-                abrirConfiguracion();
+                cfg.memoriaPlanificacion.senales=[];
+                const lista=document.getElementById('cfgMemoriaLista');
+                if(lista) lista.innerHTML='<p class="memory-empty">La memoria quedará vacía cuando guardes los cambios.</p>';
             });
             document.getElementById('btnGuardarConfig').addEventListener('click',()=>{
-                data.configuracion.bloquesDiariosMax=parseInt(document.getElementById('cfgBloquesDiarios').value)||13;
-                data.configuracion.bloquesSemestralesMax=parseInt(document.getElementById('cfgBloquesSemestral').value)||47;
-                data.configuracion.horasDescanso=parseInt(document.getElementById('cfgHorasDescanso').value)||12;
-                data.configuracion.sabadoHastaBloque=parseInt(document.getElementById('cfgSabadoBloque').value)||16;
-                data.configuracion.autoguardadoIntervalo=parseInt(document.getElementById('cfgAutoguardado').value)||30;
-                data.configuracion.exportacionExcel=document.getElementById('cfgExportacionExcel').value;
-                data.configuracion.fuenteApp=document.getElementById('cfgFuenteApp').value;
+                cfg.bloquesDiariosMax=parseInt(document.getElementById('cfgBloquesDiarios').value)||13;
+                cfg.bloquesSemestralesMax=parseInt(document.getElementById('cfgBloquesSemestral').value)||47;
+                cfg.horasDescanso=parseInt(document.getElementById('cfgHorasDescanso').value)||12;
+                cfg.sabadoHastaBloque=parseInt(document.getElementById('cfgSabadoBloque').value)||16;
+                cfg.autoguardadoIntervalo=parseInt(document.getElementById('cfgAutoguardado').value)||30;
+                cfg.exportacionExcel=document.getElementById('cfgExportacionExcel').value;
+                cfg.fuenteApp=document.getElementById('cfgFuenteApp').value;
                 const perfilEmail=document.getElementById('cfgPerfilEmail')?.value||emailActual;
                 const perfilNombre=(document.getElementById('cfgPerfilNombre')?.value||'').trim();
-                data.configuracion.perfilesUsuarios=data.configuracion.perfilesUsuarios||{};
-                if(perfilEmail) data.configuracion.perfilesUsuarios[perfilEmail]={nombre:perfilNombre||perfilEmail};
-                data.configuracion.memoriaPlanificacion=data.configuracion.memoriaPlanificacion||{senales:[]};
-                data.configuracion.memoriaPlanificacion.activa=document.getElementById('cfgMemoriaActiva')?.checked!==false;
-                data.configuracion.memoriaPlanificacion.usarEnAuto=!!document.getElementById('cfgMemoriaUsarAuto')?.checked;
-                data.configuracion.memoriaPlanificacion.fuerza=document.getElementById('cfgMemoriaFuerza')?.value||'baja';
-                data.configuracion.memoriaPlanificacion.maxSenales=Math.max(50,Math.min(2000,parseInt(document.getElementById('cfgMemoriaMax')?.value)||500));
-                data.configuracion.memoriaPlanificacion.senales=(data.configuracion.memoriaPlanificacion.senales||[]).slice(-data.configuracion.memoriaPlanificacion.maxSenales);
-                data.configuracion.confirmarEliminacion=document.getElementById('cfgConfirmarElim').checked;
-                data.configuracion.autoPlanificacion={
+                cfg.perfilesUsuarios=cfg.perfilesUsuarios||{};
+                if(perfilEmail) cfg.perfilesUsuarios[perfilEmail]={nombre:perfilNombre||perfilEmail};
+                cfg.memoriaPlanificacion=cfg.memoriaPlanificacion||{senales:[]};
+                cfg.memoriaPlanificacion.activa=document.getElementById('cfgMemoriaActiva')?.checked!==false;
+                cfg.memoriaPlanificacion.usarEnAuto=!!document.getElementById('cfgMemoriaUsarAuto')?.checked;
+                cfg.memoriaPlanificacion.fuerza=document.getElementById('cfgMemoriaFuerza')?.value||'baja';
+                cfg.memoriaPlanificacion.maxSenales=Math.max(50,Math.min(2000,parseInt(document.getElementById('cfgMemoriaMax')?.value)||500));
+                cfg.memoriaPlanificacion.senales=(cfg.memoriaPlanificacion.senales||[]).slice(-cfg.memoriaPlanificacion.maxSenales);
+                cfg.confirmarEliminacion=document.getElementById('cfgConfirmarElim').checked;
+                cfg.autoPlanificacion={
                     usarPrioridadDocente:document.getElementById('cfgAutoPrioridad').checked,
                     balancearDias:document.getElementById('cfgAutoBalance').checked,
                     permitirSabadoPresencial:document.getElementById('cfgAutoSabado').checked,
@@ -730,13 +732,14 @@ La interfaz debe ser profesional, sobria, modular, con desplazamiento horizontal
                     cuidarCriticas:document.getElementById('cfgAutoCriticas').checked,
                     cuidarAyudantias:document.getElementById('cfgAutoAyudantias').checked
                 };
-                data.configuracion.solverPesos={};
+                cfg.solverPesos={};
                 Object.keys(solverDefault).forEach(k=>{
                     const valor=document.getElementById('cfgSolver_'+k)?.value||solverDefault[k];
-                    data.configuracion.solverPesos[k]=solverOpciones.some(([v])=>v===valor)?valor:solverDefault[k];
+                    cfg.solverPesos[k]=solverOpciones.some(([v])=>v===valor)?valor:solverDefault[k];
                 });
-                const dash=data.configuracion.dashboard=data.configuracion.dashboard||{};
+                const dash=cfg.dashboard=cfg.dashboard||{};
                 ['totalBloques','totalAsignaturas','totalDocentes','presencialVirtual','incompletas','docenteNN','tro2','criticas','transversales','criteriosAsignatura','docentesEsp','conflictos','seccionesATiempo','calidadHorario'].forEach(k=>dash[k]=document.getElementById('cfgDash_'+k).checked);
+                data.configuracion=cfg;
                 ctx.aplicarFuente();
                 ctx.guardar();
                 ctx.cerrarModal();
