@@ -1,0 +1,23 @@
+{
+  "name": "Planificador Academico",
+  "short_name": "Planificador Academico",
+  "description": "Planificador academico con respaldo y sincronizacion.",
+  "start_url": "../index.html",
+  "display": "standalone",
+  "background_color": "#f6f8f5",
+  "theme_color": "#245f67",
+  "icons": [
+    {
+      "src": "icono-planificador-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icono-planificador-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
