@@ -622,7 +622,11 @@
             if(!sala) return '';
             if(sala.id===ctx.SALA_TRO2_ID || sala.id===ctx.SALA_VIRTUAL_ID || sala.esVirtual || sala.ilimitada) return sala.nombre;
             const cap=Number(sala.capacidad)||0;
-            return cap?`${sala.nombre} (${cap} cupos)`:sala.nombre;
+            const tipo=String(sala.tipoSala||sala.tipoEspacio||'').trim();
+            const partes=[sala.nombre];
+            if(tipo) partes.push(tipo);
+            if(cap) partes.push(`cap. ${cap}`);
+            return partes.filter(Boolean).join(' · ');
         }
 
         function notaCapacidadPlan(plan){
@@ -2142,7 +2146,7 @@
                         <td>
                             ${a.esPresencial?`<select class="form-select auto-sala-select" data-idx="${i}">
                                 <option value="">Automática</option>
-                                ${salas.map(s=>ctx.optionHTML(s.id,s.nombre,s.id===a.salaId)).join('')}
+                                ${salas.map(s=>ctx.optionHTML(s.id,etiquetaSalaConCapacidad(s),s.id===a.salaId)).join('')}
                             </select>`:'Sala Virtual'}
                         </td>
                         <td>${a.esPresencial?'Presencial':'Virtual'}</td>
