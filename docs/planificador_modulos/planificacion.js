@@ -4947,13 +4947,20 @@
 
         function init(){
             const scheduleGrid=document.getElementById('scheduleGrid');
+            const soportePointer=!!window.PointerEvent;
+            const coordenadasEvento=(e)=>{
+                const src=e?.touches?.[0]||e?.changedTouches?.[0]||e;
+                return {x:Number(src?.clientX),y:Number(src?.clientY)};
+            };
             const limpiarCeldasArrastre=()=>{
                 arrastre.celdas.forEach(c=>{ if(c.cell) c.cell.style.outline=''; });
             };
             const moverFantasmaArrastre=(e)=>{
                 if(!arrastre.ghost) return;
-                arrastre.ghost.style.left=`${e.clientX}px`;
-                arrastre.ghost.style.top=`${e.clientY}px`;
+                const {x,y}=coordenadasEvento(e);
+                if(!Number.isFinite(x)||!Number.isFinite(y)) return;
+                arrastre.ghost.style.left=`${x}px`;
+                arrastre.ghost.style.top=`${y}px`;
             };
             const quitarFantasmaArrastre=()=>{
                 if(arrastre.ghost){
@@ -5092,10 +5099,11 @@
             };
             const celdaDesdeEvento=(e,opciones={})=>{
                 const preferirPuntero=opciones.preferirPuntero!==false;
-                if(preferirPuntero && Number.isFinite(e?.clientX) && Number.isFinite(e?.clientY)){
-                    const celda=celdaDesdeCoordenadas(e.clientX,e.clientY);
+                const {x,y}=coordenadasEvento(e);
+                if(preferirPuntero && Number.isFinite(x) && Number.isFinite(y)){
+                    const celda=celdaDesdeCoordenadas(x,y);
                     if(celda?.dataset?.dia!==undefined) return celda;
-                    const bajoPuntero=document.elementFromPoint(e.clientX,e.clientY);
+                    const bajoPuntero=document.elementFromPoint(x,y);
                     const celdaDom=bajoPuntero?.closest?.('.grid-cell')||null;
                     if(celdaDom?.dataset?.dia!==undefined) return celdaDom;
                 }
@@ -5253,6 +5261,7 @@
             scheduleGrid.addEventListener('pointerdown',(e)=>{
                 const data = getData();
                 const indicePlan = ctx.getIndicePlan();
+                if(e.button!==0) return;
                 if(modoMovimiento){
                     const cell=celdaDesdeEvento(e); if(!cell||cell.dataset.dia===undefined) return;
                     const visible=planVisibleEn(modoMovimiento.seccionId,Number(cell.dataset.dia),Number(cell.dataset.bloque));
@@ -5267,7 +5276,7 @@
                     scheduleGrid.setPointerCapture?.(e.pointerId);
                     e.preventDefault(); return;
                 }
-                const cell=celdaDesdeEvento(e,{preferirPuntero:false}); if(!cell||cell.dataset.dia===undefined) return; if(e.button!==0) return;
+                const cell=celdaDesdeEvento(e,{preferirPuntero:false}); if(!cell||cell.dataset.dia===undefined) return;
                 const dia=parseInt(cell.dataset.dia),bloque=parseInt(cell.dataset.bloque);
                 const secId=data.sel.seccionId; const visible=secId?planVisibleEn(secId,dia,bloque):null; const plan=visible?.plan||null;
                 if(!data.modoPlan && !plan) return;
@@ -5297,6 +5306,24 @@
                 if(scheduleGrid.hasPointerCapture?.(e.pointerId)) scheduleGrid.releasePointerCapture(e.pointerId);
                 cancelarArrastreFueraGrilla();
             });
+            document.addEventListener('pointermove',(e)=>{
+                if(!arrastre.activo) return;
+                if(e.pointerType==='mouse' && e.buttons===0) return finalizarArrastre(e);
+                moverFantasmaArrastre(e);
+                const data=getData();
+                const cell=celdaDesdeEvento(e);
+                if(!cell||cell.dataset.dia===undefined) return;
+                const dia=parseInt(cell.dataset.dia),bloque=parseInt(cell.dataset.bloque);
+                if(data.modoPlan&&!arrastre.esMovimiento&&!arrastre.origenPlan){
+                    pintarCeldasArrastre(celdasRectanguloArrastre(dia,bloque),arrastre.estado?'2px solid var(--accent)':'2px solid var(--danger)');
+                }else if(!arrastre.celdas.some(c=>c.dia===dia&&c.bloque===bloque)){
+                    arrastre.celdas.push({dia,bloque,cell});
+                }
+            },true);
+            document.addEventListener('pointerup',(e)=>{
+                if(!arrastre.activo) return;
+                finalizarArrastre(e);
+            },true);
             scheduleGrid.addEventListener('contextmenu',(e)=>{
                 const data=getData();
                 const cell=celdaDesdeEvento(e);
