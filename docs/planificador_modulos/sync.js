@@ -7,6 +7,7 @@
         let modoLocalInicio = false;
         let colaGuardado = Promise.resolve();
         let avisoPendienteMostrado = false;
+        const FIRESTORE_CHUNK_SIZE = 700000;
 
         const getData = ctx.getData;
 
@@ -107,17 +108,65 @@
             delete snapshot.configuracion.temporadaActualId;
             return snapshot;
         }
-        function crearPayloadFirestore(json, data) {
-            return {
-                _schema: 'planificador-json-v1',
-                _payloadJson: String(json || ''),
+        function metadataPayload(data, extra={}) {
+            return Object.assign({
                 _version: Number(data._version) || Date.now(),
                 _versionBase: Number(data._versionBase) || 0,
                 _savedBy: String(data._savedBy || window._usuarioActual || 'usuario'),
                 _savedAt: new Date().toISOString()
-            };
+            }, extra);
         }
-        function leerPayloadFirestore(remoto) {
+        function dividirPayload(json) {
+            const texto = String(json || '');
+            const chunks = [];
+            for (let i=0; i<texto.length; i+=FIRESTORE_CHUNK_SIZE) chunks.push(texto.slice(i, i+FIRESTORE_CHUNK_SIZE));
+            return chunks;
+        }
+        function refChunk(doc, db, indice) {
+            return doc(db, 'planificador', 'datos', 'payloadChunks', String(indice).padStart(4,'0'));
+        }
+        function crearPayloadFirestore(json, data) {
+            const texto = String(json || '');
+            if (texto.length <= FIRESTORE_CHUNK_SIZE) {
+                return metadataPayload(data, {
+                    _schema: 'planificador-json-v1',
+                    _payloadJson: texto
+                });
+            }
+            const chunks = dividirPayload(texto);
+            return metadataPayload(data, {
+                _schema: 'planificador-json-chunks-v1',
+                _payloadJson: '',
+                _chunkCount: chunks.length,
+                _chunkSize: FIRESTORE_CHUNK_SIZE,
+                _payloadLength: texto.length
+            });
+        }
+        async function escribirPayloadFirestore({db, doc, setDoc, transaction, ref, payload, json}) {
+            const chunks = payload?._schema === 'planificador-json-chunks-v1' ? dividirPayload(json) : [];
+            if (transaction) {
+                transaction.set(ref, payload);
+                chunks.forEach((parte, idx) => {
+                    transaction.set(refChunk(doc, db, idx), {
+                        _schema:'planificador-json-chunk-v1',
+                        _chunkIndex:idx,
+                        _version:payload._version,
+                        _payloadPart:parte
+                    });
+                });
+                return;
+            }
+            await setDoc(ref, payload);
+            for (let idx=0; idx<chunks.length; idx++) {
+                await setDoc(refChunk(doc, db, idx), {
+                    _schema:'planificador-json-chunk-v1',
+                    _chunkIndex:idx,
+                    _version:payload._version,
+                    _payloadPart:chunks[idx]
+                });
+            }
+        }
+        async function leerPayloadFirestore(remoto, helpers={}) {
             if (remoto && remoto._schema === 'planificador-json-v1' && typeof remoto._payloadJson === 'string') {
                 try {
                     const dataRemota = JSON.parse(remoto._payloadJson);
@@ -127,6 +176,27 @@
                     return dataRemota;
                 } catch(e) {
                     console.warn('No se pudo leer el paquete remoto de Firestore:', e);
+                    return remoto;
+                }
+            }
+            if (remoto && remoto._schema === 'planificador-json-chunks-v1') {
+                const { db, doc, getDoc } = helpers;
+                const total = Math.max(0, Number(remoto._chunkCount)||0);
+                if (!db || !doc || !getDoc || !total) return remoto;
+                try {
+                    const partes = [];
+                    for (let idx=0; idx<total; idx++) {
+                        const snap = await getDoc(refChunk(doc, db, idx));
+                        const fila = snap.exists?.() ? snap.data() : null;
+                        partes.push(String(fila?._payloadPart || ''));
+                    }
+                    const dataRemota = JSON.parse(partes.join(''));
+                    dataRemota._version = Number(remoto._version) || Number(dataRemota._version) || 0;
+                    dataRemota._versionBase = Number(remoto._versionBase) || Number(dataRemota._versionBase) || 0;
+                    dataRemota._savedBy = remoto._savedBy || dataRemota._savedBy || 'usuario';
+                    return dataRemota;
+                } catch(e) {
+                    console.warn('No se pudo leer el paquete remoto fragmentado de Firestore:', e);
                     return remoto;
                 }
             }
@@ -171,8 +241,8 @@
             if (codigo === 'unauthenticated') return 'La sesión no está autenticada para guardar.';
             return `Firestore: ${codigo}${mensaje ? ' · ' + mensaje : ''}`;
         }
-        function aplicarRemoto(remoto, jsonRemoto) {
-            remoto = leerPayloadFirestore(remoto);
+        async function aplicarRemoto(remoto, jsonRemoto, helpers={}) {
+            remoto = await leerPayloadFirestore(remoto, helpers);
             const data = getData();
             Object.assign(data, remoto);
             data.configuracion = Object.assign({}, JSON.parse(JSON.stringify(ctx.CONFIG_DEFAULT)), data.configuracion);
@@ -278,9 +348,10 @@
             });
         }
         function instalarSnapshot(ref, onSnapshot) {
-            onSnapshot(ref, (snapLive) => {
+            onSnapshot(ref, async (snapLive) => {
                 if (!snapLive.exists()) return;
-                const remoto = leerPayloadFirestore(snapLive.data());
+                const { db, doc, getDoc } = window._fb;
+                const remoto = await leerPayloadFirestore(snapLive.data(), {db, doc, getDoc});
                 const jsonRemoto = JSON.stringify(remoto);
                 if (cambioLocal && jsonRemoto === lastSave) { cambioLocal = false; versionRemotaConocida = Number(remoto._version)||versionRemotaConocida; ctx.setSyncStatus?.('online'); return; }
                 if (cambioLocal) cambioLocal = false;
@@ -305,7 +376,7 @@
                     return;
                 }
                 if (!remoto._version || remoto._version > (getData()._version || 0)) {
-                    aplicarRemoto(remoto, jsonRemoto);
+                    await aplicarRemoto(remoto, jsonRemoto);
                     ctx.normalizarDatos?.();
                     ctx.reconstruirIndices(); ctx.refrescarTodo();
                     ctx.setSyncStatus?.('online');
@@ -323,7 +394,7 @@
                 const ref = doc(db, 'planificador', 'datos');
                 const snap = await getDoc(ref);
                 if (!snap.exists()) { ctx.setSyncStatus?.('online'); return false; }
-                const remoto = leerPayloadFirestore(snap.data());
+                const remoto = await leerPayloadFirestore(snap.data(), {db, doc, getDoc});
                 const jsonRemoto = JSON.stringify(remoto);
                 const pendiente = leerPendienteLocal();
                 if (pendiente?.json && pendiente.json !== jsonRemoto && !opciones.descartarLocal) {
@@ -343,7 +414,7 @@
                     }
                     if (decision !== 'discard') return false;
                 }
-                aplicarRemoto(remoto, jsonRemoto);
+                await aplicarRemoto(remoto, jsonRemoto);
                 modoLocalInicio = false;
                 conflictoRemoto = false;
                 cambioLocal = false;
@@ -400,7 +471,7 @@
                     await runTransaction(db, async (transaction) => {
                         const snap = await transaction.get(ref);
                         if (snap.exists()) {
-                            const remoto = leerPayloadFirestore(snap.data());
+                            const remoto = await leerPayloadFirestore(snap.data(), {db, doc, getDoc:(chunkRef)=>transaction.get(chunkRef)});
                             const versionRemota = Number(remoto._version) || 0;
                             validarSobrescrituraSegura({local:snapshot, remoto, versionRemota, versionBase, opciones});
                             if (!opciones.forzar && versionRemota > versionBase) {
@@ -409,12 +480,12 @@
                                 throw err;
                             }
                         }
-                        transaction.set(ref, payload);
+                        await escribirPayloadFirestore({db, doc, transaction, ref, payload, json});
                     });
                 } else {
                     const snap = await getDoc(ref);
                     if (snap.exists()) {
-                        const remoto = leerPayloadFirestore(snap.data());
+                        const remoto = await leerPayloadFirestore(snap.data(), {db, doc, getDoc});
                         const versionRemota = Number(remoto._version) || 0;
                         validarSobrescrituraSegura({local:snapshot, remoto, versionRemota, versionBase, opciones});
                         if (!opciones.forzar && versionRemota > versionBase) {
@@ -423,7 +494,7 @@
                             throw err;
                         }
                     }
-                    await setDoc(ref, payload);
+                    await escribirPayloadFirestore({db, doc, setDoc, ref, payload, json});
                 }
                 cambioLocal = true;
                 lastSave = json;
@@ -504,7 +575,7 @@
                 try {
                     const snap = await getDoc(ref);
                     if (snap.exists()) {
-                        aplicarRemoto(snap.data());
+                        await aplicarRemoto(snap.data(), null, {db, doc, getDoc});
                         ctx.normalizarDatos?.();
                         ctx.reconstruirIndices?.();
                     }
