@@ -634,6 +634,215 @@ La interfaz debe ser profesional, sobria, modular, con desplazamiento horizontal
                 });
                 return cambios;
             };
+            const TEMAS_VISUALES=ctx.TEMAS_VISUALES||{};
+            const temaLabels={planhor:'Planhor',institucional:'Institucional',sobrio:'Sobrio',usuario:'Usuario'};
+            const colorCssLabels=[
+                ['bg','Fondo general'],['surface','Superficie / tarjetas'],['surface-alt','Superficie secundaria'],['border','Bordes principales'],['border-light','Bordes suaves'],
+                ['text','Texto principal'],['text-secondary','Texto secundario'],['accent','Acento principal'],['accent-light','Acento secundario'],['danger','Error / crítico'],['warning','Advertencia'],['success','Éxito / conectado']
+            ];
+            const colorExtraLabels=[
+                ['planhor-subject-neutral','Asignatura neutral'],['planhor-subject-border','Borde asignatura'],['planhor-available-bg','Disponible fondo'],['planhor-available-border','Disponible borde'],
+                ['planhor-unavailable-bg','No disponible fondo'],['planhor-unavailable-text','No disponible texto'],['planhor-teacher-busy-bg','Docente ocupado fondo'],['planhor-teacher-busy-border','Docente ocupado borde'],
+                ['planhor-teacher-busy-text','Docente ocupado texto'],['planhor-room-busy-bg','Sala ocupada fondo'],['planhor-room-busy-border','Sala ocupada borde'],['planhor-room-busy-text','Sala ocupada texto']
+            ];
+            const temporadasTema=['Otoño','Invierno','Primavera','Verano'];
+            const esHexColor=v=>/^#[0-9a-fA-F]{6}$/.test(String(v||'').trim());
+            const normalizarHex=v=>{
+                const s=String(v||'').trim();
+                if(/^#[0-9a-fA-F]{3}$/.test(s)) return '#'+s.slice(1).split('').map(ch=>ch+ch).join('');
+                return esHexColor(s)?s.toLowerCase():null;
+            };
+            const temaUsuarioSeguro=(basadoEn='planhor')=>{
+                const base=ctx.clonarTemaVisualBase?ctx.clonarTemaVisualBase(basadoEn):(JSON.parse(JSON.stringify((TEMAS_VISUALES[basadoEn]||TEMAS_VISUALES.planhor||{}))));
+                cfg.temaUsuario=Object.assign(base,cfg.temaUsuario||{});
+                cfg.temaUsuario.temporadas=Object.assign({},base.temporadas||{},cfg.temaUsuario.temporadas||{});
+                cfg.temaUsuario.extras=Object.assign({},base.extras||{},cfg.temaUsuario.extras||{});
+                cfg.temaUsuario.colores=Array.isArray(cfg.temaUsuario.colores)&&cfg.temaUsuario.colores.length?cfg.temaUsuario.colores:(base.colores||[]);
+                cfg.temaUsuario.espColor=Object.assign({},base.espColor||{},cfg.temaUsuario.espColor||{});
+                return cfg.temaUsuario;
+            };
+            const obtenerTemaVisual=(id)=>{
+                if(id==='usuario') return temaUsuarioSeguro(cfg.temaUsuario?.basadoEn||'planhor');
+                return TEMAS_VISUALES[id]||TEMAS_VISUALES.planhor;
+            };
+            const valoresTemporada=(temaId,temp)=>{
+                const tema=obtenerTemaVisual(temaId);
+                return Object.assign({},tema?.temporadas?.[temp]?.css||{});
+            };
+            const abrirEditorTemas=()=>{
+                let temporadaEdit=data.temporadas.find(t=>t.id===(data.sel?.temporadaId||cfg.temporadaActualId))?.temporada||'Otoño';
+                if(!temporadasTema.includes(temporadaEdit)) temporadaEdit='Otoño';
+                const renderColorRow=({scope,key,label,value,index})=>{
+                    const color=normalizarHex(value)||'#102840';
+                    const inputColor=scope==='overlay'?'':`<input type="color" class="theme-color-picker" data-scope="${scope}" data-key="${ctx.escapeAttr(key)}" ${index!==undefined?`data-index="${index}"`:''} value="${color}">`;
+                    return `<label class="theme-color-row">
+                        <span>${ctx.escapeHTML(label)}</span>
+                        <button class="theme-swatch" type="button" style="background:${ctx.escapeAttr(color)}" data-scope="${scope}" data-key="${ctx.escapeAttr(key)}" ${index!==undefined?`data-index="${index}"`:''} aria-label="Editar ${ctx.escapeAttr(label)}"></button>
+                        ${inputColor}
+                        <input class="form-input theme-hex-input" data-scope="${scope}" data-key="${ctx.escapeAttr(key)}" ${index!==undefined?`data-index="${index}"`:''} value="${ctx.escapeAttr(value||'')}">
+                    </label>`;
+                };
+                const previewHTML=(temaId,temp)=>{
+                    const tema=obtenerTemaVisual(temaId);
+                    const css=Object.assign({},tema?.temporadas?.[temp]?.css||{});
+                    const extras=Object.assign({},tema?.extras||{});
+                    const colors=(tema?.colores||[]).slice(0,6);
+                    const styleVars=Object.entries(Object.assign({},css,extras)).map(([k,v])=>`--${k}:${v}`).join(';');
+                    return `<div class="theme-preview" style="${ctx.escapeAttr(styleVars)}">
+                        <div class="theme-preview-header">
+                            <strong>Planhor</strong>
+                            <span>${ctx.escapeHTML(temp)}</span>
+                        </div>
+                        <div class="theme-preview-card">
+                            <div>
+                                <strong>Vista previa</strong>
+                                <span>Tarjetas, botones, grilla y estados.</span>
+                            </div>
+                            <button class="btn btn-primary" type="button">Primario</button>
+                        </div>
+                        <div class="theme-preview-grid">
+                            <div class="theme-preview-time">B1<br>08:00</div>
+                            ${colors.map((c,i)=>`<div class="theme-preview-cell planned" style="background:${ctx.escapeAttr(c)}"><b>ASG${i+1}</b><span>Docente</span></div>`).join('')}
+                            <div class="theme-preview-cell available">Disponible</div>
+                            <div class="theme-preview-cell teacher">Docente ocupado</div>
+                            <div class="theme-preview-cell room">Sala ocupada</div>
+                            <div class="theme-preview-cell blocked">No disponible</div>
+                        </div>
+                    </div>`;
+                };
+                const render=()=>{
+                    const temaId=cfg.temaVisualActivo||'planhor';
+                    const tema=obtenerTemaVisual(temaId);
+                    const css=valoresTemporada(temaId,temporadaEdit);
+                    const extras=Object.assign({},tema?.extras||{});
+                    const colores=Array.isArray(tema?.colores)?tema.colores:[];
+                    const existente=document.getElementById('themeOverlay');
+                    if(existente) existente.remove();
+                    document.body.insertAdjacentHTML('beforeend',`
+                        <div class="modal-overlay theme-overlay" id="themeOverlay">
+                            <div class="modal theme-modal">
+                                <div class="modal-header">
+                                    <h3>Temas visuales</h3>
+                                    <p>Selecciona un tema o crea un tema Usuario tomando como guía los colores actuales.</p>
+                                </div>
+                                <div class="theme-layout">
+                                    <div class="theme-sidebar">
+                                        <div class="form-group">
+                                            <label class="form-label">Tema activo</label>
+                                            <select class="form-select" id="themeActiveSelect">
+                                                ${['planhor','institucional','sobrio','usuario'].map(id=>ctx.optionHTML(id,temaLabels[id],temaId===id)).join('')}
+                                            </select>
+                                        </div>
+                                        <p class="theme-note">${ctx.escapeHTML((TEMAS_VISUALES[temaId]||{}).descripcion||(temaId==='usuario'?'Tema editable creado por el usuario.':'Tema predefinido.'))}</p>
+                                        <button class="btn btn-primary btn-sm" id="btnPersonalizarTema" type="button">Personalizar tema actual</button>
+                                        <button class="btn btn-sm" id="btnRestaurarTemaUsuario" type="button" ${temaId==='usuario'?'':'disabled'}>Restaurar Usuario</button>
+                                        <div class="form-group">
+                                            <label class="form-label">Temporada a editar</label>
+                                            <select class="form-select" id="themeSeasonSelect">
+                                                ${temporadasTema.map(t=>ctx.optionHTML(t,t,t===temporadaEdit)).join('')}
+                                            </select>
+                                        </div>
+                                        ${previewHTML(temaId,temporadaEdit)}
+                                    </div>
+                                    <div class="theme-editor">
+                                        ${temaId!=='usuario'?`
+                                            <div class="theme-locked">
+                                                <h4>${ctx.escapeHTML(temaLabels[temaId]||temaId)}</h4>
+                                                <p>Este tema es predefinido. Para modificar colores, presiona <strong>Personalizar tema actual</strong>. La app copiará estos colores al tema Usuario como punto de partida.</p>
+                                            </div>`:`
+                                            <div class="theme-editor-head">
+                                                <div><strong>Tema Usuario</strong><span>Basado en: ${ctx.escapeHTML(temaLabels[cfg.temaUsuario?.basadoEn]||cfg.temaUsuario?.basadoEn||'Planhor')}</span></div>
+                                                <small>Editando ${ctx.escapeHTML(temporadaEdit)}. Los cambios quedan en borrador hasta Guardar cambios.</small>
+                                            </div>
+                                            <details open class="theme-group"><summary>Base, texto y estados de ${ctx.escapeHTML(temporadaEdit)}</summary>
+                                                <div class="theme-color-grid">${colorCssLabels.map(([k,l])=>renderColorRow({scope:'css',key:k,label:l,value:css[k]||''})).join('')}</div>
+                                            </details>
+                                            <details class="theme-group"><summary>Grilla, disponibilidad, docente y sala</summary>
+                                                <div class="theme-color-grid">${colorExtraLabels.map(([k,l])=>renderColorRow({scope:'extras',key:k,label:l,value:extras[k]||''})).join('')}</div>
+                                            </details>
+                                            <details class="theme-group"><summary>Paleta de asignaturas</summary>
+                                                <div class="theme-color-grid">${colores.map((c,i)=>renderColorRow({scope:'colores',key:'color',label:`Asignatura ${i+1}`,value:c,index:i})).join('')}</div>
+                                            </details>
+                                            <details class="theme-group"><summary>Especialidades / áreas</summary>
+                                                <div class="theme-color-grid">${Object.entries(tema.espColor||{}).map(([k,v])=>renderColorRow({scope:'espColor',key:k,label:k,value:v})).join('')}</div>
+                                            </details>`}
+                                    </div>
+                                </div>
+                                <div class="modal-actions split-actions">
+                                    <button class="btn" id="btnCerrarTemas" type="button">Cerrar</button>
+                                    <div class="action-right">
+                                        <button class="btn btn-primary" id="btnUsarTema" type="button">Usar este tema</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>`);
+                    const overlay=document.getElementById('themeOverlay');
+                    const cerrar=()=>overlay?.remove();
+                    overlay.addEventListener('click',e=>{if(e.target===overlay) cerrar();});
+                    document.getElementById('btnCerrarTemas')?.addEventListener('click',cerrar);
+                    document.getElementById('themeSeasonSelect')?.addEventListener('change',e=>{temporadaEdit=e.target.value; render();});
+                    document.getElementById('themeActiveSelect')?.addEventListener('change',e=>{cfg.temaVisualActivo=e.target.value; if(cfg.temaVisualActivo==='usuario') temaUsuarioSeguro(cfg.temaUsuario?.basadoEn||'planhor'); render();});
+                    document.getElementById('btnPersonalizarTema')?.addEventListener('click',()=>{
+                        const base=cfg.temaVisualActivo==='usuario'?(cfg.temaUsuario?.basadoEn||'planhor'):cfg.temaVisualActivo||'planhor';
+                        cfg.temaUsuario=ctx.clonarTemaVisualBase?ctx.clonarTemaVisualBase(base):temaUsuarioSeguro(base);
+                        cfg.temaUsuario.basadoEn=base;
+                        cfg.temaVisualActivo='usuario';
+                        render();
+                    });
+                    document.getElementById('btnRestaurarTemaUsuario')?.addEventListener('click',async()=>{
+                        const base=cfg.temaUsuario?.basadoEn||'planhor';
+                        const ok=ctx.confirmarAccionCritica?await ctx.confirmarAccionCritica({
+                            titulo:'Restaurar tema Usuario',
+                            mensaje:'El tema Usuario volverá a copiar los colores del tema base.',
+                            queHara:`Reemplazará los colores personalizados por los de ${temaLabels[base]||base}.`,
+                            afectara:'Solo el borrador visual del tema Usuario.',
+                            noTocara:'No cambiará planificación, datos, docentes, salas ni reportes.',
+                            confirmarTexto:'Restaurar tema',
+                            peligro:false
+                        }):confirm('¿Restaurar tema Usuario?');
+                        if(!ok) return;
+                        cfg.temaUsuario=ctx.clonarTemaVisualBase?ctx.clonarTemaVisualBase(base):temaUsuarioSeguro(base);
+                        cfg.temaUsuario.basadoEn=base;
+                        render();
+                    });
+                    document.getElementById('btnUsarTema')?.addEventListener('click',()=>{
+                        cfg.temaVisualActivo=document.getElementById('themeActiveSelect')?.value||cfg.temaVisualActivo||'planhor';
+                        if(cfg.temaVisualActivo==='usuario') temaUsuarioSeguro(cfg.temaUsuario?.basadoEn||'planhor');
+                        cerrar();
+                        ctx.toast('Tema actualizado en borrador. Presiona Guardar cambios para aplicar.','info');
+                    });
+                    const actualizarValor=(el)=>{
+                        const scope=el.dataset.scope;
+                        const key=el.dataset.key;
+                        const idx=el.dataset.index!==undefined?parseInt(el.dataset.index):null;
+                        const val=el.value;
+                        const tema=temaUsuarioSeguro(cfg.temaUsuario?.basadoEn||'planhor');
+                        if(scope==='css') tema.temporadas[temporadaEdit].css[key]=val;
+                        if(scope==='extras') tema.extras[key]=val;
+                        if(scope==='colores'&&Number.isInteger(idx)) tema.colores[idx]=val;
+                        if(scope==='espColor') tema.espColor[key]=val;
+                        const row=el.closest('.theme-color-row');
+                        const hex=row?.querySelector('.theme-hex-input');
+                        const picker=row?.querySelector('.theme-color-picker');
+                        const swatch=row?.querySelector('.theme-swatch');
+                        const normalized=normalizarHex(val);
+                        if(normalized){
+                            if(hex&&hex!==el) hex.value=normalized;
+                            if(picker&&picker!==el) picker.value=normalized;
+                            if(swatch) swatch.style.background=normalized;
+                        }
+                        const prev=overlay.querySelector('.theme-sidebar .theme-preview');
+                        if(prev) prev.outerHTML=previewHTML('usuario',temporadaEdit);
+                    };
+                    overlay.querySelectorAll('.theme-color-picker').forEach(inp=>inp.addEventListener('input',()=>actualizarValor(inp)));
+                    overlay.querySelectorAll('.theme-hex-input').forEach(inp=>inp.addEventListener('change',()=>actualizarValor(inp)));
+                    overlay.querySelectorAll('.theme-swatch').forEach(btn=>btn.addEventListener('click',()=>{
+                        const picker=btn.closest('.theme-color-row')?.querySelector('.theme-color-picker');
+                        picker?.click();
+                    }));
+                };
+                render();
+            };
             document.getElementById('modalContainer').innerHTML=`
             <div class="modal-overlay" id="modalOverlay"><div class="modal">
                 <div class="modal-header">
@@ -711,6 +920,18 @@ La interfaz debe ser profesional, sobria, modular, con desplazamiento horizontal
                     </select></div>
                 </div>
                 <div class="config-section">
+                    <h4>Temas</h4>
+                    <div class="config-help-entry">
+                        <div>
+                            <p>Escoge un tema predefinido o crea un tema Usuario editable con selector cromático, colores por temporada, grilla, estados y asignaturas.</p>
+                            <small style="color:var(--text-secondary);font-size:0.72rem;">Tema actual: ${ctx.escapeHTML(temaLabels[cfg.temaVisualActivo||'planhor']||'Planhor')}</small>
+                        </div>
+                        <div class="config-help-actions">
+                            <button class="btn btn-primary btn-sm" id="btnAbrirEditorTemas" type="button">Temas visuales</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="config-section">
                     <h4>Perfil de usuario</h4>
                     <div class="form-row">
                         <div class="form-group"><label class="form-label">Correo</label><input class="form-input" id="cfgPerfilEmail" value="${ctx.escapeAttr(emailActual)}" disabled></div>
@@ -776,6 +997,7 @@ La interfaz debe ser profesional, sobria, modular, con desplazamiento horizontal
             document.getElementById('btnCancelarConfig').addEventListener('click',ctx.cerrarModal);
             document.getElementById('btnAbrirAyudaApp')?.addEventListener('click',abrirAyudaApp);
             document.getElementById('btnAbrirDesarrolloApp')?.addEventListener('click',abrirDesarrolloApp);
+            document.getElementById('btnAbrirEditorTemas')?.addEventListener('click',abrirEditorTemas);
             function abrirMotorPlanificacion(){
                 let draft=Object.assign({},solverDefault,cfg.solverPesos||{});
                 Object.keys(solverDefault).forEach(k=>draft[k]=normalizarNivelSolver(draft[k],solverDefault[k]));
@@ -930,6 +1152,8 @@ La interfaz debe ser profesional, sobria, modular, con desplazamiento horizontal
                 };
                 cfg.solverPesos=Object.assign({},solverDefault,cfg.solverPesos||data.configuracion?.solverPesos||{});
                 Object.keys(solverDefault).forEach(k=>cfg.solverPesos[k]=normalizarNivelSolver(cfg.solverPesos[k],solverDefault[k]));
+                cfg.temaVisualActivo=['planhor','institucional','sobrio','usuario'].includes(cfg.temaVisualActivo)?cfg.temaVisualActivo:'planhor';
+                if(cfg.temaVisualActivo==='usuario') cfg.temaUsuario=temaUsuarioSeguro(cfg.temaUsuario?.basadoEn||'planhor');
                 const dash=cfg.dashboard=cfg.dashboard||{};
                 ['totalBloques','totalAsignaturas','totalDocentes','presencialVirtual','incompletas','docenteNN','tro2','criticas','transversales','criteriosAsignatura','docentesEsp','conflictos','seccionesATiempo','calidadHorario'].forEach(k=>dash[k]=document.getElementById('cfgDash_'+k).checked);
                 const criticos=cambiosCriticosConfiguracion(configAnterior,cfg);
@@ -947,6 +1171,7 @@ La interfaz debe ser profesional, sobria, modular, con desplazamiento horizontal
                 }
                 data.configuracion=cfg;
                 ctx.aplicarFuente();
+                ctx.aplicarPaleta();
                 ctx.guardar();
                 ctx.cerrarModal();
                 ctx.renderDashboard();
@@ -959,6 +1184,7 @@ La interfaz debe ser profesional, sobria, modular, con desplazamiento horizontal
             const data = getData();
             const sel=document.getElementById('selectorTemporada');
             if(!sel) return;
+            ctx.ordenarTemporadas?.();
             sel.innerHTML=data.temporadas.map(t=>ctx.optionHTML(t.id, `${t.temporada} ${t.anio}`, t.id===data.sel.temporadaId)).join('');
             sel.onchange=()=>{
                 ctx.switchTemporada(sel.value);
@@ -982,6 +1208,7 @@ La interfaz debe ser profesional, sobria, modular, con desplazamiento horizontal
 
         function abrirGestionTemporadas(){
             const data = getData();
+            ctx.ordenarTemporadas?.();
             let html='<div class="modal-overlay" id="modalOverlay"><div class="modal"><h3>📅 Gestionar Temporadas</h3><table style="width:100%;border-collapse:collapse;"><tr><th style="text-align:left;padding:6px;">Temporada</th><th style="text-align:left;padding:6px;">Año</th><th></th></tr>';
             data.temporadas.forEach((t,i)=>html+=`<tr><td style="padding:4px;"><select class="form-select" data-idx="${i}" id="tempSel_${i}">${ctx.TEMPORADAS.map(tt=>`<option value="${tt}" ${tt===t.temporada?'selected':''}>${tt}</option>`).join('')}</select></td><td style="padding:4px;"><input class="form-input" type="number" id="tempAnio_${i}" value="${t.anio}" style="width:80px;"></td><td style="padding:4px;"><button class="btn btn-xs btn-eliminar-temp" data-idx="${i}">🗑️</button></td></tr>`);
             html+=`</table><button class="btn btn-sm" id="btnAgregarTemp">+ Agregar temporada</button><button class="btn btn-primary btn-sm" id="btnGuardarTemps" style="margin-left:8px;">Guardar</button></div></div>`;
@@ -1019,30 +1246,47 @@ La interfaz debe ser profesional, sobria, modular, con desplazamiento horizontal
                     ctx.toast('Nueva temporada vacía','info');
                 }
                 data.temporadas.push(nuevaTemp);
+                ctx.ordenarTemporadas?.();
                 actualizarSelectorTemporada();
                 abrirGestionTemporadas();
             };
             document.getElementById('modalOverlay').onclick=(e)=>{if(e.target===e.currentTarget)ctx.cerrarModal();};
             document.querySelectorAll('.btn-eliminar-temp').forEach(b=>b.onclick=()=>{
+                if((data.temporadas||[]).length<=1) return ctx.toast('No puedes eliminar la única temporada disponible','warning');
                 if(confirm('Eliminar temporada? Se borrarán todos sus datos.')){
                     const idx=parseInt(b.dataset.idx);
                     const idElim=data.temporadas[idx]?.id;
+                    const eraActiva=idElim && idElim===data.sel.temporadaId;
                     if(idElim) delete data.temporadaData[idElim];
                     data.temporadas.splice(idx,1);
-                    if(data.sel.temporadaId===idElim) data.sel.temporadaId=data.temporadas[0]?.id;
+                    ctx.ordenarTemporadas?.();
+                    if(eraActiva){
+                        const nuevaId=data.temporadas[0]?.id||null;
+                        if(nuevaId) ctx.cargarTemporadaSinPersistirActual?.(nuevaId);
+                    }
+                    ctx.aplicarPaleta();
+                    actualizarIndicadorPaleta();
+                    ctx.reconstruirIndices();
                     actualizarSelectorTemporada();
+                    ctx.guardar({forzar:true});
+                    ctx.refrescarTodo();
                     abrirGestionTemporadas();
                 }
             });
             document.getElementById('btnGuardarTemps').onclick=()=>{
+                const activaAntes=data.sel.temporadaId;
                 data.temporadas.forEach((t,i)=>{
                     const sel2=document.getElementById(`tempSel_${i}`);
                     const anio2=document.getElementById(`tempAnio_${i}`);
                     if(sel2) t.temporada=sel2.value;
                     if(anio2) t.anio=parseInt(anio2.value);
                 });
+                ctx.ordenarTemporadas?.();
+                if(activaAntes) data.configuracion.temporadaActualId=activaAntes;
                 ctx.guardar();
                 actualizarSelectorTemporada();
+                ctx.aplicarPaleta();
+                actualizarIndicadorPaleta();
                 ctx.cerrarModal();
                 ctx.reconstruirIndices();
                 ctx.refrescarTodo();

@@ -199,6 +199,7 @@
             wrapper.appendChild(clon);
             document.body.appendChild(wrapper);
             await new Promise(resolve=>requestAnimationFrame(resolve));
+            ctx.sanitizarNodoExportacion?.(clon,clon);
             try{
                 return await html2canvas(wrapper,{
                     scale:2,
@@ -225,7 +226,8 @@
             if(ctx.asegurarJsPDF && !(await ctx.asegurarJsPDF())) return;
             const grid=document.getElementById('fichaContenido');
             window.scrollTo(0,0);
-            capturarFichaFija(grid).then(canvas=>{
+            try{
+                const canvas=await capturarFichaFija(grid);
                 const imgData=canvas.toDataURL('image/jpeg',0.95);
                 const {jsPDF}=window.jspdf;
                 const pdf=new jsPDF('landscape','mm','a4');
@@ -233,7 +235,10 @@
                 pdf.addImage(imgData,'JPEG',0,0,iw,Math.min(ih,200));
                 pdf.save('Ficha_'+doc.apellido+'_'+doc.nombre+'_'+ctx.getTemporadaLabel()+'.pdf');
                 ctx.toast('PDF exportado','success');
-            }).catch(()=>ctx.toast('Error al exportar PDF','error'));
+            }catch(error){
+                if(ctx.mostrarErrorTecnico) ctx.mostrarErrorTecnico({titulo:'No se pudo exportar Ficha Docente',mensaje:'La exportación falló, pero la app principal sigue funcionando.',modulo:'Ficha Docente',accion:'Exportar ficha a PDF',error});
+                else ctx.toast('Error al exportar PDF','error');
+            }
         }
 
         async function exportarFichaJPG(){
@@ -245,13 +250,17 @@
             if(ctx.asegurarHtml2Canvas && !(await ctx.asegurarHtml2Canvas())) return;
             const grid=document.getElementById('fichaContenido');
             window.scrollTo(0,0);
-            capturarFichaFija(grid).then(canvas=>{
+            try{
+                const canvas=await capturarFichaFija(grid);
                 const link=document.createElement('a');
                 link.download='Ficha_'+doc.apellido+'_'+doc.nombre+'_'+ctx.getTemporadaLabel()+'.jpg';
                 link.href=canvas.toDataURL('image/jpeg',0.95);
                 link.click();
                 ctx.toast('JPG exportado','success');
-            }).catch(()=>ctx.toast('Error al exportar JPG','error'));
+            }catch(error){
+                if(ctx.mostrarErrorTecnico) ctx.mostrarErrorTecnico({titulo:'No se pudo exportar Ficha Docente',mensaje:'La exportación falló, pero la app principal sigue funcionando.',modulo:'Ficha Docente',accion:'Exportar ficha a JPG',error});
+                else ctx.toast('Error al exportar JPG','error');
+            }
         }
 
         function init(){

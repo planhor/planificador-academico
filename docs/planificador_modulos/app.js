@@ -180,18 +180,58 @@ window._appRuntimeInicializada = true;
             espColor:PLANHOR_ESP_COLOR
         }
     };
+    const TEMA_EXTRAS = {
+        'planhor-subject-neutral':'#dce4ec','planhor-subject-border':'#8fa9bc','planhor-available-bg':'#d8f1ee','planhor-available-border':'#18a8a0','planhor-unavailable-bg':'#edf2f5','planhor-unavailable-text':'#8a98a4',
+        'planhor-teacher-busy-bg':'#dff3ea','planhor-teacher-busy-border':'#6bb38a','planhor-teacher-busy-text':'#25583d','planhor-room-busy-bg':'#fdebd8','planhor-room-busy-border':'#d89645','planhor-room-busy-text':'#744912'
+    };
+    const TEMAS_VISUALES = {
+        planhor:{nombre:'Planhor',descripcion:'Identidad principal tecnológica e institucional.',temporadas:PALETAS,extras:TEMA_EXTRAS,colores:PLANHOR_COLORES,espColor:PLANHOR_ESP_COLOR},
+        institucional:{nombre:'Institucional',descripcion:'Azules sobrios, alto contraste y lectura formal.',temporadas:{
+            Otoño:{css:{bg:'#f7f8fa',surface:'#ffffff','surface-alt':'#eef2f5',border:'#d8e0e6','border-light':'#e8edf2',text:'#102840','text-secondary':'#536270',accent:'#265f8f','accent-light':'#6f95b5',danger:'#a6404b',warning:'#a8742a',success:'#1c7f68','modal-overlay':'rgba(16,40,64,0.42)'},colores:PLANHOR_COLORES,espColor:PLANHOR_ESP_COLOR},
+            Invierno:{css:{bg:'#f2f6fa',surface:'#ffffff','surface-alt':'#e7eef5',border:'#cfdae5','border-light':'#e2e9f0',text:'#102840','text-secondary':'#506070',accent:'#174f82','accent-light':'#3f8fbd',danger:'#9d4150',warning:'#96702a',success:'#187966','modal-overlay':'rgba(16,40,64,0.44)'},colores:PLANHOR_COLORES,espColor:PLANHOR_ESP_COLOR},
+            Primavera:{css:{bg:'#f5f9f8',surface:'#ffffff','surface-alt':'#e9f2f1',border:'#d2e1df','border-light':'#e4efed',text:'#102840','text-secondary':'#506767',accent:'#147f86','accent-light':'#42a7a0',danger:'#a6404b',warning:'#b57b2b',success:'#167d67','modal-overlay':'rgba(16,40,64,0.40)'},colores:PLANHOR_COLORES,espColor:PLANHOR_ESP_COLOR},
+            Verano:{css:{bg:'#f8f8f7',surface:'#ffffff','surface-alt':'#eef1f2',border:'#d8e0e2','border-light':'#e7ecee',text:'#102840','text-secondary':'#5c6468',accent:'#1f6f8f','accent-light':'#4aa0b0',danger:'#a6404b',warning:'#ad762c',success:'#17806d','modal-overlay':'rgba(16,40,64,0.40)'},colores:PLANHOR_COLORES,espColor:PLANHOR_ESP_COLOR}
+        },extras:TEMA_EXTRAS,colores:PLANHOR_COLORES,espColor:PLANHOR_ESP_COLOR},
+        sobrio:{nombre:'Sobrio',descripcion:'Grises azulados y acentos contenidos.',temporadas:{
+            Otoño:{css:{bg:'#f6f6f5',surface:'#ffffff','surface-alt':'#eeefef',border:'#d7dcde','border-light':'#e7eaeb',text:'#152638','text-secondary':'#5a636b',accent:'#405f75','accent-light':'#7a909d',danger:'#994650',warning:'#8f7435',success:'#3d7a6b','modal-overlay':'rgba(16,38,56,0.42)'},colores:PLANHOR_COLORES,espColor:PLANHOR_ESP_COLOR},
+            Invierno:{css:{bg:'#f3f5f7',surface:'#ffffff','surface-alt':'#e9eef2',border:'#d2dce3','border-light':'#e4eaf0',text:'#152638','text-secondary':'#53616d',accent:'#365e82','accent-light':'#6e91aa',danger:'#934654',warning:'#927435',success:'#397b68','modal-overlay':'rgba(16,38,56,0.44)'},colores:PLANHOR_COLORES,espColor:PLANHOR_ESP_COLOR},
+            Primavera:{css:{bg:'#f5f8f7',surface:'#ffffff','surface-alt':'#e9f0ee',border:'#d2dfdb','border-light':'#e3eeeb',text:'#152638','text-secondary':'#566763',accent:'#3f7f78','accent-light':'#7aa79d',danger:'#994650',warning:'#977635',success:'#347b67','modal-overlay':'rgba(16,38,56,0.40)'},colores:PLANHOR_COLORES,espColor:PLANHOR_ESP_COLOR},
+            Verano:{css:{bg:'#f7f6f4',surface:'#ffffff','surface-alt':'#efebe5',border:'#ddd6cc','border-light':'#ece6de',text:'#152638','text-secondary':'#625f59',accent:'#6d6c7d','accent-light':'#a0876a',danger:'#994650',warning:'#987133',success:'#3d7a6b','modal-overlay':'rgba(16,38,56,0.40)'},colores:PLANHOR_COLORES,espColor:PLANHOR_ESP_COLOR}
+        },extras:TEMA_EXTRAS,colores:PLANHOR_COLORES,espColor:PLANHOR_ESP_COLOR}
+    };
+    function clonarTemaVisualBase(id='planhor'){
+        const base=TEMAS_VISUALES[id]||TEMAS_VISUALES.planhor;
+        return JSON.parse(JSON.stringify({
+            nombre:'Usuario',
+            basadoEn:id,
+            temporadas:base.temporadas,
+            extras:base.extras||TEMA_EXTRAS,
+            colores:base.colores||PLANHOR_COLORES,
+            espColor:base.espColor||PLANHOR_ESP_COLOR
+        }));
+    }
     function getColores() { return getPaletaActiva().colores; }
     function getEspColor() { return getPaletaActiva().espColor; }
     function getPaletaActiva() {
+        const temaId=data.configuracion?.temaVisualActivo||'planhor';
         const id=data.sel.temporadaId||data.configuracion.temporadaActualId||data.temporadas[0]?.id;
         const t=data.temporadas.find(tmp=>tmp.id===id);
-        return PALETAS[t?.temporada]||PALETAS.Otoño;
+        const nombreTemp=t?.temporada||'Otoño';
+        if(temaId==='usuario'&&data.configuracion?.temaUsuario?.temporadas){
+            const usuario=data.configuracion.temaUsuario;
+            const paleta=usuario.temporadas[nombreTemp]||usuario.temporadas.Otoño||PALETAS[nombreTemp]||PALETAS.Otoño;
+            return Object.assign({},paleta,{colores:Array.isArray(usuario.colores)&&usuario.colores.length?usuario.colores:PLANHOR_COLORES,espColor:usuario.espColor||PLANHOR_ESP_COLOR,extras:usuario.extras||TEMA_EXTRAS});
+        }
+        const tema=TEMAS_VISUALES[temaId]||TEMAS_VISUALES.planhor;
+        const paleta=tema.temporadas[nombreTemp]||tema.temporadas.Otoño||PALETAS[nombreTemp]||PALETAS.Otoño;
+        return Object.assign({},paleta,{colores:tema.colores||paleta.colores||PLANHOR_COLORES,espColor:tema.espColor||paleta.espColor||PLANHOR_ESP_COLOR,extras:tema.extras||TEMA_EXTRAS});
     }
     function aplicarPaleta() {
         const paleta=getPaletaActiva();
         if(!paleta) return;
         const c=paleta.css;
         Object.keys(c).forEach(k=>document.documentElement.style.setProperty('--'+k,c[k]));
+        Object.keys(paleta.extras||{}).forEach(k=>document.documentElement.style.setProperty('--'+k,paleta.extras[k]));
         const theme=document.querySelector('meta[name="theme-color"]');
         if(theme&&c.accent) theme.setAttribute('content',c.accent);
     }
@@ -204,7 +244,9 @@ window._appRuntimeInicializada = true;
         bloquesDiariosMax:13, bloquesSemestralesMax:47, horasDescanso:12, sabadoHastaBloque:16,
         horasPorBloque:18, confirmarEliminacion:true, sensibilidadArrastre:5,
         umbralCargaDocente:80, porcentajesHomologo:[{desde:0,hasta:200,porcentaje:50},{desde:201,hasta:500,porcentaje:30},{desde:501,hasta:9999,porcentaje:20}],
-        exportacionExcel:'xlsx', fuenteApp:'segoe',
+        exportacionExcel:'xlsx', vistaGeneralColumnas:2,
+        vistaGeneralCampos:{asignatura:true,docente:false,sala:false,hora:false},
+        fuenteApp:'segoe', temaVisualActivo:'planhor', temaUsuario:null,
         especialidades:[],
         autoPlanificacion:{
             usarPrioridadDocente:true,
@@ -284,6 +326,18 @@ window._appRuntimeInicializada = true;
 
     function temporadaExiste(id) {
         return !!id && (data.temporadas||[]).some(t=>t.id===id);
+    }
+    const ORDEN_TEMPORADAS = { 'Otoño':0, 'Invierno':1, 'Primavera':2, 'Verano':3 };
+    function ordenarTemporadas(){
+        if(!Array.isArray(data.temporadas)) data.temporadas=[];
+        data.temporadas.sort((a,b)=>
+            (Number(b.anio)||0)-(Number(a.anio)||0) ||
+            (ORDEN_TEMPORADAS[a.temporada]??99)-(ORDEN_TEMPORADAS[b.temporada]??99) ||
+            String(a.id||'').localeCompare(String(b.id||''))
+        );
+    }
+    function datosTemporadaVacios(){
+        return { carreras:[], niveles:[], secciones:[], asignaturas:[], docentes:[], salas:[], asignaturaCarreraNivel:[], asignaturaSeccion:[], planificaciones:[], gruposDictacion:[], gestorSecciones:{cargas:[],ids:[],filas:[],enlacesManuales:[],ultimaCargaId:null,tablaLimite:250} };
     }
 
     function guardarTemporadaPreferida(id) {
@@ -461,6 +515,13 @@ window._appRuntimeInicializada = true;
         asegurarXLSX,
         asegurarHtml2Canvas,
         asegurarJsPDF,
+        irASeccion,
+        confirmarAccionCritica,
+        mostrarErrorTecnico,
+        sanitizarNodoExportacion,
+        optionHTML,
+        escapeHTML,
+        escapeAttr,
         toast
     });
     const actualizarVista = VistaHorario.actualizarVista;
@@ -520,6 +581,8 @@ window._appRuntimeInicializada = true;
         colorAsignaturaPlanhor,
         asegurarHtml2Canvas,
         asegurarJsPDF,
+        mostrarErrorTecnico,
+        sanitizarNodoExportacion,
         activarTab,
         actualizarReporte,
         toast
@@ -651,10 +714,14 @@ window._appRuntimeInicializada = true;
         TEMPORADAS,
         FUENTES_APP,
         CONFIG_DEFAULT,
+        TEMAS_VISUALES,
+        clonarTemaVisualBase,
         genId,
         optionHTML,
         escapeHTML,
         switchTemporada,
+        cargarTemporadaSinPersistirActual,
+        ordenarTemporadas,
         aplicarPaleta,
         aplicarFuente,
         confirmarAccionCritica,
@@ -676,7 +743,12 @@ window._appRuntimeInicializada = true;
         limpiarHistorialCambios();
         const tempData = data.temporadaData;
         tempData[data.sel.temporadaId] = { carreras:data.carreras, niveles:data.niveles, secciones:data.secciones, asignaturas:data.asignaturas, docentes:data.docentes, salas:data.salas, asignaturaCarreraNivel:data.asignaturaCarreraNivel, asignaturaSeccion:data.asignaturaSeccion||[], planificaciones:data.planificaciones, gruposDictacion:data.gruposDictacion, gestorSecciones:data.gestorSecciones };
-        const nueva = tempData[id] || { carreras:[], niveles:[], secciones:[], asignaturas:[], docentes:[], salas:[], asignaturaCarreraNivel:[], asignaturaSeccion:[], planificaciones:[], gruposDictacion:[], gestorSecciones:{cargas:[],ids:[],ultimaCargaId:null} };
+        cargarTemporadaSinPersistirActual(id);
+    }
+    function cargarTemporadaSinPersistirActual(id) {
+        if(!id) return;
+        const tempData = data.temporadaData || (data.temporadaData={});
+        const nueva = tempData[id] || datosTemporadaVacios();
         if (!tempData[id]) tempData[id] = nueva;
         data.carreras = nueva.carreras; data.niveles = nueva.niveles; data.secciones = nueva.secciones;
         data.asignaturas = nueva.asignaturas; data.docentes = nueva.docentes; data.salas = nueva.salas;
@@ -1044,6 +1116,7 @@ window._appRuntimeInicializada = true;
     }
     function normalizarDatos() {
         data.configuracion = Object.assign(JSON.parse(JSON.stringify(CONFIG_DEFAULT)), data.configuracion || {});
+        ordenarTemporadas();
         data.configuracion.dashboard = Object.assign({}, CONFIG_DEFAULT.dashboard, data.configuracion.dashboard || {});
         if(!data.configuracion.perfilesUsuarios || typeof data.configuracion.perfilesUsuarios!=='object' || Array.isArray(data.configuracion.perfilesUsuarios)) data.configuracion.perfilesUsuarios={};
         data.configuracion.memoriaPlanificacion = Object.assign({}, CONFIG_DEFAULT.memoriaPlanificacion, data.configuracion.memoriaPlanificacion || {});
@@ -1066,6 +1139,19 @@ window._appRuntimeInicializada = true;
             data.configuracion.solverPesos[k]=normalizarNivelSolver(data.configuracion.solverPesos[k],CONFIG_DEFAULT.solverPesos[k]);
         });
         if(!['xlsx','html'].includes(data.configuracion.exportacionExcel)) data.configuracion.exportacionExcel='xlsx';
+        data.configuracion.vistaGeneralColumnas=Math.max(1,Math.min(4,parseInt(data.configuracion.vistaGeneralColumnas)||2));
+        data.configuracion.vistaGeneralCampos=Object.assign({},CONFIG_DEFAULT.vistaGeneralCampos,data.configuracion.vistaGeneralCampos||{});
+        if(!['planhor','institucional','sobrio','usuario'].includes(data.configuracion.temaVisualActivo)) data.configuracion.temaVisualActivo='planhor';
+        if(data.configuracion.temaVisualActivo==='usuario'&&(!data.configuracion.temaUsuario||typeof data.configuracion.temaUsuario!=='object'||Array.isArray(data.configuracion.temaUsuario))){
+            data.configuracion.temaUsuario=clonarTemaVisualBase('planhor');
+        }
+        if(data.configuracion.temaUsuario&&typeof data.configuracion.temaUsuario==='object'&&!Array.isArray(data.configuracion.temaUsuario)){
+            const baseUsuario=clonarTemaVisualBase(data.configuracion.temaUsuario.basadoEn||'planhor');
+            data.configuracion.temaUsuario=Object.assign(baseUsuario,data.configuracion.temaUsuario||{});
+            data.configuracion.temaUsuario.temporadas=Object.assign({},baseUsuario.temporadas,data.configuracion.temaUsuario.temporadas||{});
+            data.configuracion.temaUsuario.extras=Object.assign({},baseUsuario.extras,data.configuracion.temaUsuario.extras||{});
+            if(!Array.isArray(data.configuracion.temaUsuario.colores)||!data.configuracion.temaUsuario.colores.length) data.configuracion.temaUsuario.colores=baseUsuario.colores;
+        }
         if(!Array.isArray(data.gruposDictacion)) data.gruposDictacion=[];
         if(!Array.isArray(data.asignaturaSeccion)) data.asignaturaSeccion=[];
         data.sel=Object.assign({temporadaId:null,area:null,carreraId:null,nivelId:null,seccionId:null,asignaturaId:null,docenteId:null,salaId:null,tipo:'presencial'},data.sel||{});
@@ -1203,6 +1289,101 @@ window._appRuntimeInicializada = true;
         setTimeout(quitar, tipo==='error' ? 5200 : 2600);
     }
 
+    function mostrarErrorTecnico(opciones={}){
+        const cfg=Object.assign({
+            titulo:'No se pudo completar la acción',
+            mensaje:'Se detectó un error técnico. La app principal sigue funcionando.',
+            modulo:'Aplicación',
+            accion:'Acción no especificada',
+            error:null
+        },opciones||{});
+        const error=cfg.error||{};
+        const detalle=[
+            `Módulo: ${cfg.modulo}`,
+            `Acción: ${cfg.accion}`,
+            `Mensaje: ${error?.message||String(error||'Error no identificado')}`,
+            error?.name ? `Tipo: ${error.name}` : '',
+            error?.stack ? `Stack:\n${String(error.stack).split('\n').slice(0,8).join('\n')}` : ''
+        ].filter(Boolean).join('\n\n');
+        console.error(`[${cfg.modulo}] ${cfg.accion}:`, error);
+        document.getElementById('technicalErrorOverlay')?.remove();
+        const overlay=document.createElement('div');
+        overlay.id='technicalErrorOverlay';
+        overlay.className='modal-overlay technical-error-overlay';
+        overlay.innerHTML=`
+            <div class="modal technical-error-modal">
+                <div class="modal-header">
+                    <h3>${escapeHTML(cfg.titulo)}</h3>
+                    <p>${escapeHTML(cfg.mensaje)}</p>
+                </div>
+                <div class="technical-error-summary">
+                    <div><strong>Módulo</strong><span>${escapeHTML(cfg.modulo)}</span></div>
+                    <div><strong>Acción</strong><span>${escapeHTML(cfg.accion)}</span></div>
+                    <div><strong>Error</strong><span>${escapeHTML(error?.message||String(error||'Error no identificado'))}</span></div>
+                </div>
+                <textarea class="technical-error-detail" readonly>${escapeHTML(detalle)}</textarea>
+                <div class="modal-actions">
+                    <button class="btn" id="technicalCopy" type="button">Copiar detalle</button>
+                    <button class="btn btn-primary" id="technicalClose" type="button">Cerrar</button>
+                </div>
+            </div>`;
+        const cerrar=()=>overlay.remove();
+        overlay.addEventListener('click',e=>{ if(e.target===overlay) cerrar(); });
+        overlay.querySelector('#technicalClose')?.addEventListener('click',cerrar);
+        overlay.querySelector('#technicalCopy')?.addEventListener('click',async()=>{
+            try{
+                await navigator.clipboard?.writeText(detalle);
+                toast('Detalle técnico copiado','success');
+            }catch(e){
+                toast('No se pudo copiar automáticamente','warning');
+            }
+        });
+        document.body.appendChild(overlay);
+        overlay.querySelector('#technicalClose')?.focus();
+    }
+
+    function colorExportableHtml2Canvas(valor,fallback='#ffffff'){
+        const txt=String(valor||'').trim();
+        if(!txt) return fallback;
+        if(txt==='transparent'||txt==='rgba(0, 0, 0, 0)'||txt==='rgba(0,0,0,0)') return 'transparent';
+        if(/^(#|rgb|hsl)/i.test(txt)) return txt;
+        const m=txt.match(/^color\([^\s]+\s+([0-9.]+%?)\s+([0-9.]+%?)\s+([0-9.]+%?)(?:\s*\/\s*([0-9.]+%?))?\)$/i);
+        if(m){
+            const canal=v=>{
+                const s=String(v||'0');
+                const n=parseFloat(s);
+                return Math.max(0,Math.min(255,Math.round(s.includes('%') ? n*2.55 : n*255)));
+            };
+            const a=m[4]?.includes('%') ? Math.max(0,Math.min(1,parseFloat(m[4])/100)) : Math.max(0,Math.min(1,Number(m[4]??1)));
+            return a<1 ? `rgba(${canal(m[1])}, ${canal(m[2])}, ${canal(m[3])}, ${a})` : `rgb(${canal(m[1])}, ${canal(m[2])}, ${canal(m[3])})`;
+        }
+        return fallback;
+    }
+
+    function primerColorExportable(valor,fallback='#ffffff'){
+        const txt=String(valor||'');
+        const color=txt.match(/color\([^)]+\)/i)?.[0] || txt.match(/rgba?\([^)]+\)/i)?.[0] || txt.match(/#[0-9a-f]{3,8}/i)?.[0] || '';
+        return colorExportableHtml2Canvas(color,fallback);
+    }
+
+    function sanitizarNodoExportacion(origen,destino){
+        if(!origen || !destino || origen.nodeType!==1 || destino.nodeType!==1) return;
+        const cs=getComputedStyle(origen);
+        const bgImage=String(cs.backgroundImage||'');
+        const bgColor=colorExportableHtml2Canvas(cs.backgroundColor,'transparent');
+        destino.style.color=colorExportableHtml2Canvas(cs.color,'#102840');
+        destino.style.backgroundColor=bgColor==='transparent'&&bgImage!=='none' ? primerColorExportable(bgImage,'#ffffff') : bgColor;
+        if(bgImage.includes('color(') || bgImage.includes('color-mix(')) destino.style.backgroundImage='none';
+        ['Top','Right','Bottom','Left'].forEach(lado=>{
+            destino.style[`border${lado}Color`]=colorExportableHtml2Canvas(cs[`border${lado}Color`],'#d9e4ec');
+        });
+        destino.style.outlineColor=colorExportableHtml2Canvas(cs.outlineColor,'#0b7f86');
+        if(String(cs.boxShadow||'').includes('color(') || String(cs.boxShadow||'').includes('color-mix(')) destino.style.boxShadow='none';
+        const hijosOrigen=Array.from(origen.children||[]);
+        const hijosDestino=Array.from(destino.children||[]);
+        hijosDestino.forEach((hijo,i)=>sanitizarNodoExportacion(hijosOrigen[i],hijo));
+    }
+
     function confirmarAccionCritica(opciones={}){
         const cfg=Object.assign({
             titulo:'Confirmar acción crítica',
@@ -1259,37 +1440,77 @@ window._appRuntimeInicializada = true;
         });
     }
 
+    const PANEL_POR_TAB = {
+        dashboard:'panelDashboard',
+        secciones:'panelSecciones',
+        asignaturas:'panelAsignaturas',
+        docentes:'panelDocentes',
+        salas:'panelSalas',
+        planificacion:'panelPlanificacion',
+        vistaHorarios:'panelVistaHorarios',
+        reportes:'panelReportes',
+        gestorSecciones:'panelGestorSecciones',
+        historial:'panelHistorial',
+        fichaDocente:'panelFichaDocente'
+    };
+    function limpiarErrorPanel(tab){
+        const panel=document.getElementById(PANEL_POR_TAB[tab]);
+        panel?.querySelector('.tab-error-panel')?.remove();
+    }
+    function mostrarErrorPanel(tab,error){
+        const panel=document.getElementById(PANEL_POR_TAB[tab]);
+        if(!panel) return;
+        panel.querySelector('.tab-error-panel')?.remove();
+        const box=document.createElement('div');
+        box.className='tab-error-panel';
+        box.innerHTML=`
+            <strong>No se pudo cargar ${escapeHTML(tabLabel(tab)||'esta vista')}</strong>
+            <span>La app principal sigue funcionando. Recarga la pestaña o revisa esta vista antes de continuar usándola.</span>
+            <small>${escapeHTML(error?.message||String(error||'Error no identificado'))}</small>
+        `;
+        panel.prepend(box);
+    }
+    function ejecutarRenderTab(tab,fn){
+        try{
+            limpiarErrorPanel(tab);
+            fn();
+        }catch(e){
+            console.error(`Error al renderizar ${tab}:`, e);
+            mostrarErrorPanel(tab,e);
+            toast(`No se pudo cargar ${tabLabel(tab)||'la vista'}. El resto de la app sigue operativo.`,'warning');
+        }
+    }
     function renderTabActual(){
         const tab=document.querySelector('.tab-btn.active')?.dataset?.tab || 'secciones';
-        if(tab==='dashboard'){ renderDashboard(); detectarConflictos(); }
-        else if(tab==='secciones') renderCarreras();
-        else if(tab==='asignaturas') renderAsignaturas();
-        else if(tab==='docentes') renderDocentes();
-        else if(tab==='salas') renderSalas();
-        else if(tab==='planificacion'){ construirGrilla(); actualizarSelectoresPlan(); actualizarModoPlanificacionUI(); actualizarProgresoPlan(); }
-        else if(tab==='vistaHorarios') actualizarVista();
-        else if(tab==='reportes') actualizarReporte();
-        else if(tab==='gestorSecciones') renderGestorSecciones();
-        else if(tab==='historial') renderHistorial();
-        else if(tab==='fichaDocente'){ actualizarFichaDocentes(); renderFichaDocente(); }
+        if(tab==='dashboard') ejecutarRenderTab(tab,()=>{ renderDashboard(); detectarConflictos(); });
+        else if(tab==='secciones') ejecutarRenderTab(tab,renderCarreras);
+        else if(tab==='asignaturas') ejecutarRenderTab(tab,renderAsignaturas);
+        else if(tab==='docentes') ejecutarRenderTab(tab,renderDocentes);
+        else if(tab==='salas') ejecutarRenderTab(tab,renderSalas);
+        else if(tab==='planificacion') ejecutarRenderTab(tab,()=>{ construirGrilla(); actualizarSelectoresPlan(); actualizarModoPlanificacionUI(); actualizarProgresoPlan(); });
+        else if(tab==='vistaHorarios') ejecutarRenderTab(tab,actualizarVista);
+        else if(tab==='reportes') ejecutarRenderTab(tab,actualizarReporte);
+        else if(tab==='gestorSecciones') ejecutarRenderTab(tab,renderGestorSecciones);
+        else if(tab==='historial') ejecutarRenderTab(tab,renderHistorial);
+        else if(tab==='fichaDocente') ejecutarRenderTab(tab,()=>{ actualizarFichaDocentes(); renderFichaDocente(); });
     }
     function refrescarInicial(){
-        actualizarSelectorTemporada();
-        aplicarPaleta();
-        aplicarFuente();
-        actualizarIndicadorPaleta();
-        actualizarEstadoRespaldoLocal();
-        actualizarBotonesUndoRedo();
+        try{ actualizarSelectorTemporada(); }catch(e){ console.error('Error al actualizar temporadas:',e); toast('No se pudo actualizar el selector de temporadas','warning'); }
+        try{ aplicarPaleta(); }catch(e){ console.error('Error al aplicar paleta:',e); }
+        try{ aplicarFuente(); }catch(e){ console.error('Error al aplicar fuente:',e); }
+        try{ actualizarIndicadorPaleta(); }catch(e){ console.error('Error al actualizar indicador de temporada:',e); }
+        try{ actualizarEstadoRespaldoLocal(); }catch(e){ console.error('Error al actualizar respaldo local:',e); }
+        try{ actualizarBotonesUndoRedo(); }catch(e){ console.error('Error al actualizar deshacer/rehacer:',e); }
         renderTabActual();
     }
     function tabActivaEs(tab){
         return document.querySelector('.tab-btn.active')?.dataset?.tab===tab;
     }
     function refrescarTodo(){
-        actualizarSelectorTemporada();
-        actualizarIndicadorPaleta();
-        actualizarEstadoRespaldoLocal();
-        actualizarBotonesUndoRedo();
+        try{ actualizarSelectorTemporada(); }catch(e){ console.error('Error al actualizar temporadas:',e); }
+        try{ actualizarIndicadorPaleta(); }catch(e){ console.error('Error al actualizar indicador de temporada:',e); }
+        try{ actualizarEstadoRespaldoLocal(); }catch(e){ console.error('Error al actualizar respaldo local:',e); }
+        try{ actualizarBotonesUndoRedo(); }catch(e){ console.error('Error al actualizar deshacer/rehacer:',e); }
         renderTabActual();
     }
 
@@ -1312,7 +1533,13 @@ window._appRuntimeInicializada = true;
             if(el) el.style.display=activo?'inline-flex':'none';
         });
         document.getElementById('scheduleContainer').classList.toggle('modo-activo',activo);
-        if(!activo) document.getElementById('planProgreso').style.display='none';
+        if(!activo){
+            const progreso=document.getElementById('planProgreso');
+            if(progreso){
+                progreso.style.display='none';
+                progreso.textContent='';
+            }
+        }
     }
 
     document.getElementById('btnModoPlanificar').onclick=()=>{
@@ -1560,6 +1787,7 @@ window._appRuntimeInicializada = true;
             docenteId:limpiarTexto(p.docenteId), salaId:limpiarTexto(p.salaId), dia:Number(p.dia), bloque:Number(p.bloque),
             tipoPresencial:p.tipoPresencial!==false,
             componenteId:limpiarTexto(p.componenteId,60),
+            nota:limpiarTexto(p.nota,500),
             fijo:!!p.fijo,
             explicacionAuto:(p.explicacionAuto&&typeof p.explicacionAuto==='object'&&!Array.isArray(p.explicacionAuto))?{
                 origen:limpiarTexto(p.explicacionAuto.origen,60),
@@ -4099,8 +4327,40 @@ window._appRuntimeInicializada = true;
         ['passActual','passNueva','passConfirmar'].forEach(id=>document.getElementById(id).addEventListener('keydown',e=>{ if(e.key==='Enter') guardarCambio(); }));
         document.getElementById('passActual').focus();
     }
-    document.getElementById('btnExportar').addEventListener('click',()=>document.getElementById('exportDropdown').classList.toggle('show'));
-    document.getElementById('btnMenu').addEventListener('click',()=>{ actualizarEstadoRespaldoLocal(); document.getElementById('menuDropdown').classList.toggle('show'); });
+    function ajustarDropdownViewport(menu, boton){
+        if(!menu||!boton||!menu.classList.contains('show')) return;
+        menu.style.left='';
+        menu.style.right='';
+        menu.style.top='';
+        menu.style.maxHeight='';
+        menu.style.overflowY='';
+        const rect=menu.getBoundingClientRect();
+        const btnRect=boton.getBoundingClientRect();
+        const margen=12;
+        if(rect.right>window.innerWidth-margen){
+            const delta=rect.right-(window.innerWidth-margen);
+            menu.style.right=`${delta}px`;
+        }
+        if(rect.left<margen){
+            menu.style.left=`${margen-btnRect.left}px`;
+            menu.style.right='auto';
+        }
+        const rect2=menu.getBoundingClientRect();
+        if(rect2.bottom>window.innerHeight-margen){
+            menu.style.maxHeight=`${Math.max(160,window.innerHeight-rect2.top-margen)}px`;
+            menu.style.overflowY='auto';
+        }
+    }
+    function alternarDropdown(menuId, boton){
+        const menu=document.getElementById(menuId);
+        if(!menu) return;
+        const seAbre=!menu.classList.contains('show');
+        document.querySelectorAll('.dropdown-menu').forEach(m=>{ if(m!==menu) m.classList.remove('show'); });
+        menu.classList.toggle('show',seAbre);
+        if(seAbre) requestAnimationFrame(()=>ajustarDropdownViewport(menu,boton));
+    }
+    document.getElementById('btnExportar').addEventListener('click',(e)=>alternarDropdown('exportDropdown',e.currentTarget));
+    document.getElementById('btnMenu').addEventListener('click',(e)=>{ actualizarEstadoRespaldoLocal(); alternarDropdown('menuDropdown',e.currentTarget); });
     document.getElementById('btnUndoGlobal')?.addEventListener('click',deshacer);
     document.getElementById('btnRedoGlobal')?.addEventListener('click',rehacer);
     document.getElementById('btnGestorCargar')?.addEventListener('click',previsualizarGestorSecciones);
@@ -4538,13 +4798,24 @@ window._appRuntimeInicializada = true;
         abrirReversionAutos
     });
 
+    function inicializarModuloSeguro(nombre,initFn){
+        try{
+            initFn();
+            return true;
+        }catch(e){
+            console.error(`${nombre} no pudo inicializarse:`, e);
+            toast(`${nombre} quedó desactivado temporalmente. El resto de la app sigue operativo.`,'warning');
+            return false;
+        }
+    }
+
     cargar().then(()=>pedirTemporadaInicialSiHaceFalta()).then(()=>{
-        Reportes.init();
-        FichaDocente.init();
-        Entidades.init();
-        VistaHorario.init();
-        Planificacion.init();
-        Configuracion.init();
+        inicializarModuloSeguro('Reportes',()=>Reportes.init());
+        inicializarModuloSeguro('Ficha Docente',()=>FichaDocente.init());
+        inicializarModuloSeguro('Entidades',()=>Entidades.init());
+        inicializarModuloSeguro('Vista Horarios',()=>VistaHorario.init());
+        inicializarModuloSeguro('Planificación',()=>Planificacion.init());
+        inicializarModuloSeguro('Configuración',()=>Configuracion.init());
         refrescarInicial();
         // Sin autoguardado por intervalo — cada acción llama a guardar() directamente
         // Esto evita que un usuario pise los cambios del otro en entorno multiusuario

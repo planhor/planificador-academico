@@ -13,6 +13,11 @@
                 asig?.condicion&&asig.condicion!=='normal' ? LABEL_CRITERIOS_ASIGNATURA.condicion[asig.condicion] : ''
             ].filter(Boolean).join(' · ');
         }
+        const comparadorSecciones = [];
+        const comparadorFiltros = [];
+        let comparadorActivo = false;
+        let comparadorCapacidad = 2;
+
         function alertasCriteriosAsignatura(asig){
             const alertas=[];
             if(asig?.area==='transversal'||asig?.controlHorario==='coordinacion-externa') alertas.push({txt:'Coordinar',cls:'info'});
@@ -176,9 +181,17 @@
             ctx.renderHistorial?.();
         }
 
+        function mismoId(a,b){
+            return String(a??'')===String(b??'');
+        }
+
+        function idTexto(valor){
+            return String(valor??'');
+        }
+
         function nombreSeccion(seccionId){
             const data=getData();
-            return data.secciones.find(s=>s.id===seccionId)?.nombre||'Sección no encontrada';
+            return data.secciones.find(s=>mismoId(s.id,seccionId))?.nombre||'Sección no encontrada';
         }
 
         function jornadaSeccion(seccion={}){
@@ -209,7 +222,22 @@
         }
 
         function areaCarrera(carrera={}){
+            carrera=carrera||{};
             return String(carrera.area||carrera.especialidad||'Sin área').trim()||'Sin área';
+        }
+
+        function contextoSeccion(seccionId){
+            const data=getData();
+            const sec=data.secciones.find(s=>mismoId(s.id,seccionId));
+            const nivel=sec?data.niveles.find(n=>mismoId(n.id,sec.nivelId)):null;
+            const carrera=nivel?data.carreras.find(c=>mismoId(c.id,nivel.carreraId)):null;
+            return {sec,nivel,carrera};
+        }
+
+        function idSeccionReal(seccionId){
+            const data=getData();
+            const sec=data.secciones.find(s=>mismoId(s.id,seccionId));
+            return sec?idTexto(sec.id):'';
         }
 
         function areasCarrera(){
@@ -219,20 +247,21 @@
         }
 
         function gruposVinculadosDeSeccion(seccionId){
-            const grupos=ctx.getGruposDictacionSeccion?.(seccionId)||[];
-            return grupos.filter(g=>g.seccionMadreId!==seccionId && g.seccionesVinculadasIds?.includes(seccionId));
+            const grupos=ctx.getGruposDictacion?.()||[];
+            return grupos.filter(g=>!mismoId(g.seccionMadreId,seccionId) && g.seccionesVinculadasIds?.some(id=>mismoId(id,seccionId)));
         }
 
         function planVinculadoEn(seccionId,dia,bloque,planes=null){
             const data=getData();
             const fuente=planes||data.planificaciones;
+            const diaNum=Number(dia), bloqueNum=Number(bloque);
             for(const grupo of gruposVinculadosDeSeccion(seccionId)){
                 const asignaturas=[grupo.asignaturaId, ...(grupo.asignaturasEquivalentesIds||[])].filter(Boolean);
                 const plan=fuente.find(p=>
-                    p.seccionId===grupo.seccionMadreId &&
-                    asignaturas.includes(p.asignaturaId) &&
-                    p.dia===dia &&
-                    p.bloque===bloque
+                    mismoId(p.seccionId,grupo.seccionMadreId) &&
+                    asignaturas.some(id=>mismoId(id,p.asignaturaId)) &&
+                    Number(p.dia)===diaNum &&
+                    Number(p.bloque)===bloqueNum
                 );
                 if(plan) return {plan, grupo, vinculado:true, seccionVistaId:seccionId};
             }
@@ -243,7 +272,7 @@
             const data=getData();
             const fuente=planes||data.planificaciones;
             const propio=planes
-                ? fuente.find(p=>p.seccionId===seccionId&&p.dia===dia&&p.bloque===bloque)
+                ? fuente.find(p=>mismoId(p.seccionId,seccionId)&&Number(p.dia)===Number(dia)&&Number(p.bloque)===Number(bloque))
                 : ctx.getIndicePlan()[`${seccionId}_${dia}_${bloque}`];
             if(propio) return {plan:propio, vinculado:false, grupo:null, seccionVistaId:seccionId};
             return planVinculadoEn(seccionId,dia,bloque,fuente);
@@ -454,6 +483,305 @@
                 });
             });
             pintarSeleccionBloques();
+            renderComparadorPlanificacion();
+        }
+
+        function agregarSeccionComparador(seccionId=null){
+            const data=getData();
+            comparadorActivo=true;
+            const id=idTexto(seccionId||data.sel?.seccionId);
+            if(!id){ renderComparadorPlanificacion(); return ctx.toast('Selecciona una sección en cualquier espacio comparativo','info'); }
+            if(!data.secciones.some(s=>mismoId(s.id,id))) return ctx.toast('La sección seleccionada no existe','error');
+            if(comparadorSecciones.some(x=>mismoId(x,id))) return ctx.toast('Esa sección ya está en la vista comparativa','info');
+            const libre=Array.from({length:comparadorCapacidad},(_,i)=>i).find(i=>!comparadorSecciones[i]);
+            if(libre===undefined) return ctx.toast(`La vista comparativa actual permite ${comparadorCapacidad} secciones`,'info');
+            comparadorSecciones[libre]=id;
+            comparadorFiltros[libre]=filtrosDesdeSeccion(id);
+            renderComparadorPlanificacion();
+        }
+
+        function quitarSeccionComparador(seccionId){
+            const idx=comparadorSecciones.findIndex(id=>mismoId(id,seccionId));
+            if(idx>=0){
+                comparadorSecciones[idx]=null;
+                if(comparadorFiltros[idx]) comparadorFiltros[idx].seccionId='';
+            }
+            renderComparadorPlanificacion();
+        }
+
+        function limpiarComparadorPlanificacion(){
+            comparadorSecciones.splice(0,comparadorSecciones.length);
+            comparadorFiltros.splice(0,comparadorFiltros.length);
+            renderComparadorPlanificacion();
+        }
+
+        function filtrosDesdeSeccion(seccionId){
+            const {sec,nivel,carrera}=contextoSeccion(seccionId);
+            return {
+                area:areaCarrera(carrera),
+                carreraId:carrera?idTexto(carrera.id):'',
+                nivelId:nivel?idTexto(nivel.id):'',
+                jornada:sec?jornadaSeccion(sec):'',
+                seccionId:sec?idTexto(sec.id):''
+            };
+        }
+
+        function filtrosComparador(index){
+            const id=idTexto(comparadorSecciones[index]||'');
+            if(id) return Object.assign({},filtrosDesdeSeccion(id),comparadorFiltros[index]||{}, {seccionId:id});
+            return Object.assign({area:'',carreraId:'',nivelId:'',jornada:'',seccionId:''},comparadorFiltros[index]||{});
+        }
+
+        function seccionComparadorPorIndice(index, fallback=''){
+            const f=filtrosComparador(index);
+            return idSeccionReal(f.seccionId||comparadorSecciones[index]||fallback);
+        }
+
+        function actualizarFiltroComparador(index,campo,valor){
+            if(!Number.isFinite(index)||index<0) return;
+            const f=Object.assign({area:'',carreraId:'',nivelId:'',jornada:'',seccionId:''},comparadorFiltros[index]||{});
+            f[campo]=valor||'';
+            if(campo==='area'){f.carreraId='';f.nivelId='';f.jornada='';f.seccionId='';}
+            if(campo==='carreraId'){f.nivelId='';f.jornada='';f.seccionId='';}
+            if(campo==='nivelId'){f.jornada='';f.seccionId='';}
+            if(campo==='jornada') f.seccionId='';
+            if(campo==='seccionId'&&valor){
+                const real=filtrosDesdeSeccion(valor);
+                comparadorSecciones[index]=real.seccionId||idTexto(valor);
+                comparadorFiltros[index]=real.seccionId?real:Object.assign({},f,{seccionId:idTexto(valor)});
+            }else{
+                comparadorSecciones[index]=null;
+                comparadorFiltros[index]=f;
+            }
+            renderComparadorPlanificacion();
+        }
+
+        function enfocarCeldaPlanificacion(dia,bloque){
+            if(!Number.isFinite(Number(dia))||!Number.isFinite(Number(bloque))) return;
+            requestAnimationFrame(()=>{
+                const cell=document.querySelector(`#scheduleGrid .grid-cell[data-dia="${Number(dia)}"][data-bloque="${Number(bloque)}"]`);
+                if(!cell) return;
+                cell.classList.add('compare-jump-focus');
+                cell.scrollIntoView({behavior:'smooth',block:'center',inline:'center'});
+                setTimeout(()=>cell.classList.remove('compare-jump-focus'),2600);
+            });
+        }
+
+        function abrirSeccionComparador(seccionId, opciones={}){
+            const data=getData();
+            const index=Number(opciones.index);
+            const baseId=Number.isFinite(index)?seccionComparadorPorIndice(index,seccionId):idSeccionReal(seccionId);
+            let targetId=baseId;
+            let planObjetivo=null;
+            if(!targetId) return ctx.toast('No se pudo abrir la sección seleccionada','error');
+            if(opciones.dia!==undefined&&opciones.bloque!==undefined){
+                const visible=planVisibleEn(targetId,Number(opciones.dia),Number(opciones.bloque));
+                if(visible?.plan){
+                    planObjetivo=visible.plan;
+                    if(visible.vinculado) targetId=visible.plan.seccionId;
+                }
+            }
+            const {sec,nivel,carrera}=contextoSeccion(targetId);
+            if(!sec||!nivel||!carrera) return ctx.toast('No se pudo abrir la sección seleccionada','error');
+            ctx.activarTab?.('planificacion');
+            cerrarPopupAccion();
+            data.sel.area=areaCarrera(carrera);
+            data.sel.carreraId=carrera.id;
+            data.sel.nivelId=nivel.id;
+            data.sel.jornada=jornadaSeccion(sec);
+            data.sel.seccionId=sec.id;
+            if(planObjetivo&&mismoId(planObjetivo.seccionId,sec.id)){
+                data.sel.asignaturaId=planObjetivo.asignaturaId||null;
+                data.sel.componenteId=planObjetivo.componenteId||null;
+                data.sel.docenteId=planObjetivo.docenteId||null;
+                data.sel.salaId=planObjetivo.salaId||null;
+                data.sel.tipo=planObjetivo.tipoPresencial===false?'virtual':'presencial';
+            }else{
+                data.sel.asignaturaId=null;
+                data.sel.componenteId=null;
+                data.sel.docenteId=null;
+                data.sel.salaId=null;
+                data.sel.tipo='presencial';
+            }
+            actualizarSelectoresPlan();
+            construirGrilla();
+            actualizarProgresoPlan();
+            document.getElementById('scheduleContainer')?.scrollIntoView({behavior:'smooth',block:'start'});
+            enfocarCeldaPlanificacion(opciones.dia,opciones.bloque);
+            ctx.toast(planObjetivo?'Bloque abierto en la grilla principal':'Sección abierta en la grilla principal','info');
+        }
+
+        function renderComparadorPlanificacion(){
+            const data=getData();
+            const panel=document.getElementById('planComparador');
+            if(!panel) return;
+            for(let i=comparadorSecciones.length-1;i>=0;i--){
+                if(comparadorSecciones[i]&&!data.secciones.some(s=>mismoId(s.id,comparadorSecciones[i]))) comparadorSecciones[i]=null;
+            }
+            if(!comparadorActivo&&!comparadorSecciones.some(Boolean)){
+                panel.style.display='none';
+                panel.innerHTML='';
+                return;
+            }
+            panel.style.display='block';
+            const seleccionadas=comparadorSecciones.filter(Boolean).length;
+            const slots=Array.from({length:comparadorCapacidad},(_,i)=>seccionComparadorPorIndice(i));
+            panel.innerHTML=`
+                <div class="plan-compare-head">
+                    <div>
+                        <strong>Vista comparativa</strong>
+                        <span>${seleccionadas} de ${comparadorCapacidad} secciones</span>
+                    </div>
+                    <div class="plan-compare-toolbar">
+                        <label>Grillas
+                            <select class="form-select" data-compare-capacity>
+                                ${[2,4,6].map(n=>ctx.optionHTML(String(n),String(n),comparadorCapacidad===n)).join('')}
+                            </select>
+                        </label>
+                        <button class="btn btn-xs" type="button" data-compare-clear>Limpiar vista</button>
+                    </div>
+                </div>
+                <div class="plan-compare-grid" style="--compare-columns:${comparadorCapacidad===2?2:comparadorCapacidad===4?2:3};">
+                    ${slots.map((id,i)=>id?renderTarjetaComparador(id,i):renderSlotComparadorVacio(i)).join('')}
+                </div>
+            `;
+            panel.querySelector('[data-compare-capacity]')?.addEventListener('change',e=>{
+                comparadorCapacidad=Math.max(2,Math.min(6,parseInt(e.target.value)||2));
+                renderComparadorPlanificacion();
+            });
+            sincronizarValoresSelectoresComparador(panel);
+            if(!panel.dataset.compareDelegated){
+                panel.dataset.compareDelegated='1';
+                panel.addEventListener('click',e=>{
+                    const clear=e.target.closest('[data-compare-clear]');
+                    if(clear) return limpiarComparadorPlanificacion();
+                    const open=e.target.closest('[data-compare-open]');
+                    if(open) return abrirSeccionComparador(open.dataset.compareOpen,{index:open.dataset.compareIndex});
+                    const remove=e.target.closest('[data-compare-remove]');
+                    if(remove) return quitarSeccionComparador(remove.dataset.compareRemove);
+                    const cell=e.target.closest('[data-compare-cell-open]');
+                    if(cell) return abrirSeccionComparador(cell.dataset.compareSection,{index:cell.dataset.compareIndex,dia:cell.dataset.compareDia,bloque:cell.dataset.compareBloque});
+                });
+                panel.addEventListener('change',e=>{
+                    const sel=e.target.closest('[data-compare-filter]');
+                    if(!sel) return;
+                    actualizarFiltroComparador(Number(sel.dataset.compareIndex),sel.dataset.compareFilter,sel.value);
+                });
+            }
+        }
+
+        function sincronizarValoresSelectoresComparador(panel){
+            panel.querySelectorAll('[data-compare-filter]').forEach(sel=>{
+                const index=Number(sel.dataset.compareIndex);
+                const campo=sel.dataset.compareFilter;
+                const f=filtrosComparador(index);
+                const valor=String(f[campo]??'');
+                if([...sel.options].some(o=>String(o.value)===valor)) sel.value=valor;
+            });
+        }
+
+        function opcionesSlotComparador(index){
+            const data=getData(), f=filtrosComparador(index);
+            const areas=areasCarrera();
+            const carreras=data.carreras.filter(c=>!f.area||areaCarrera(c)===f.area).sort((a,b)=>String(a.nombre||'').localeCompare(String(b.nombre||''),undefined,{numeric:true,sensitivity:'base'}));
+            const carreraIdsPermitidos=new Set(carreras.map(c=>String(c.id??'')));
+            const niveles=data.niveles.filter(n=>{
+                if(f.carreraId) return mismoId(n.carreraId,f.carreraId);
+                if(f.area) return carreraIdsPermitidos.has(String(n.carreraId??''));
+                return true;
+            }).sort(ordenarNivelesDesc);
+            const nivelIds=new Set(niveles.map(n=>String(n.id??'')));
+            const seccionesBase=data.secciones.filter(s=>{
+                if(f.nivelId) return mismoId(s.nivelId,f.nivelId);
+                if(f.carreraId||f.area) return nivelIds.has(String(s.nivelId??''));
+                return true;
+            });
+            const jornadas=[...new Set(seccionesBase.map(jornadaSeccion))].sort((a,b)=>a==='diurna'?-1:b==='diurna'?1:0);
+            const secciones=seccionesBase.filter(s=>!f.jornada||jornadaSeccion(s)===f.jornada).sort(ordenarSeccionesNombre);
+            return {f,areas,carreras,niveles,jornadas,secciones};
+        }
+
+        function renderSelectoresSlotComparador(index){
+            const {f,areas,carreras,niveles,jornadas,secciones}=opcionesSlotComparador(index);
+            const attrs=campo=>`data-compare-filter="${campo}" data-compare-index="${index}"`;
+            return `<div class="plan-compare-selectors">
+                <select class="form-select" ${attrs('area')}><option value="">Área</option>${areas.map(a=>ctx.optionHTML(a,a,f.area===a)).join('')}</select>
+                <select class="form-select" ${attrs('carreraId')}><option value="">Carrera</option>${carreras.map(c=>ctx.optionHTML(c.id,c.nombre||c.codigo||'Carrera',mismoId(f.carreraId,c.id))).join('')}</select>
+                <select class="form-select" ${attrs('nivelId')}><option value="">Nivel</option>${niveles.map(n=>ctx.optionHTML(n.id,n.nombre,mismoId(f.nivelId,n.id))).join('')}</select>
+                <select class="form-select" ${attrs('jornada')}><option value="">Jornada</option>${jornadas.map(j=>ctx.optionHTML(j,etiquetaJornada(j),f.jornada===j)).join('')}</select>
+                <select class="form-select" ${attrs('seccionId')}><option value="">Sección</option>${secciones.map(s=>ctx.optionHTML(s.id,s.nombre,mismoId(f.seccionId,s.id))).join('')}</select>
+            </div>`;
+        }
+
+        function docenteNombreCorto(doc){
+            if(!doc) return 'Sin docente';
+            if(doc.id===ctx.DOCENTE_NN_ID) return 'Docente NN';
+            const nombre=String(doc.nombre||'').trim();
+            const apellido=String(doc.apellido||'').trim();
+            if(nombre&&apellido) return `${nombre.charAt(0)}. ${apellido}`;
+            return docenteNombre(doc);
+        }
+
+        function renderSlotComparadorVacio(index){
+            return `<article class="plan-compare-card plan-compare-card-empty" data-compare-index="${index}">
+                <div class="plan-compare-card-head"><div><strong>Espacio ${index+1}</strong><span>Selecciona una sección para comparar</span></div></div>
+                ${renderSelectoresSlotComparador(index)}
+            </article>`;
+        }
+
+        function renderTarjetaComparador(seccionId,index=0){
+            const data=getData();
+            const {sec,nivel,carrera}=contextoSeccion(seccionId);
+            const titulo=sec?.nombre||nombreSeccion(seccionId);
+            const subtitulo=[carrera?.nombre,nivel?.nombre,sec?etiquetaJornada(jornadaSeccion(sec)):null].filter(Boolean).join(' · ');
+            const planesComparador=Array.isArray(data.planificaciones)?data.planificaciones:[];
+            let ocupados=0, heredados=0;
+            const filas=ctx.BLOQUES.map(b=>{
+                const celdas=ctx.DIAS.map((d,di)=>{
+                    const visible=planVisibleEnFuente(seccionId,di,b.n,planesComparador);
+                    const cellAttrs=`data-compare-cell-open data-compare-index="${index}" data-compare-section="${ctx.escapeAttr(seccionId)}" data-compare-dia="${di}" data-compare-bloque="${b.n}"`;
+                    if(!visible?.plan) return `<button class="compare-cell" type="button" ${cellAttrs} title="${ctx.escapeAttr(d)} B${b.n} · abrir sección"></button>`;
+                    ocupados++;
+                    if(visible.vinculado) heredados++;
+                    const plan=visible.plan;
+                    const asig=data.asignaturas.find(a=>a.id===plan.asignaturaId);
+                    const sala=data.salas.find(s=>s.id===plan.salaId);
+                    const doc=data.docentes.find(d=>d.id===plan.docenteId);
+                    const color=ctx.colorAsignaturaPlanhor?.(asig)||asig?.color||'var(--planhor-subject-neutral)';
+                    const detalle=[
+                        [asig?.codigo,asig?.nombre].filter(Boolean).join(' - '),
+                        `${d} B${b.n}`,
+                        sala?.nombre?`Sala ${sala.nombre}`:'',
+                        doc?`Docente ${docenteNombre(doc)}`:'',
+                        visible.vinculado?`Heredada desde ${nombreSeccion(plan.seccionId)}`:''
+                    ].filter(Boolean).join(' · ');
+                    return `<button class="compare-cell filled ${visible.vinculado?'linked':''}" type="button" ${cellAttrs} style="background:${ctx.escapeAttr(color)}" title="${ctx.escapeAttr(detalle)}">
+                        <span>${ctx.escapeHTML(asig?.codigo||'?')}</span>
+                        <small>${ctx.escapeHTML(sala?.nombre||'Sin sala')}</small>
+                        <small>${ctx.escapeHTML(docenteNombreCorto(doc))}</small>
+                    </button>`;
+                }).join('');
+                return `<div class="compare-time">B${b.n}</div>${celdas}`;
+            }).join('');
+            return `<article class="plan-compare-card" data-section="${ctx.escapeAttr(seccionId)}" data-compare-index="${index}">
+                <div class="plan-compare-card-head">
+                    <div>
+                        <strong>${ctx.escapeHTML(titulo)}</strong>
+                        <span>${ctx.escapeHTML(subtitulo)}</span>
+                    </div>
+                    <div class="plan-compare-actions">
+                        <button class="btn btn-xs" type="button" data-compare-open="${ctx.escapeAttr(seccionId)}" data-compare-index="${index}">Editar</button>
+                        <button class="btn btn-xs" type="button" data-compare-remove="${ctx.escapeAttr(seccionId)}">Quitar</button>
+                    </div>
+                </div>
+                <div class="plan-compare-meta">${ocupados} bloque(s)${heredados?` · ${heredados} heredado(s)`:''}</div>
+                ${renderSelectoresSlotComparador(index)}
+                <div class="compare-schedule">
+                    <div class="compare-corner">B</div>
+                    ${ctx.DIAS.map(d=>`<div class="compare-day">${ctx.escapeHTML(d.slice(0,3))}</div>`).join('')}
+                    ${filas}
+                </div>
+            </article>`;
         }
 
         function aplicarEstadoCelda(cell,plan,meta={}){
@@ -564,6 +892,7 @@
                 compNombre?['Componente', compNombre]:null
             ].filter(Boolean);
             const explicacion=textoExplicacionAuto(plan.explicacionAuto);
+            const nota=String(plan.nota||'').trim();
             const tooltip=asegurarTooltipPlan();
             tooltip.innerHTML=`
                 <div class="plan-block-tooltip-title">${ctx.escapeHTML(titulo)}</div>
@@ -571,6 +900,7 @@
                 <div class="plan-block-tooltip-grid">
                     ${filas.map(([k,v])=>`<span>${ctx.escapeHTML(k)}</span><strong>${ctx.escapeHTML(v)}</strong>`).join('')}
                 </div>
+                ${nota?`<div class="plan-block-tooltip-note"><strong>Observación</strong><br>${ctx.escapeHTML(nota)}</div>`:''}
                 ${explicacion?`<div class="plan-block-tooltip-note">${ctx.escapeHTML(explicacion)}</div>`:''}
             `;
             tooltip.classList.add('visible');
@@ -607,9 +937,9 @@
             }).filter(Boolean).join(' · ');
         }
 
-        function aplicarOcupacionDocenteCelda(cell,dia,bloque,planVisible=null){
+        function aplicarOcupacionDocenteCelda(cell,dia,bloque,planVisible=null,docenteIdOverride=null){
             const data=getData();
-            const docId=data.sel?.docenteId;
+            const docId=docenteIdOverride||data.sel?.docenteId;
             if(!docId||docId===ctx.DOCENTE_NN_ID) return false;
             const ocupados=planesDocenteEn(docId,dia,bloque,{ignorarIds:planVisible?.id?[planVisible.id]:[]});
             if(!ocupados.length) return false;
@@ -630,9 +960,9 @@
             return true;
         }
 
-        function aplicarOcupacionSalaCelda(cell,dia,bloque,planVisible=null){
+        function aplicarOcupacionSalaCelda(cell,dia,bloque,planVisible=null,salaIdOverride=null){
             const data=getData();
-            const salaId=data.sel?.salaId;
+            const salaId=salaIdOverride||data.sel?.salaId;
             if(!salaId||salaId===ctx.SALA_VIRTUAL_ID||salaId===ctx.SALA_TRO2_ID) return false;
             const ocupados=planesSalaEn(salaId,dia,bloque,{ignorarIds:planVisible?.id?[planVisible.id]:[]});
             if(!ocupados.length) return false;
@@ -655,6 +985,18 @@
                 cell.appendChild(marca);
             }
             return true;
+        }
+
+        function limpiarMarcasDisponibilidadGrilla(){
+            document.querySelectorAll('#scheduleGrid .grid-cell').forEach(cell=>{
+                cell.classList.remove('available','unavailable-docente','teacher-busy','teacher-busy-overlay','room-busy','room-busy-overlay');
+                cell.querySelectorAll('.teacher-busy-label,.teacher-busy-title,.room-busy-label,.room-busy-title').forEach(el=>el.remove());
+                if(!cell.classList.contains('planned')&&!cell.classList.contains('linked-plan')){
+                    cell.innerHTML='';
+                    cell.title='';
+                    cell.removeAttribute('aria-label');
+                }
+            });
         }
 
         function actualizarDisponibilidadCelda(cell,dia,bloque){
@@ -978,6 +1320,59 @@
             ctx.toast(actual.fijo?'Bloque fijado':'Bloque desbloqueado','success');
         }
 
+        function editarNotaPlanificacion(plan){
+            const data=getData();
+            const modal=document.getElementById('modalContainer');
+            if(!modal) return;
+            const porComponente=!!plan.componenteId;
+            const relacionados=data.planificaciones.filter(p=>
+                p.seccionId===plan.seccionId &&
+                p.asignaturaId===plan.asignaturaId &&
+                String(p.componenteId||'')===String(plan.componenteId||'')
+            );
+            const asig=data.asignaturas.find(a=>a.id===plan.asignaturaId);
+            const sec=data.secciones.find(s=>s.id===plan.seccionId);
+            const actual=relacionados.find(p=>String(p.nota||'').trim())?.nota||plan.nota||'';
+            modal.innerHTML=`
+                <div class="modal-overlay" id="modalOverlay"><div class="modal">
+                    <h3>Observación de planificación</h3>
+                    <p style="color:var(--text-secondary);font-size:0.82rem;margin-top:-4px;">
+                        ${ctx.escapeHTML([asig?.codigo,asig?.nombre].filter(Boolean).join(' - ')||'Asignatura')} · ${ctx.escapeHTML(sec?.nombre||'Sección')}
+                    </p>
+                    <div class="form-group">
+                        <label class="form-label">Observación</label>
+                        <textarea class="form-input" id="planNotaTexto" rows="5" maxlength="500" placeholder="Ej: Coordinar con laboratorio, revisar software, pendiente confirmar docente...">${ctx.escapeHTML(actual)}</textarea>
+                    </div>
+                    <p style="color:var(--text-secondary);font-size:0.74rem;">
+                        Se aplicará a ${relacionados.length} bloque(s) de esta ${porComponente?'subsección/componente':'asignatura'}.
+                    </p>
+                    <div class="modal-actions">
+                        <button class="btn btn-danger" id="btnPlanNotaBorrar">Borrar nota</button>
+                        <button class="btn" id="btnPlanNotaCancelar">Cancelar</button>
+                        <button class="btn btn-primary" id="btnPlanNotaGuardar">Guardar</button>
+                    </div>
+                </div></div>`;
+            const cerrar=()=>{ modal.innerHTML=''; };
+            document.getElementById('btnPlanNotaCancelar').onclick=cerrar;
+            document.getElementById('modalOverlay').onclick=(e)=>{ if(e.target===e.currentTarget) cerrar(); };
+            const guardar=(valor)=>{
+                ctx.pushUndo?.({tipo:'nota_planificacion',resumen:'Editar observación de planificación',afecta:`${relacionados.length} bloque(s)`,critica:false});
+                relacionados.forEach(p=>{
+                    if(valor) p.nota=valor;
+                    else delete p.nota;
+                });
+                ctx.auditoria?.('nota_planificacion_actualizada',{seccionId:plan.seccionId,asignaturaId:plan.asignaturaId,componenteId:plan.componenteId||'',cantidad:relacionados.length,nota:valor});
+                ctx.guardar();
+                ctx.reconstruirIndices();
+                construirGrilla();
+                refrescarDespuesCambioPlanificacion();
+                cerrar();
+                ctx.toast(valor?'Observación guardada':'Observación eliminada','success');
+            };
+            document.getElementById('btnPlanNotaGuardar').onclick=()=>guardar((document.getElementById('planNotaTexto')?.value||'').trim().slice(0,500));
+            document.getElementById('btnPlanNotaBorrar').onclick=()=>guardar('');
+        }
+
         function posicionarPopupEnPuntero(popup, cell, evento=null){
             const rect=cell.getBoundingClientRect();
             const eventoDentroCelda=Number.isFinite(evento?.clientX)&&Number.isFinite(evento?.clientY)&&
@@ -1015,6 +1410,7 @@
                     <button id="popupMoverAsignatura">🔄 Mover asignatura</button>
                     <button id="popupCambiarDocente">Cambiar docente</button>
                     <button id="popupCambiarSala">Cambiar sala</button>
+                    <button id="popupEditarNota">${plan.nota?'Editar observación':'Agregar observación'}</button>
                     <button id="popupEliminarBloque">Eliminar este bloque</button>
                     <button id="popupEliminarTodos">Eliminar todos</button>
                 `:`
@@ -1030,6 +1426,7 @@
                 popup.querySelector('#popupMoverAsignatura').onclick = () => { iniciarModoMovimiento(plan); cerrarPopupAccion(); };
                 popup.querySelector('#popupCambiarDocente').onclick = () => { cambiarDocenteAsignatura(plan); cerrarPopupAccion(); };
                 popup.querySelector('#popupCambiarSala').onclick = () => { cambiarSalaAsignatura(plan); cerrarPopupAccion(); };
+                popup.querySelector('#popupEditarNota').onclick = () => { editarNotaPlanificacion(plan); cerrarPopupAccion(); };
                 popup.querySelector('#popupEliminarBloque').onclick = () => { if(confirm('¿Eliminar este bloque?')) eliminarBloque(plan); cerrarPopupAccion(); actualizarSelectoresPlan(); };
                 popup.querySelector('#popupEliminarTodos').onclick = () => { const porComponente=!!plan.componenteId; if(confirm(porComponente?'¿Eliminar todos los bloques no fijos de este componente?':'¿Eliminar todos los bloques no fijos de esta asignatura?')){ ctx.pushUndo(); const coincide=p => !p.fijo && p.asignaturaId === plan.asignaturaId && p.seccionId === plan.seccionId && (!porComponente || String(p.componenteId||'')===String(plan.componenteId||'')); const eliminados=data.planificaciones.filter(coincide); data.planificaciones = data.planificaciones.filter(p => !coincide(p)); ctx.auditoria?.('bloques_eliminados_asignatura',{cantidad:eliminados.length,seccionId:plan.seccionId,asignaturaId:plan.asignaturaId,componenteId:plan.componenteId||'',bloques:eliminados,respetaFijos:true}); ctx.guardar(); ctx.reconstruirIndices(); construirGrilla(); actualizarSelectoresPlan(); refrescarDespuesCambioPlanificacion(); } cerrarPopupAccion(); };
             } else {
@@ -1308,10 +1705,7 @@
             document.getElementById('btnMovVerDisponibilidad').onclick=()=>{
                 modoMovimiento.nuevoDocenteId=document.getElementById('movNuevoDocente').value;
                 ctx.cerrarModal(); data.modoPlan=true;
-                document.getElementById('btnModoPlanificar').style.display='none';
-                document.getElementById('btnAutoAsignatura').style.display='none'; document.getElementById('btnAutoSeccion').style.display='none'; document.getElementById('btnOptimizarHorario').style.display='none';
-                document.getElementById('btnCancelarModo').style.display='inline-flex';
-                document.getElementById('scheduleContainer').classList.add('modo-activo');
+                ctx.actualizarModoPlanificacionUI?.();
                 document.getElementById('planProgreso').style.display='block';
                 document.getElementById('planProgreso').textContent='🔄 Moviendo '+(asig.codigo||'')+' → '+(data.docentes.find(d=>d.id===modoMovimiento.nuevoDocenteId)?.nombre||'')+' — Arrastra un bloque. Usa Command/Ctrl para mover el tramo completo.';
                 construirGrillaMovimiento();
@@ -1348,23 +1742,27 @@
                     const planExistente=visibleExistente?.plan||null;
                     const esDeMiAsig=planExistente && !visibleExistente.vinculado && planExistente.asignaturaId===mm.plan.asignaturaId;
                     if(esDeMiAsig){
-                        cell.classList.add('planned');
-                        if(planExistente.fijo) cell.classList.add('fixed-plan');
-                        cell.style.backgroundColor=ctx.colorAsignaturaPlanhor?.(mm.asig)||mm.asig.color||'var(--planhor-subject-neutral)';
-                        cell.innerHTML='';
-                        const codigo=document.createElement('span');
-                        codigo.textContent=(planExistente.fijo?'🔒 ':'')+(mm.asig.codigo||'');
-                        const ayuda=document.createElement('small');
-                        ayuda.textContent=planExistente.fijo?'Fijo':'Arrastrar';
-                        cell.append(codigo,ayuda);
+                        aplicarEstadoCelda(cell,planExistente,visibleExistente);
+                        aplicarOcupacionDocenteCelda(cell,di,b.n,planExistente,docId);
+                        aplicarOcupacionSalaCelda(cell,di,b.n,planExistente,mm.salaId);
                     } else if(!planExistente){
                         const disp=checkDisponibilidad(docId,di,b.n,secId,{ignorarIds:[mm.plan.id],asignaturaId:mm.plan.asignaturaId});
-                        const ocupacionSala = ctx.getOcupacionSala();
-                        if(disp.ok && (mm.salaId===ctx.SALA_VIRTUAL_ID||mm.salaId===ctx.SALA_TRO2_ID||!ocupacionSala[`${mm.salaId}_${di}_${b.n}`])){
+                        const docenteOcupado=aplicarOcupacionDocenteCelda(cell,di,b.n,null,docId);
+                        const salaOcupada=aplicarOcupacionSalaCelda(cell,di,b.n,null,mm.salaId);
+                        if(docenteOcupado||salaOcupada){
+                            cell.title=[docenteOcupado?'Docente ocupado':'',salaOcupada?'Sala ocupada':''].filter(Boolean).join(' · ');
+                        } else if(disp.ok){
                             cell.classList.add('available');
                             cell.innerHTML='<small>↳ destino</small>';
-                        } else cell.classList.add('unavailable-docente');
-                    } else cell.classList.add('unavailable-docente');
+                        } else {
+                            cell.classList.add('unavailable-docente');
+                            cell.title=disp.msg||'No disponible';
+                        }
+                    } else {
+                        aplicarEstadoCelda(cell,planExistente,visibleExistente);
+                        cell.classList.add('unavailable-docente');
+                        cell.title='Horario ocupado por otra planificación';
+                    }
                     grid.appendChild(cell);
                 });
             });
@@ -1525,17 +1923,17 @@
             area.innerHTML='<option value="">Todas las áreas</option>'+areas.map(a=>ctx.optionHTML(a,a,data.sel.area===a)).join('');
             area.value=data.sel.area||'';
             const carrerasFiltradas=data.carreras.filter(c=>!data.sel.area||areaCarrera(c)===data.sel.area).sort((a,b)=>String(a.nombre||'').localeCompare(String(b.nombre||''),undefined,{numeric:true,sensitivity:'base'}));
-            if(data.sel.carreraId&&!carrerasFiltradas.some(c=>c.id===data.sel.carreraId)) data.sel.carreraId=null;
+            if(data.sel.carreraId&&!carrerasFiltradas.some(c=>mismoId(c.id,data.sel.carreraId))) data.sel.carreraId=null;
             carr.innerHTML='<option value="">-- Carrera --</option>'+carrerasFiltradas.map(c=>ctx.optionHTML(c.id, `${c.nombre||''} [${areaCarrera(c)}]${c.especialidad&&c.especialidad!==areaCarrera(c)?` · ${c.especialidad}`:''}`)).join(''); carr.value=data.sel.carreraId||'';
-            niv.innerHTML='<option value="">-- Nivel --</option>'+(data.sel.carreraId?data.niveles.filter(n=>n.carreraId===data.sel.carreraId).sort(ordenarNivelesDesc).map(n=>ctx.optionHTML(n.id,n.nombre)).join(''):''); niv.value=data.sel.nivelId||''; niv.disabled=!data.sel.carreraId;
-            const seccionesNivel=data.sel.nivelId?data.secciones.filter(s=>s.nivelId===data.sel.nivelId):[];
+            niv.innerHTML='<option value="">-- Nivel --</option>'+(data.sel.carreraId?data.niveles.filter(n=>mismoId(n.carreraId,data.sel.carreraId)).sort(ordenarNivelesDesc).map(n=>ctx.optionHTML(n.id,n.nombre)).join(''):''); niv.value=data.sel.nivelId||''; niv.disabled=!data.sel.carreraId;
+            const seccionesNivel=data.sel.nivelId?data.secciones.filter(s=>mismoId(s.nivelId,data.sel.nivelId)):[];
             const jornadas=[...new Set(seccionesNivel.map(jornadaSeccion))].sort((a,b)=>a==='diurna'?-1:b==='diurna'?1:0);
             if(data.sel.jornada&&!jornadas.includes(data.sel.jornada)) data.sel.jornada=null;
             if(!data.sel.jornada&&jornadas.length===1) data.sel.jornada=jornadas[0];
             jor.innerHTML='<option value="">-- Jornada --</option>'+jornadas.map(j=>ctx.optionHTML(j,etiquetaJornada(j))).join('');
             jor.value=data.sel.jornada||''; jor.disabled=!data.sel.nivelId||!jornadas.length;
             const seccionesFiltradas=seccionesNivel.filter(s=>!data.sel.jornada||jornadaSeccion(s)===data.sel.jornada).sort(ordenarSeccionesNombre);
-            if(data.sel.seccionId&&!seccionesFiltradas.some(s=>s.id===data.sel.seccionId)) data.sel.seccionId=null;
+            if(data.sel.seccionId&&!seccionesFiltradas.some(s=>mismoId(s.id,data.sel.seccionId))) data.sel.seccionId=null;
             sec.innerHTML='<option value="">-- Sección --</option>'+(data.sel.jornada?seccionesFiltradas.map(s=>ctx.optionHTML(s.id,s.nombre)).join(''):''); sec.value=data.sel.seccionId||''; sec.disabled=!data.sel.nivelId||!data.sel.jornada;
             const asignaturasSelector=data.sel.seccionId?asignaturasDeSeccion(data.sel.seccionId):(data.sel.carreraId&&data.sel.nivelId?data.asignaturaCarreraNivel.filter(r=>r.carreraId===data.sel.carreraId&&r.nivelId===data.sel.nivelId).map(r=>r.asignaturaId):[]);
             asig.innerHTML='<option value="">-- Asignatura --</option>'+(asignaturasSelector.length?asignaturasSelector.map(asignaturaId=>{
@@ -5887,6 +6285,10 @@
                 const data = getData();
                 const map={planArea:'area',planCarrera:'carreraId',planNivel:'nivelId',planJornada:'jornada',planSeccion:'seccionId',planAsignatura:'asignaturaId',planComponente:'componenteId',planDocente:'docenteId',planSala:'salaId',planTipo:'tipo'};
                 if(['planArea','planCarrera','planNivel','planJornada','planSeccion'].includes(id)) limpiarSeleccionBloques();
+                if(modoMovimiento){
+                    modoMovimiento=null;
+                    ctx.toast('Movimiento cancelado por cambio de selección','info');
+                }
                 if(map[id]) data.sel[map[id]]=this.value||null;
                 if(id==='planTipo'){
                     if(data.sel.tipo==='virtual') data.sel.salaId=ctx.SALA_VIRTUAL_ID;
@@ -5905,6 +6307,8 @@
                     if(!['planSala','planComponente'].includes(id)) actualizarSelectoresPlan();
                     actualizarProgresoPlan();
                     if(data.modoPlan||id==='planJornada'||id==='planSeccion'||id==='planTipo') construirGrilla();
+                    else limpiarMarcasDisponibilidadGrilla();
+                    ctx.actualizarModoPlanificacionUI?.();
                 }
             }));
             document.getElementById('btnAutoAsignatura').onclick=autoAsignarAsignaturaActual;
@@ -5912,6 +6316,7 @@
             document.getElementById('btnAutoGeneral').onclick=autoAsignarGeneral;
             document.getElementById('btnOptimizarHorario').onclick=abrirOptimizacionHorario;
             document.getElementById('btnRevertirAutoRapido').onclick=deshacerUltimaAuto;
+            document.getElementById('btnCompararSeccion').onclick=()=>agregarSeccionComparador();
         }
 
         return {

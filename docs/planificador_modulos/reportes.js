@@ -897,6 +897,37 @@
                         accionSeccion(g.sec?.id,g.asig?.id)
                     ]);
                 columnas = ['Sección','Código','Asignatura','Área','Modalidad','Tipo','NN/Planificados','Estado','Bloques NN','Acción'];
+            } else if (tipo === 'observacionesPlanificacion') {
+                const grupos = new Map();
+                data.planificaciones
+                    .filter(p=>String(p.nota||'').trim())
+                    .forEach(p=>{
+                        const asig=data.asignaturas.find(a=>a.id===p.asignaturaId);
+                        const sec=data.secciones.find(s=>s.id===p.seccionId);
+                        const nivel=sec?data.niveles.find(n=>n.id===sec.nivelId):null;
+                        const carrera=nivel?data.carreras.find(c=>c.id===nivel.carreraId):null;
+                        const key=[p.seccionId,p.asignaturaId,p.componenteId||'',String(p.nota||'').trim()].join('|');
+                        if(!grupos.has(key)) grupos.set(key,{p,asig,sec,nivel,carrera,bloques:[]});
+                        grupos.get(key).bloques.push(p);
+                    });
+                datos=Array.from(grupos.values())
+                    .sort((a,b)=>(a.carrera?.nombre||'').localeCompare(b.carrera?.nombre||'',undefined,{numeric:true,sensitivity:'base'})
+                        || (a.nivel?.nombre||'').localeCompare(b.nivel?.nombre||'',undefined,{numeric:true,sensitivity:'base'})
+                        || (a.sec?.nombre||'').localeCompare(b.sec?.nombre||'',undefined,{numeric:true,sensitivity:'base'})
+                        || (a.asig?.codigo||'').localeCompare(b.asig?.codigo||'',undefined,{numeric:true,sensitivity:'base'}))
+                    .map(g=>[
+                        g.carrera?.codigo||g.carrera?.nombre||'',
+                        g.nivel?.nombre||'',
+                        g.sec?.nombre||'',
+                        g.asig?.codigo||'',
+                        g.asig?.nombre||'',
+                        criterio(g.asig,'area','especialidad'),
+                        criterio(g.asig,'modalidad','lectiva'),
+                        bloquesTexto(g.bloques),
+                        String(g.p.nota||'').trim(),
+                        accionSeccion(g.sec?.id,g.asig?.id)
+                    ]);
+                columnas = ['Carrera','Nivel','Sección','Código','Asignatura','Área','Modalidad','Bloques','Observación','Acción'];
             } else if (tipo === 'criticas') {
                 const criticas=data.asignaturas.filter(a=>['alta-reprobacion','requiere-ayudantia','alta-reprobacion-ayudantia'].includes(a.condicion));
                 const filas=[];
@@ -1712,7 +1743,7 @@
                 if(total) datosExportar.push(total);
             }
             if (!datosExportar.length) return ctx.toast('No hay datos para exportar','info');
-            const etiquetas={tro2:'TRO2',docenteNN:'DocenteNN',criticas:'Criticas',transversales:'Transversales',softwareSala:'SoftwarePorSala',softwareAsignatura:'SoftwarePorAsignatura',validacionPrevia:'ValidacionPrevia',integridadDatos:'IntegridadDatos',gruposDictacion:'GruposDictacion',subseccionesAsignatura:'SubseccionesAsignatura',horasNegociacion:'HorasNegociacionAsignatura',calidadHorario:'CalidadHorario',incompletas:'Incompletas',cargaDocente:'CargaDocente',cargaDefendible:'CargaDefendibleDocente',excedidos:'Excedidos',comparativaHomologo:'ComparativaHomologo',conflictos:'Conflictos'};
+            const etiquetas={tro2:'TRO2',docenteNN:'DocenteNN',observacionesPlanificacion:'ObservacionesPlanificacion',criticas:'Criticas',transversales:'Transversales',softwareSala:'SoftwarePorSala',softwareAsignatura:'SoftwarePorAsignatura',validacionPrevia:'ValidacionPrevia',integridadDatos:'IntegridadDatos',gruposDictacion:'GruposDictacion',subseccionesAsignatura:'SubseccionesAsignatura',horasNegociacion:'HorasNegociacionAsignatura',calidadHorario:'CalidadHorario',incompletas:'Incompletas',cargaDocente:'CargaDocente',cargaDefendible:'CargaDefendibleDocente',excedidos:'Excedidos',comparativaHomologo:'ComparativaHomologo',conflictos:'Conflictos'};
             const nombre=(etiquetas[tipo]||'Reporte')+'_'+ctx.getTemporadaLabel();
             const data = getData();
             const usarCompatible=data.configuracion.exportacionExcel==='html';
