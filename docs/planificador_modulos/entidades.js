@@ -187,6 +187,7 @@
                     if(g.seccionMadreId===id) ctx.eliminarGrupoDictacion?.(g.id);
                     else if(g.seccionesVinculadasIds?.includes(id)) ctx.desvincularSeccionDeGrupo?.(g.id,id);
                 });
+                data.vinculosElectivos=(data.vinculosElectivos||[]).filter(v=>v.seccionOrigenId!==id&&v.seccionDestinoId!==id);
                 data.secciones=data.secciones.filter(s=>s.id!==id);
             }
             ctx.guardar(); ctx.reconstruirIndices(); ctx.refrescarTodo();
@@ -278,7 +279,13 @@
                 </section>
             `).join('');
             cont.innerHTML=renderPanelAlertas()+resumenGeneralHtml+(contenido||'<p class="auto-plan-empty">No hay carreras para el área seleccionada.</p>');
-            acordeonAbierto.forEach(id=>{document.getElementById(id)?.classList.add('open');});
+            acordeonAbierto.forEach(id=>{
+                const nested=document.getElementById(id);
+                if(!nested) return;
+                nested.classList.add('open');
+                nested.style.maxHeight='none';
+                nested.previousElementSibling?.classList.add('open');
+            });
         }
 
         function nombreSeccion(seccionId){
@@ -819,6 +826,39 @@
             };
         }
 
+        function contextoDestinoElectiva(seccion){
+            const data=getData();
+            const nivel=data.niveles.find(n=>n.id===seccion?.nivelId);
+            const carrera=nivel?data.carreras.find(c=>c.id===nivel.carreraId):null;
+            return {nivel,carrera,texto:[carrera?areaCarrera(carrera):'',carrera?.nombre,nivel?.nombre,etiquetaJornada(jornadaSeccion(seccion)),seccion?.nombre].filter(Boolean).join(' · ')};
+        }
+
+        function vinculosElectivosSeccion(seccionId){
+            const data=getData();
+            return (data.vinculosElectivos||[])
+                .filter(v=>v.seccionDestinoId===seccionId)
+                .sort((a,b)=>nombreAsignatura(a.asignaturaId).localeCompare(nombreAsignatura(b.asignaturaId),'es',{numeric:true})||nombreSeccion(a.seccionOrigenId).localeCompare(nombreSeccion(b.seccionOrigenId),'es',{numeric:true}));
+        }
+
+        function renderElectivasVinculadasSeccion(seccionId){
+            const data=getData();
+            const vinculos=vinculosElectivosSeccion(seccionId);
+            if(!vinculos.length) return '<div class="elective-section-empty">Sin electivas vinculadas.</div>';
+            return `<div class="dictation-list elective-dictation-list">${vinculos.map(v=>{
+                const asignatura=data.asignaturas.find(a=>a.id===v.asignaturaId);
+                return `<div class="dictation-row" data-vinculo-electivo="${ctx.escapeAttr(v.id)}">
+                    <div>
+                        <strong>${ctx.escapeHTML(nombreAsignatura(v.asignaturaId))}</strong>
+                        <span class="dictation-status elective">Electiva vinculada</span>
+                        <small>Sección de origen: ${ctx.escapeHTML(nombreSeccion(v.seccionOrigenId))}</small>
+                    </div>
+                    <div class="dictation-actions">
+                        <button class="btn btn-xs btn-ir-origen-electiva" data-seccion="${ctx.escapeAttr(v.seccionOrigenId)}">Ir a origen</button>
+                        <button class="btn btn-xs btn-quitar-vinculo-electivo" data-vinculo="${ctx.escapeAttr(v.id)}">Quitar vínculo</button>
+                    </div>
+                </div>`;}).join('')}</div>`;
+        }
+
         function abrirGestionDictacionSeccion(seccionId, opciones={}){
             const data=getData();
             const seccion=data.secciones.find(s=>s.id===seccionId);
@@ -848,6 +888,13 @@
                         </div>
                     `).join('')}
                 </div>`}
+                <div class="elective-section-panel">
+                    <div class="elective-section-head">
+                        <div><strong>Electivas vinculadas</strong><small>Protegen el horario de esta sección sin crear una fusión.</small></div>
+                        <button class="btn btn-xs btn-primary" id="btnVincularElectivaSeccion">+ Vincular electiva</button>
+                    </div>
+                    ${renderElectivasVinculadasSeccion(seccion.id)}
+                </div>
                 <div class="modal-actions">
                     <button class="btn" id="btnCerrarDictacion">Cerrar</button>
                 </div>
@@ -911,6 +958,57 @@
                 const madre=data.secciones.find(s=>s.id===btn.dataset.seccion);
                 if(madre) abrirGestionDictacionSeccion(madre.id);
             });
+            document.getElementById('btnVincularElectivaSeccion').onclick=()=>abrirVincularElectivaSeccion(seccion.id);
+            modal.querySelectorAll('.btn-ir-origen-electiva').forEach(btn=>btn.onclick=()=>abrirGestionDictacionSeccion(btn.dataset.seccion));
+            modal.querySelectorAll('.btn-quitar-vinculo-electivo').forEach(btn=>btn.onclick=()=>quitarVinculoElectivo(btn.dataset.vinculo,seccion.id));
+        }
+
+        function ofertasElectivas(){
+            const data=getData();
+            const ofertas=[];
+            data.asignaturas.filter(a=>a.area==='electiva').forEach(asignatura=>{
+                const origenes=new Set(data.planificaciones.filter(p=>p.asignaturaId===asignatura.id).map(p=>p.seccionId));
+                (data.asignaturaSeccion||[]).filter(r=>r.asignaturaId===asignatura.id).forEach(r=>origenes.add(r.seccionId));
+                (data.asignaturaCarreraNivel||[]).filter(r=>r.asignaturaId===asignatura.id).forEach(r=>data.secciones.filter(s=>s.nivelId===r.nivelId).forEach(s=>origenes.add(s.id)));
+                [...origenes].filter(id=>data.secciones.some(s=>s.id===id)).forEach(seccionOrigenId=>ofertas.push({asignaturaId:asignatura.id,seccionOrigenId,texto:`${nombreAsignatura(asignatura.id)} · Sección origen: ${nombreSeccion(seccionOrigenId)}`}));
+            });
+            return ofertas.sort((a,b)=>a.texto.localeCompare(b.texto,'es',{numeric:true}));
+        }
+
+        function abrirVincularElectivaSeccion(seccionDestinoId){
+            const data=getData();
+            const existentes=new Set((data.vinculosElectivos||[]).filter(v=>v.seccionDestinoId===seccionDestinoId).map(v=>`${v.asignaturaId}|${v.seccionOrigenId}`));
+            const ofertas=ofertasElectivas().filter(o=>o.seccionOrigenId!==seccionDestinoId&&!existentes.has(`${o.asignaturaId}|${o.seccionOrigenId}`));
+            if(!ofertas.length) return ctx.toast('No hay ofertas electivas pendientes de vincular','info');
+            document.getElementById('modalContainer').innerHTML=`
+                <div class="modal-overlay" id="modalOverlay"><div class="modal">
+                    <div class="modal-header"><h3>Vincular electiva</h3><p>Destino: ${ctx.escapeHTML(nombreSeccion(seccionDestinoId))}</p></div>
+                    <div class="form-group"><label class="form-label">Electiva y sección de origen</label><select class="form-select" id="ofertaElectivaVincular">${ofertas.map((o,i)=>ctx.optionHTML(String(i),o.texto)).join('')}</select></div>
+                    <p class="criteria-note">Puedes repetir esta acción para agregar electivas de la misma o de otras secciones.</p>
+                    <div class="modal-actions"><button class="btn" id="btnVolverVinculoElectivo">Volver</button><button class="btn btn-primary" id="btnConfirmarVinculoElectivo">Vincular</button></div>
+                </div></div>`;
+            document.getElementById('modalOverlay').onclick=e=>{if(e.target===e.currentTarget)abrirGestionDictacionSeccion(seccionDestinoId);};
+            document.getElementById('btnVolverVinculoElectivo').onclick=()=>abrirGestionDictacionSeccion(seccionDestinoId);
+            document.getElementById('btnConfirmarVinculoElectivo').onclick=async()=>{
+                const oferta=ofertas[Number(document.getElementById('ofertaElectivaVincular').value)];
+                if(!oferta) return;
+                const ok=await confirmarCambioCritico({titulo:'Vincular electiva',mensaje:'La sección considerará esta oferta electiva en su horario.',queHara:`${nombreAsignatura(oferta.asignaturaId)} desde ${nombreSeccion(oferta.seccionOrigenId)} se vinculará con ${nombreSeccion(seccionDestinoId)}.`,afectara:'Visualización y validación de topes.',noTocara:'No creará fusiones ni duplicará bloques.',confirmarTexto:'Vincular',peligro:false});
+                if(!ok) return;
+                ctx.pushUndo?.({tipo:'vincular_electiva',resumen:`Vincular electiva · ${nombreAsignatura(oferta.asignaturaId)}`,afecta:nombreSeccion(seccionDestinoId),critica:false});
+                (data.vinculosElectivos||(data.vinculosElectivos=[])).push({id:ctx.genId(),asignaturaId:oferta.asignaturaId,seccionOrigenId:oferta.seccionOrigenId,seccionDestinoId,origen:'manual'});
+                ctx.guardar(); abrirGestionDictacionSeccion(seccionDestinoId); ctx.toast('Electiva vinculada','success');
+            };
+        }
+
+        async function quitarVinculoElectivo(vinculoId,seccionRetornoId){
+            const data=getData();
+            const vinculo=(data.vinculosElectivos||[]).find(v=>v.id===vinculoId);
+            if(!vinculo) return;
+            const ok=await confirmarCambioCritico({titulo:'Quitar vínculo electivo',mensaje:'La sección dejará de considerar esta oferta electiva.',queHara:`Se quitará ${nombreAsignatura(vinculo.asignaturaId)} desde ${nombreSeccion(vinculo.seccionOrigenId)}.`,afectara:'Solo esta relación electiva.',noTocara:'No eliminará asignaturas ni bloques.',confirmarTexto:'Quitar vínculo'});
+            if(!ok) return;
+            ctx.pushUndo?.({tipo:'quitar_vinculo_electivo',resumen:`Quitar electiva · ${nombreAsignatura(vinculo.asignaturaId)}`,afecta:nombreSeccion(seccionRetornoId),critica:false});
+            data.vinculosElectivos=data.vinculosElectivos.filter(v=>v.id!==vinculoId);
+            ctx.guardar(); abrirGestionDictacionSeccion(seccionRetornoId); ctx.toast('Vínculo electivo eliminado','success');
         }
 
         async function desvincularFusionDesdeMadre(seccionMadreId,grupoId,seccionHijaId,asignaturaId){
@@ -1483,7 +1581,7 @@
                 <div class="form-group"><label class="form-label">Carreras/Niveles donde se dicta</label>
                     <div id="chipsCarrerasNivel" style="margin-bottom:8px;"></div>
                     <div class="search-box input-with-clear"><input class="form-input" id="buscarCarreraNivel" placeholder="🔍 Buscar carrera o nivel..." autocomplete="off"><button class="clear-btn" id="clearBuscarCarreraNivel">✕</button><ul class="search-results" id="resultadosCarreraNivel"></ul></div>
-                    <p class="criteria-note">Si el área es Electiva, puedes guardarla sin destino y asociarla después a la carrera/nivel donde corresponda.</p>
+                    <p class="criteria-note">Para electivas, conserva aquí su origen ELEC. Los destinos se administran desde Secciones → Asignaturas.</p>
                 </div>
                 <button class="btn btn-primary" id="btnGuardarAsignatura">Guardar</button>
             </div></div>`;
@@ -1950,7 +2048,12 @@
                 controlHorario:document.getElementById('asigControlHorario').value,
                 preferenciaHoraria:document.getElementById('asigPreferenciaHoraria').value
             };
+            delete asig.grupoElectivo;
+            delete asig.destinosElectivaIds;
             if(id){const idx=data.asignaturas.findIndex(a=>a.id===id); if(idx>=0) data.asignaturas[idx]=asig;} else data.asignaturas.push(asig);
+            if(asig.area!=='electiva'){
+                data.vinculosElectivos=(data.vinculosElectivos||[]).filter(v=>v.asignaturaId!==asig.id);
+            }
             data.asignaturaCarreraNivel=data.asignaturaCarreraNivel.filter(r=>r.asignaturaId!==asig.id);
             asignaturaTemp.relaciones.forEach(rel=>data.asignaturaCarreraNivel.push({asignaturaId:asig.id,carreraId:rel.carreraId,nivelId:rel.nivelId}));
             ctx.guardar(); ctx.cerrarModal(); ctx.refrescarTodo(); ctx.toast('Asignatura guardada','success');
@@ -1968,9 +2071,11 @@
             const etiquetas=[LABEL_CRITERIOS_ASIGNATURA.area[criterioAsignatura(a,'area','especialidad')],LABEL_CRITERIOS_ASIGNATURA.modalidad[criterioAsignatura(a,'modalidad','lectiva')]].filter(Boolean).join(' · ');
             const alerta=a.alertasImportacion?.length?` · ${a.alertasImportacion.length} alerta(s)`:'';
             const soft=(a.softwares||[]).length?` · ${(a.softwares||[]).length} software(s)`:'';
+            const vinculos=a.area==='electiva'?(getData().vinculosElectivos||[]).filter(v=>v.asignaturaId===a.id):[];
+            const destinos=vinculos.length?` · ${vinculos.length} vínculo(s) electivo(s)`:'';
             return `<span class="item-chip subject-chip" style="background:${ctx.colorAsignaturaPlanhor?.(a)||ctx.colorSeguro(a.color,'var(--planhor-subject-neutral)')}">
                 <span class="subject-chip-main">${ctx.escapeHTML(a.codigo)} - ${ctx.escapeHTML(a.nombre)} (${Number(a.horasTotales)||0}h: ${ctx.escapeHTML(partes.join(' + '))})</span>
-                <small class="subject-criteria-chip">${ctx.escapeHTML(etiquetas)}${metaExtra?` · ${ctx.escapeHTML(metaExtra)}`:''}${ctx.escapeHTML(soft)}${ctx.escapeHTML(alerta)}</small>
+                <small class="subject-criteria-chip">${ctx.escapeHTML(etiquetas)}${metaExtra?` · ${ctx.escapeHTML(metaExtra)}`:''}${ctx.escapeHTML(destinos)}${ctx.escapeHTML(soft)}${ctx.escapeHTML(alerta)}</small>
                 <button class="btn btn-xs btn-editar-asignatura" data-id="${ctx.escapeAttr(a.id)}">✎</button>
                 <button class="btn btn-xs btn-eliminar-asignatura" data-id="${ctx.escapeAttr(a.id)}">🗑️</button>
             </span>`;
@@ -2101,6 +2206,7 @@
                 asignaturaSeccion:data.asignaturaSeccion||[],
                 planificaciones:data.planificaciones,
                 gruposDictacion:data.gruposDictacion||[],
+                vinculosElectivos:data.vinculosElectivos||[],
                 gestorSecciones:data.gestorSecciones
             };
         }
@@ -2275,6 +2381,7 @@
                     if(g.asignaturaId===id) ctx.eliminarGrupoDictacion?.(g.id);
                     else if(g.asignaturasEquivalentesIds?.includes(id)) g.asignaturasEquivalentesIds=g.asignaturasEquivalentesIds.filter(x=>x!==id);
                 });
+                data.vinculosElectivos=(data.vinculosElectivos||[]).filter(v=>v.asignaturaId!==id);
                 data.asignaturas=data.asignaturas.filter(a=>a.id!==id);
                 ctx.guardar(); ctx.refrescarTodo();
             }
@@ -3053,10 +3160,34 @@
                     const tipo=careerHeader.dataset.tipo, id=careerHeader.dataset.id;
                     const nested=document.getElementById(`${tipo==='carrera'?'niveles':'secciones'}_${id}`);
                     if(nested){
-                        nested.classList.toggle('open');
-                        careerHeader.classList.toggle('open');
-                        if(nested.classList.contains('open')) acordeonAbierto.add(nested.id);
-                        else acordeonAbierto.delete(nested.id);
+                        const abrir=!nested.classList.contains('open');
+                        const reducirMovimiento=window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+                        window.clearTimeout(nested._planhorAccordionTimer);
+                        if(reducirMovimiento){
+                            nested.classList.toggle('open',abrir);
+                            careerHeader.classList.toggle('open',abrir);
+                            nested.style.maxHeight=abrir?'none':'0px';
+                            if(abrir) acordeonAbierto.add(nested.id); else acordeonAbierto.delete(nested.id);
+                            return;
+                        }
+                        if(abrir){
+                            nested.classList.add('open');
+                            careerHeader.classList.add('open');
+                            nested.style.maxHeight='0px';
+                            void nested.offsetHeight;
+                            nested.style.maxHeight=`${nested.scrollHeight}px`;
+                            acordeonAbierto.add(nested.id);
+                            nested._planhorAccordionTimer=window.setTimeout(()=>{
+                                if(nested.classList.contains('open')) nested.style.maxHeight='none';
+                            },260);
+                        }else{
+                            nested.style.maxHeight=`${nested.scrollHeight}px`;
+                            void nested.offsetHeight;
+                            nested.classList.remove('open');
+                            careerHeader.classList.remove('open');
+                            nested.style.maxHeight='0px';
+                            acordeonAbierto.delete(nested.id);
+                        }
                     }
                 }
                 if(e.target.classList.contains('btn-eliminar')){e.stopPropagation();eliminarEntidad(e.target.dataset.tipo,e.target.dataset.id);}

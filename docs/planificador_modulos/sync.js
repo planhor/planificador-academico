@@ -144,6 +144,7 @@
                 asignaturaSeccion:data.asignaturaSeccion || [],
                 planificaciones:data.planificaciones || [],
                 gruposDictacion:data.gruposDictacion || [],
+                vinculosElectivos:data.vinculosElectivos || [],
                 gestorSecciones:data.gestorSecciones || {cargas:[],ids:[],ultimaCargaId:null}
             };
         }
@@ -167,6 +168,8 @@
             data.asignaturaSeccion = temp.asignaturaSeccion || [];
             data.planificaciones = temp.planificaciones || [];
             data.gruposDictacion = temp.gruposDictacion || [];
+            data.vinculosElectivos = temp.vinculosElectivos || [];
+            data.gruposElectivos = temp.gruposElectivos || [];
             data.gestorSecciones = temp.gestorSecciones || {cargas:[],ids:[],ultimaCargaId:null};
         }
         function crearSnapshotCompartido(data) {

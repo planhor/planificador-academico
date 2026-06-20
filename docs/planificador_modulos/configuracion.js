@@ -236,7 +236,7 @@
                     </div>
                 </div>`;
             document.getElementById('modalContainer').appendChild(cont);
-            const cerrar=()=>cont.remove();
+            const cerrar=()=>ctx.cerrarFlotante(cont);
             cont.addEventListener('click',(e)=>{if(e.target===cont) cerrar();});
             cont.querySelector('#btnCerrarAyuda')?.addEventListener('click',cerrar);
             cont.querySelectorAll('.help-nav a').forEach(a=>a.addEventListener('click',()=>{
@@ -447,7 +447,7 @@ La interfaz debe ser profesional, sobria, modular, con desplazamiento horizontal
                     </div>
                 </div>`;
             document.getElementById('modalContainer').appendChild(cont);
-            const cerrar=()=>cont.remove();
+            const cerrar=()=>ctx.cerrarFlotante(cont);
             cont.addEventListener('click',(e)=>{if(e.target===cont) cerrar();});
             cont.querySelector('#btnCerrarDesarrollo')?.addEventListener('click',cerrar);
             cont.querySelectorAll('.help-nav a').forEach(a=>a.addEventListener('click',()=>{
@@ -777,7 +777,7 @@ La interfaz debe ser profesional, sobria, modular, con desplazamiento horizontal
                             </div>
                         </div>`);
                     const overlay=document.getElementById('themeOverlay');
-                    const cerrar=()=>overlay?.remove();
+                    const cerrar=()=>ctx.cerrarFlotante(overlay);
                     overlay.addEventListener('click',e=>{if(e.target===overlay) cerrar();});
                     document.getElementById('btnCerrarTemas')?.addEventListener('click',cerrar);
                     document.getElementById('themeSeasonSelect')?.addEventListener('change',e=>{temporadaEdit=e.target.value; render();});
@@ -1039,7 +1039,7 @@ La interfaz debe ser profesional, sobria, modular, con desplazamiento horizontal
                             </div>
                         </div>`);
                     const overlay=document.getElementById('motorOverlay');
-                    const cerrar=()=>overlay?.remove();
+                    const cerrar=()=>ctx.cerrarFlotante(overlay);
                     overlay.addEventListener('click',e=>{ if(e.target===overlay) cerrar(); });
                     overlay.querySelectorAll('.cfg-solver-peso').forEach(sel=>sel.addEventListener('change',()=>{
                         const key=sel.dataset.solverKey;
@@ -1238,11 +1238,12 @@ La interfaz debe ser profesional, sobria, modular, con desplazamiento horizontal
                         asignaturaSeccion:JSON.parse(JSON.stringify(src.asignaturaSeccion||[])),
                         planificaciones:[],
                         gruposDictacion:JSON.parse(JSON.stringify(src.gruposDictacion||[])),
+                        vinculosElectivos:JSON.parse(JSON.stringify(src.vinculosElectivos||[])),
                         gestorSecciones:{cargas:[],ids:[],filas:[],enlacesManuales:[],ultimaCargaId:null,tablaLimite:250}
                     };
                     ctx.toast('Datos copiados desde ' + origen.temporada + ' ' + origen.anio,'success');
                 } else {
-                    data.temporadaData[id] = { carreras:[], niveles:[], secciones:[], asignaturas:[], docentes:[], salas:[], asignaturaCarreraNivel:[], asignaturaSeccion:[], planificaciones:[], gruposDictacion:[], gestorSecciones:{cargas:[],ids:[],filas:[],enlacesManuales:[],ultimaCargaId:null,tablaLimite:250} };
+                    data.temporadaData[id] = { carreras:[], niveles:[], secciones:[], asignaturas:[], docentes:[], salas:[], asignaturaCarreraNivel:[], asignaturaSeccion:[], planificaciones:[], gruposDictacion:[], vinculosElectivos:[], gestorSecciones:{cargas:[],ids:[],filas:[],enlacesManuales:[],ultimaCargaId:null,tablaLimite:250} };
                     ctx.toast('Nueva temporada vacía','info');
                 }
                 data.temporadas.push(nuevaTemp);

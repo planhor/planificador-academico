@@ -6,6 +6,7 @@
         const VISTA_GENERAL_PAGE_SIZE = 20;
         const getData = ctx.getData;
         const EXPORT_WIDTH = 1510;
+        const mismoId=(a,b)=>String(a??'')===String(b??'');
         function reportarErrorExportacion(error, accion){
             if(ctx.mostrarErrorTecnico){
                 ctx.mostrarErrorTecnico({
@@ -23,13 +24,13 @@
 
         function planesVisiblesSeccion(seccionId){
             const data=getData();
-            const propios=data.planificaciones.filter(p=>p.seccionId===seccionId);
+            const propios=data.planificaciones.filter(p=>mismoId(p.seccionId,seccionId));
             const heredados=(Array.isArray(data.gruposDictacion)?data.gruposDictacion:[])
-                .filter(g=>g.seccionMadreId!==seccionId&&g.seccionesVinculadasIds?.includes(seccionId))
+                .filter(g=>!mismoId(g.seccionMadreId,seccionId)&&g.seccionesVinculadasIds?.some(id=>mismoId(id,seccionId)))
                 .flatMap(g=>{
                     const ids=[g.asignaturaId,...(g.asignaturasEquivalentesIds||[])].filter(Boolean);
                     return data.planificaciones
-                        .filter(p=>p.seccionId===g.seccionMadreId&&ids.includes(p.asignaturaId))
+                        .filter(p=>mismoId(p.seccionId,g.seccionMadreId)&&ids.some(id=>mismoId(id,p.asignaturaId)))
                         .map(p=>Object.assign({},p,{vinculado:true,seccionVistaId:seccionId,seccionOrigenId:g.seccionMadreId}));
                 });
             const vistos=new Set();
@@ -42,7 +43,7 @@
         }
 
         function componentesSubseccion(asignaturaId,seccionId,data){
-            const rel=(data.asignaturaSeccion||[]).find(r=>r.asignaturaId===asignaturaId&&r.seccionId===seccionId);
+            const rel=(data.asignaturaSeccion||[]).find(r=>mismoId(r.asignaturaId,asignaturaId)&&mismoId(r.seccionId,seccionId));
             return rel?.usaSubsecciones&&Array.isArray(rel.componentesSubseccion)?rel.componentesSubseccion:[];
         }
 
@@ -416,10 +417,9 @@
             });
         }
 
-        function renderMiniHorarioGeneral(seccionId){
+        function renderMiniGrillaSeccion(seccionId, opciones={}){
             const data=getData();
-            const campos=camposVistaGeneral();
-            const {sec,nivel,carrera}=contextoSeccion(seccionId,data);
+            const campos=opciones.campos||camposVistaGeneral();
             const planes=planesVisiblesSeccion(seccionId);
             let heredados=0;
             const filas=ctx.BLOQUES.map(b=>{
@@ -447,20 +447,31 @@
                 }).join('');
                 return `<div class="vista-general-time">${campos.hora?`B${b.n}<small>${ctx.escapeHTML(b.inicio)}-${ctx.escapeHTML(b.fin)}</small>`:`B${b.n}`}</div>${celdas}`;
             }).join('');
+            return {
+                html:`<div class="vista-general-mini">
+                    <div class="vista-general-corner">B</div>
+                    ${ctx.DIAS.map(d=>`<div class="vista-general-day">${ctx.escapeHTML(d.slice(0,3))}</div>`).join('')}
+                    ${filas}
+                </div>`,
+                total:planes.length,
+                heredados
+            };
+        }
+
+        function renderMiniHorarioGeneral(seccionId){
+            const data=getData();
+            const {sec,nivel,carrera}=contextoSeccion(seccionId,data);
+            const mini=renderMiniGrillaSeccion(seccionId);
             const subtitulo=[areaCarrera(carrera),carrera?.nombre,nivel?.nombre,etiquetaJornada(jornadaSeccion(sec))].filter(Boolean).join(' · ');
             return `<article class="vista-general-card">
                 <div class="vista-general-card-head">
                     <div><strong>${ctx.escapeHTML(sec?.nombre||'Sección')}</strong><span>${ctx.escapeHTML(subtitulo)}</span></div>
                     <div class="vista-general-card-actions">
-                        <small>${planes.length} bloque(s)${heredados?` · ${heredados} heredado(s)`:''}</small>
+                        <small>${mini.total} bloque(s)${mini.heredados?` · ${mini.heredados} heredado(s)`:''}</small>
                         <button class="btn btn-xs vista-general-go" type="button" data-seccion="${ctx.escapeAttr(seccionId)}">Ir a planificación</button>
                     </div>
                 </div>
-                <div class="vista-general-mini">
-                    <div class="vista-general-corner">B</div>
-                    ${ctx.DIAS.map(d=>`<div class="vista-general-day">${ctx.escapeHTML(d.slice(0,3))}</div>`).join('')}
-                    ${filas}
-                </div>
+                ${mini.html}
             </article>`;
         }
 

@@ -10,7 +10,7 @@
     <link rel="apple-touch-icon" sizes="180x180" href="planificador_modulos/icono-planhor-180.png?v=5">
     <link rel="manifest" href="planificador_modulos/site.webmanifest?v=2">
     <meta name="theme-color" content="#245f67">
-<link rel="stylesheet" href="planificador_modulos/estilos.css?v=20260617-compare-polish">
+<link rel="stylesheet" href="planificador_modulos/estilos.css?v=20260620-menu-suave">
 </head>
 <body>
 <div id="appRoot" style="display:none;">
@@ -97,19 +97,44 @@
             <div class="form-group plan-work-control"><label class="form-label">Docente</label><select class="form-select" id="planDocente" disabled></select></div>
             <div class="form-group plan-work-control"><label class="form-label">Sala</label><select class="form-select" id="planSala" disabled></select></div>
             <div class="form-group plan-work-control"><label class="form-label">Tipo</label><select class="form-select" id="planTipo"><option value="presencial">Presencial</option><option value="virtual">Virtual</option></select></div>
-            <button class="btn btn-primary" id="btnModoPlanificar">🎯 Modo Planificación</button>
-            <button class="btn" id="btnAutoAsignatura" style="display:none;">🤖 Auto-asignatura</button>
-            <button class="btn" id="btnAutoSeccion" style="display:none;">🤖 Auto-sección</button>
-            <button class="btn" id="btnAutoGeneral" style="display:none;">🤖 Auto-general</button>
-            <button class="btn" id="btnOptimizarHorario" style="display:none;">✨ Optimizar</button>
-            <button class="btn btn-danger" id="btnRevertirAutoRapido" style="display:none;">↩ Revertir auto</button>
-            <button class="btn" id="btnCancelarModo" style="display:none;">✖ Cancelar</button>
-            <button class="btn" id="btnCompararSeccion">▦ Comparar sección</button>
+            <div class="plan-action-bar">
+                <div class="plan-mode-switch">
+                    <div class="plan-mode-group plan-mode-idle" id="planModeIdle">
+                        <button class="btn btn-primary" id="btnModoPlanificar">🎯 Modo Planificación</button>
+                    </div>
+                    <div class="plan-mode-group plan-mode-tools" id="planModeTools" aria-hidden="true">
+                        <button class="btn" id="btnAutoAsignatura">🤖 Auto-asignatura</button>
+                        <button class="btn" id="btnAutoSeccion">🤖 Auto-sección</button>
+                        <button class="btn" id="btnAutoGeneral">🤖 Auto-general</button>
+                        <button class="btn" id="btnOptimizarHorario">✨ Optimizar</button>
+                        <button class="btn btn-danger" id="btnRevertirAutoRapido">↩ Revertir auto</button>
+                        <button class="btn" id="btnCancelarModo">✖ Cancelar</button>
+                    </div>
+                </div>
+                <button class="btn" id="btnCompararSeccion">▦ Comparar sección</button>
+            </div>
         </div>
         <div id="planProgreso" style="padding:8px 20px; font-size:0.8rem; color:var(--text-secondary); display:none;"></div>
         <div id="planMensajes" class="plan-message-box" style="display:none;"></div>
         <div id="planComparador" class="plan-compare-panel" style="display:none;"></div>
-        <div class="schedule-grid-container" id="scheduleContainer"><div class="schedule-grid" id="scheduleGrid"></div></div>
+        <div class="schedule-grid-container" id="scheduleContainer">
+            <div class="schedule-grid" id="scheduleGrid"></div>
+            <div class="plan-empty-state" id="planEmptyState" aria-live="polite">
+                <img src="planificador_modulos/assets/brand/planhor_simbolo_p_transparente.png" alt="" aria-hidden="true">
+                <strong id="planEmptyTitle">Selecciona una sección</strong>
+                <span id="planEmptyText">Usa los filtros superiores para visualizar o comenzar una planificación.</span>
+                <button class="btn btn-primary btn-sm" id="btnPlanEmptyAction" type="button">Elegir sección</button>
+            </div>
+        </div>
+        <div class="plan-grid-legend" id="planGridLegend" aria-label="Leyenda de la grilla">
+            <span><i class="legend-swatch available"></i>Disponible</span>
+            <span><i class="legend-swatch unavailable"></i>No disponible</span>
+            <span><i class="legend-swatch teacher"></i>Docente ocupado</span>
+            <span><i class="legend-swatch room"></i>Sala ocupada</span>
+            <span><i class="legend-swatch both"></i>Docente y sala ocupados</span>
+            <span><i class="legend-swatch linked"></i>Heredada o electiva vinculada</span>
+            <span><i class="legend-swatch fixed"></i>Bloque fijo</span>
+        </div>
     </div>
     <div class="tab-panel" id="panelVistaHorarios">
         <div class="vista-selector">
@@ -289,6 +314,9 @@
         <div id="fichaContenido" style="display:none;"></div>
     </div>
 </div>
+<footer class="app-footer">
+    <span>Planhor © 2026</span><i aria-hidden="true"></i><span>Sistema de Planificación Académica</span><i aria-hidden="true"></i><span>Planifica. Organiza. Optimiza.</span>
+</footer>
 <div class="toast-container" id="toastContainer"></div>
 <div id="modalContainer"></div>
 </div><!-- fin appRoot -->
@@ -452,12 +480,12 @@ onAuthStateChanged(auth, async (user) => {
 <script src="planificador_modulos/utils.js"></script>
 <script src="planificador_modulos/sync.js?v=20260610-puntos-recuperacion-criticos"></script>
 <script src="planificador_modulos/exportaciones.js?v=20260608-subsecciones-reportes"></script>
-<script src="planificador_modulos/vista-horario.js?v=20260616-vista-general-content-options"></script>
-<script src="planificador_modulos/reportes.js?v=20260612-fase6-observaciones"></script>
+<script src="planificador_modulos/vista-horario.js?v=20260619-vista-general-mini"></script>
+<script src="planificador_modulos/reportes.js?v=20260620-fase9-cierre"></script>
 <script src="planificador_modulos/ficha-docente.js?v=20260616-vista-general-export-layout"></script>
-<script src="planificador_modulos/entidades.js?v=20260611-fusion-visible-bilateral"></script>
-<script src="planificador_modulos/planificacion.js?v=20260617-compare-open-slot-fix"></script>
-<script src="planificador_modulos/configuracion.js?v=20260616-vista-general-export-layout"></script>
-<script src="planificador_modulos/app.js?v=20260616-vista-general-content-options"></script>
+<script src="planificador_modulos/entidades.js?v=20260620-tiempos-ui"></script>
+<script src="planificador_modulos/planificacion.js?v=20260620-tiempos-ui"></script>
+<script src="planificador_modulos/configuracion.js?v=20260620-fase9-cierre"></script>
+<script src="planificador_modulos/app.js?v=20260620-tiempos-ui"></script>
 </body>
 </html>

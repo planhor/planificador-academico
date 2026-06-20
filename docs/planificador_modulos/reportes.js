@@ -1694,7 +1694,7 @@
                     </div>
                 </div></div>`;
                 const cerrar=(ok)=>{
-                    document.getElementById('modalContainer').innerHTML='';
+                    ctx.cerrarModal();
                     resolve(ok);
                 };
                 document.getElementById('btnCancelarExportacionReporte').onclick=()=>cerrar(false);
@@ -2849,7 +2849,7 @@
             document.getElementById('modalContainer')?.addEventListener('click',(e)=>{
                 const revisar=e.target.closest('.report-action-btn');
                 if(revisar && ctx.irASeccion){
-                    document.getElementById('modalContainer').innerHTML='';
+                    ctx.cerrarModal();
                     ctx.irASeccion(revisar.dataset.seccion,{
                         asignaturaId:revisar.dataset.asignatura||null,
                         mensaje:'Sección abierta desde el dashboard'
@@ -2858,13 +2858,13 @@
                 }
                 const entity=e.target.closest('.report-entity-btn');
                 if(entity){
-                    document.getElementById('modalContainer').innerHTML='';
+                    ctx.cerrarModal();
                     abrirEntidadDesdeReporte(entity.dataset.entityType,entity.dataset.entityId);
                     return;
                 }
                 const abrir=e.target.closest('[data-open-report]');
                 if(abrir){
-                    document.getElementById('modalContainer').innerHTML='';
+                    ctx.cerrarModal();
                     abrirReporteDesdeDashboard(abrir.dataset.openReport);
                 }
             });

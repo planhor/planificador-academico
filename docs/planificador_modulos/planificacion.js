@@ -13,10 +13,12 @@
                 asig?.condicion&&asig.condicion!=='normal' ? LABEL_CRITERIOS_ASIGNATURA.condicion[asig.condicion] : ''
             ].filter(Boolean).join(' · ');
         }
-        const comparadorSecciones = [];
-        const comparadorFiltros = [];
+        const comparadorSlots = [];
         let comparadorActivo = false;
         let comparadorCapacidad = 2;
+        let comparadorAnimacionTimer = null;
+        let ultimaSeccionRenderizada;
+        let animacionCambioSeccionTimer = null;
 
         function alertasCriteriosAsignatura(asig){
             const alertas=[];
@@ -179,6 +181,7 @@
             ctx.renderDashboard?.();
             ctx.detectarConflictos?.();
             ctx.renderHistorial?.();
+            if(comparadorActivo) renderComparadorPlanificacion();
         }
 
         function mismoId(a,b){
@@ -226,7 +229,7 @@
             return String(carrera.area||carrera.especialidad||'Sin área').trim()||'Sin área';
         }
 
-        function contextoSeccion(seccionId){
+        function contextoSeccionPorId(seccionId){
             const data=getData();
             const sec=data.secciones.find(s=>mismoId(s.id,seccionId));
             const nivel=sec?data.niveles.find(n=>mismoId(n.id,sec.nivelId)):null;
@@ -268,6 +271,30 @@
             return null;
         }
 
+        function planesElectivosObjetivoEn(seccionId,dia,bloque,planes=null){
+            const data=getData();
+            const fuente=planes||data.planificaciones;
+            const vinculos=(data.vinculosElectivos||[]).filter(v=>mismoId(v.seccionDestinoId,seccionId));
+            return fuente.filter(p=>
+                !mismoId(p.seccionId,seccionId) && vinculos.some(v=>mismoId(v.asignaturaId,p.asignaturaId)&&mismoId(v.seccionOrigenId,p.seccionId)) &&
+                Number(p.dia)===Number(dia) && (bloque===null||bloque===undefined||Number(p.bloque)===Number(bloque))
+            ).map(plan=>({plan,vinculos:vinculos.filter(v=>mismoId(v.asignaturaId,plan.asignaturaId)&&mismoId(v.seccionOrigenId,plan.seccionId))}));
+        }
+
+        function planElectivoObjetivoEn(seccionId,dia,bloque,planes=null){
+            const coincidencias=planesElectivosObjetivoEn(seccionId,dia,bloque,planes);
+            if(!coincidencias.length) return null;
+            return {
+                plan:coincidencias[0].plan,
+                vinculado:true,
+                electivaObjetivo:true,
+                alternativas:coincidencias.length,
+                seccionVistaId:seccionId,
+                seccionOrigenId:coincidencias[0].plan.seccionId,
+                grupoElectivo:''
+            };
+        }
+
         function planVisibleEnFuente(seccionId,dia,bloque,planes=null){
             const data=getData();
             const fuente=planes||data.planificaciones;
@@ -275,7 +302,7 @@
                 ? fuente.find(p=>mismoId(p.seccionId,seccionId)&&Number(p.dia)===Number(dia)&&Number(p.bloque)===Number(bloque))
                 : ctx.getIndicePlan()[`${seccionId}_${dia}_${bloque}`];
             if(propio) return {plan:propio, vinculado:false, grupo:null, seccionVistaId:seccionId};
-            return planVinculadoEn(seccionId,dia,bloque,fuente);
+            return planVinculadoEn(seccionId,dia,bloque,fuente)||planElectivoObjetivoEn(seccionId,dia,bloque,fuente);
         }
 
         function planVisibleEn(seccionId,dia,bloque){
@@ -308,6 +335,12 @@
         }
 
         function seccionesImpactadasDictacion(asigId,seccionId){
+            const data=getData();
+            const asig=data.asignaturas.find(a=>mismoId(a.id,asigId));
+            if(asig?.area==='electiva'){
+                const destinos=(data.vinculosElectivos||[]).filter(v=>mismoId(v.asignaturaId,asigId)&&mismoId(v.seccionOrigenId,seccionId)).map(v=>v.seccionDestinoId);
+                return [...new Set([seccionId,...destinos].filter(Boolean))];
+            }
             const estado=estadoDictacionAsignatura(asigId,seccionId);
             if(estado.estado==='dictada-aqui'&&estado.grupo){
                 return [...new Set([seccionId,...(estado.grupo.seccionesVinculadasIds||[])].filter(Boolean))];
@@ -316,11 +349,17 @@
         }
 
         function ocupacionSeccionesImpactadas(asigId,seccionId,dia,bloque,opciones={}){
+            const data=getData();
             const ignorar=new Set(opciones.ignorarIds||[]);
             const planes=opciones.planes||null;
+            const asigActual=data.asignaturas.find(a=>mismoId(a.id,asigId));
             for(const secId of seccionesImpactadasDictacion(asigId,seccionId)){
                 const visible=planVisibleEnFuente(secId,dia,bloque,planes);
                 if(!visible?.plan || ignorar.has(visible.plan.id)) continue;
+                const asigOcupante=data.asignaturas.find(a=>mismoId(a.id,visible.plan.asignaturaId));
+                const vinculoActual=(data.vinculosElectivos||[]).some(v=>mismoId(v.asignaturaId,asigActual?.id)&&mismoId(v.seccionOrigenId,seccionId)&&mismoId(v.seccionDestinoId,secId));
+                const vinculoOcupante=(data.vinculosElectivos||[]).some(v=>mismoId(v.asignaturaId,asigOcupante?.id)&&mismoId(v.seccionOrigenId,visible.plan.seccionId)&&mismoId(v.seccionDestinoId,secId));
+                if(asigActual?.area==='electiva'&&asigOcupante?.area==='electiva'&&vinculoActual&&vinculoOcupante) continue;
                 return {ocupada:true,seccionId:secId,plan:visible.plan,vinculado:!!visible.vinculado};
             }
             return {ocupada:false};
@@ -394,7 +433,12 @@
             }
             const estado=estadoDictacionAsignatura(asig.id,data.sel.seccionId);
             const mensajes=[];
-            if(estado.estado==='vinculada'){
+            const vinculosElectivos=(data.vinculosElectivos||[]).filter(v=>mismoId(v.asignaturaId,asig.id)&&mismoId(v.seccionOrigenId,data.sel.seccionId));
+            if(asig.area==='electiva'&&vinculosElectivos.length){
+                const destinos=[...new Set(vinculosElectivos.map(v=>v.seccionDestinoId))].map(nombreSeccion).filter(Boolean);
+                mensajes.push(`<strong>Electiva vinculada a ${destinos.length} sección(es)</strong>`);
+                mensajes.push(`Protege el horario de: ${ctx.escapeHTML(destinos.join(', '))}.`);
+            }else if(estado.estado==='vinculada'){
                 const madreId=estado.grupo?.seccionMadreId||'';
                 const madreNombre=nombreSeccion(madreId);
                 const asigMadre=data.asignaturas.find(a=>a.id===estado.grupo?.asignaturaId);
@@ -460,7 +504,50 @@
                 const ids=[g.asignaturaId,...(g.asignaturasEquivalentesIds||[])].filter(Boolean);
                 return fuente.filter(p=>p.seccionId===g.seccionMadreId&&ids.includes(p.asignaturaId)&&p.dia===dia);
             });
-            return [...propios,...heredados];
+            const electivas=planesElectivosObjetivoEn(seccionId,dia,null,fuente).map(x=>x.plan);
+            return [...propios,...heredados,...electivas];
+        }
+
+        function planesVisiblesComparador(seccionId){
+            const data=getData();
+            const propios=data.planificaciones.filter(p=>mismoId(p.seccionId,seccionId));
+            const heredados=(Array.isArray(data.gruposDictacion)?data.gruposDictacion:[])
+                .filter(g=>!mismoId(g.seccionMadreId,seccionId)&&g.seccionesVinculadasIds?.some(id=>mismoId(id,seccionId)))
+                .flatMap(g=>{
+                    const ids=[g.asignaturaId,...(g.asignaturasEquivalentesIds||[])].filter(Boolean);
+                    return data.planificaciones
+                        .filter(p=>mismoId(p.seccionId,g.seccionMadreId)&&ids.some(id=>mismoId(id,p.asignaturaId)))
+                        .map(p=>Object.assign({},p,{vinculado:true,seccionVistaId:seccionId,seccionOrigenId:g.seccionMadreId}));
+                });
+            const electivas=data.planificaciones.filter(p=>{
+                return !mismoId(p.seccionId,seccionId)&&(data.vinculosElectivos||[]).some(v=>mismoId(v.seccionDestinoId,seccionId)&&mismoId(v.asignaturaId,p.asignaturaId)&&mismoId(v.seccionOrigenId,p.seccionId));
+            }).map(p=>Object.assign({},p,{vinculado:true,electivaObjetivo:true,seccionVistaId:seccionId,seccionOrigenId:p.seccionId}));
+            const vistos=new Set();
+            return [...propios,...heredados,...electivas].filter(p=>{
+                const key=[p.dia,p.bloque,p.asignaturaId,p.seccionId,p.componenteId||''].join('|');
+                if(vistos.has(key)) return false;
+                vistos.add(key);
+                return true;
+            });
+        }
+
+        function actualizarEstadoVacioPlanificador(seccionId,totalVisible=0){
+            const data=getData();
+            const estado=document.getElementById('planEmptyState');
+            const contenedor=document.getElementById('scheduleContainer');
+            if(!estado||!contenedor) return;
+            const mostrar=!data.modoPlan&&(!seccionId||totalVisible===0);
+            estado.classList.toggle('visible',mostrar);
+            contenedor.classList.toggle('has-empty-state',mostrar);
+            if(!mostrar) return;
+            const sinSeccion=!seccionId;
+            document.getElementById('planEmptyTitle').textContent=sinSeccion?'Selecciona una sección':'Aún no hay planificación';
+            document.getElementById('planEmptyText').textContent=sinSeccion
+                ? 'Usa los filtros superiores para visualizar o comenzar una planificación.'
+                : 'La sección está lista. Activa el modo planificación para comenzar a asignar bloques.';
+            const btn=document.getElementById('btnPlanEmptyAction');
+            btn.textContent=sinSeccion?'Elegir sección':'Comenzar a planificar';
+            btn.dataset.action=sinSeccion?'seleccionar':'planificar';
         }
 
         function construirGrilla() {
@@ -468,12 +555,17 @@
             const grid=document.getElementById('scheduleGrid'); grid.innerHTML='';
             grid.appendChild(ctx.createHeader());
             const secId=data.sel.seccionId;
+            const seccionActual=idTexto(secId);
+            const cambioSeccion=ultimaSeccionRenderizada!==undefined&&seccionActual!==ultimaSeccionRenderizada;
+            ultimaSeccionRenderizada=seccionActual;
+            let totalVisible=0;
             ctx.BLOQUES.forEach(b=>{
                 grid.appendChild(ctx.createTimeCell(b));
                 ctx.DIAS.forEach((d,di)=>{
                     const cell=document.createElement('div'); cell.className='grid-cell'; cell.dataset.dia=di; cell.dataset.bloque=b.n;
                     const visible=secId?planVisibleEn(secId,di,b.n):null;
                     if(visible?.plan){
+                        totalVisible++;
                         aplicarEstadoCelda(cell,visible.plan,visible);
                         aplicarOcupacionDocenteCelda(cell,di,b.n,visible.plan);
                         aplicarOcupacionSalaCelda(cell,di,b.n,visible.plan);
@@ -482,8 +574,20 @@
                     grid.appendChild(cell);
                 });
             });
+            actualizarEstadoVacioPlanificador(secId,totalVisible);
             pintarSeleccionBloques();
-            renderComparadorPlanificacion();
+            if(cambioSeccion&&!window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches){
+                const superficies=['planProgreso','planMensajes','planComparador','scheduleContainer','planGridLegend']
+                    .map(id=>document.getElementById(id)).filter(Boolean);
+                window.clearTimeout(animacionCambioSeccionTimer);
+                superficies.forEach(el=>el.classList.remove('plan-section-surface-change'));
+                void document.getElementById('scheduleContainer')?.offsetWidth;
+                superficies.forEach(el=>el.classList.add('plan-section-surface-change'));
+                animacionCambioSeccionTimer=window.setTimeout(()=>{
+                    superficies.forEach(el=>el.classList.remove('plan-section-surface-change'));
+                },260);
+            }
+            if(comparadorActivo) renderComparadorPlanificacion();
         }
 
         function agregarSeccionComparador(seccionId=null){
@@ -492,31 +596,57 @@
             const id=idTexto(seccionId||data.sel?.seccionId);
             if(!id){ renderComparadorPlanificacion(); return ctx.toast('Selecciona una sección en cualquier espacio comparativo','info'); }
             if(!data.secciones.some(s=>mismoId(s.id,id))) return ctx.toast('La sección seleccionada no existe','error');
-            if(comparadorSecciones.some(x=>mismoId(x,id))) return ctx.toast('Esa sección ya está en la vista comparativa','info');
-            const libre=Array.from({length:comparadorCapacidad},(_,i)=>i).find(i=>!comparadorSecciones[i]);
+            if(comparadorSlots.some(slot=>mismoId(slot?.seccionId,id))) return ctx.toast('Esa sección ya está en la vista comparativa','info');
+            const libre=Array.from({length:comparadorCapacidad},(_,i)=>i).find(i=>!comparadorSlots[i]?.seccionId);
             if(libre===undefined) return ctx.toast(`La vista comparativa actual permite ${comparadorCapacidad} secciones`,'info');
-            comparadorSecciones[libre]=id;
-            comparadorFiltros[libre]=filtrosDesdeSeccion(id);
+            comparadorSlots[libre]=filtrosDesdeSeccion(id);
             renderComparadorPlanificacion();
         }
 
-        function quitarSeccionComparador(seccionId){
-            const idx=comparadorSecciones.findIndex(id=>mismoId(id,seccionId));
-            if(idx>=0){
-                comparadorSecciones[idx]=null;
-                if(comparadorFiltros[idx]) comparadorFiltros[idx].seccionId='';
-            }
+        function quitarSlotComparador(index){
+            if(!Number.isFinite(index)||index<0) return;
+            comparadorSlots[index]=crearSlotComparador();
             renderComparadorPlanificacion();
         }
 
         function limpiarComparadorPlanificacion(){
-            comparadorSecciones.splice(0,comparadorSecciones.length);
-            comparadorFiltros.splice(0,comparadorFiltros.length);
+            comparadorSlots.splice(0,comparadorSlots.length);
             renderComparadorPlanificacion();
         }
 
+        function columnasComparador(){
+            if(comparadorCapacidad===1) return 1;
+            if(comparadorCapacidad===2) return 2;
+            if(comparadorCapacidad===4) return 2;
+            return 3;
+        }
+
+        function actualizarBotonComparador(){
+            const btn=document.getElementById('btnCompararSeccion');
+            if(!btn) return;
+            btn.classList.toggle('active',comparadorActivo);
+            btn.textContent=comparadorActivo?'Cerrar comparación':'▦ Comparar sección';
+            btn.setAttribute('aria-pressed',comparadorActivo?'true':'false');
+        }
+
+        function alternarComparadorPlanificacion(){
+            if(comparadorActivo){
+                comparadorActivo=false;
+                comparadorSlots.splice(0,comparadorSlots.length);
+                renderComparadorPlanificacion();
+                return;
+            }
+            comparadorActivo=true;
+            comparadorSlots.splice(0,comparadorSlots.length);
+            renderComparadorPlanificacion();
+        }
+
+        function crearSlotComparador(){
+            return {area:'',carreraId:'',nivelId:'',jornada:'',seccionId:''};
+        }
+
         function filtrosDesdeSeccion(seccionId){
-            const {sec,nivel,carrera}=contextoSeccion(seccionId);
+            const {sec,nivel,carrera}=contextoSeccionPorId(seccionId);
             return {
                 area:areaCarrera(carrera),
                 carreraId:carrera?idTexto(carrera.id):'',
@@ -527,19 +657,12 @@
         }
 
         function filtrosComparador(index){
-            const id=idTexto(comparadorSecciones[index]||'');
-            if(id) return Object.assign({},filtrosDesdeSeccion(id),comparadorFiltros[index]||{}, {seccionId:id});
-            return Object.assign({area:'',carreraId:'',nivelId:'',jornada:'',seccionId:''},comparadorFiltros[index]||{});
-        }
-
-        function seccionComparadorPorIndice(index, fallback=''){
-            const f=filtrosComparador(index);
-            return idSeccionReal(f.seccionId||comparadorSecciones[index]||fallback);
+            return Object.assign(crearSlotComparador(),comparadorSlots[index]||{});
         }
 
         function actualizarFiltroComparador(index,campo,valor){
             if(!Number.isFinite(index)||index<0) return;
-            const f=Object.assign({area:'',carreraId:'',nivelId:'',jornada:'',seccionId:''},comparadorFiltros[index]||{});
+            const f=filtrosComparador(index);
             f[campo]=valor||'';
             if(campo==='area'){f.carreraId='';f.nivelId='';f.jornada='';f.seccionId='';}
             if(campo==='carreraId'){f.nivelId='';f.jornada='';f.seccionId='';}
@@ -547,11 +670,9 @@
             if(campo==='jornada') f.seccionId='';
             if(campo==='seccionId'&&valor){
                 const real=filtrosDesdeSeccion(valor);
-                comparadorSecciones[index]=real.seccionId||idTexto(valor);
-                comparadorFiltros[index]=real.seccionId?real:Object.assign({},f,{seccionId:idTexto(valor)});
+                comparadorSlots[index]=real.seccionId?real:Object.assign({},f,{seccionId:idTexto(valor)});
             }else{
-                comparadorSecciones[index]=null;
-                comparadorFiltros[index]=f;
+                comparadorSlots[index]=f;
             }
             renderComparadorPlanificacion();
         }
@@ -570,18 +691,18 @@
         function abrirSeccionComparador(seccionId, opciones={}){
             const data=getData();
             const index=Number(opciones.index);
-            const baseId=Number.isFinite(index)?seccionComparadorPorIndice(index,seccionId):idSeccionReal(seccionId);
-            let targetId=baseId;
+            const slot=Number.isFinite(index)?filtrosComparador(index):crearSlotComparador();
+            let targetId=idSeccionReal(slot.seccionId||seccionId);
             let planObjetivo=null;
             if(!targetId) return ctx.toast('No se pudo abrir la sección seleccionada','error');
             if(opciones.dia!==undefined&&opciones.bloque!==undefined){
-                const visible=planVisibleEn(targetId,Number(opciones.dia),Number(opciones.bloque));
-                if(visible?.plan){
-                    planObjetivo=visible.plan;
-                    if(visible.vinculado) targetId=visible.plan.seccionId;
+                const visible=planesVisiblesComparador(targetId).find(p=>Number(p.dia)===Number(opciones.dia)&&Number(p.bloque)===Number(opciones.bloque));
+                if(visible){
+                    planObjetivo=visible;
+                    if(visible.vinculado) targetId=visible.seccionOrigenId||visible.seccionId;
                 }
             }
-            const {sec,nivel,carrera}=contextoSeccion(targetId);
+            const {sec,nivel,carrera}=contextoSeccionPorId(targetId);
             if(!sec||!nivel||!carrera) return ctx.toast('No se pudo abrir la sección seleccionada','error');
             ctx.activarTab?.('planificacion');
             cerrarPopupAccion();
@@ -612,41 +733,80 @@
         }
 
         function renderComparadorPlanificacion(){
-            const data=getData();
             const panel=document.getElementById('planComparador');
             if(!panel) return;
-            for(let i=comparadorSecciones.length-1;i>=0;i--){
-                if(comparadorSecciones[i]&&!data.secciones.some(s=>mismoId(s.id,comparadorSecciones[i]))) comparadorSecciones[i]=null;
-            }
-            if(!comparadorActivo&&!comparadorSecciones.some(Boolean)){
-                panel.style.display='none';
-                panel.innerHTML='';
+            actualizarBotonComparador();
+            const reducirMovimiento=window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+            if(!comparadorActivo){
+                window.clearTimeout(comparadorAnimacionTimer);
+                panel.classList.remove('opening');
+                if(panel.style.display==='none') return;
+                if(reducirMovimiento){ panel.style.display='none'; panel.style.maxHeight=''; panel.classList.remove('closing'); return; }
+                panel.style.maxHeight=`${panel.scrollHeight}px`;
+                void panel.offsetHeight;
+                panel.classList.add('closing');
+                panel.style.maxHeight='0px';
+                comparadorAnimacionTimer=window.setTimeout(()=>{
+                    if(comparadorActivo) return;
+                    panel.style.display='none';
+                    panel.style.maxHeight='';
+                    panel.classList.remove('closing');
+                },270);
                 return;
             }
+            window.clearTimeout(comparadorAnimacionTimer);
+            const estabaOculto=panel.style.display==='none'||!panel.innerHTML.trim();
+            panel.classList.remove('closing');
             panel.style.display='block';
-            const seleccionadas=comparadorSecciones.filter(Boolean).length;
-            const slots=Array.from({length:comparadorCapacidad},(_,i)=>seccionComparadorPorIndice(i));
+            if(estabaOculto&&!reducirMovimiento){
+                panel.classList.add('opening');
+                panel.style.maxHeight='0px';
+            }
+            const slots=Array.from({length:comparadorCapacidad},(_,i)=>filtrosComparador(i));
+            const seleccionadas=slots.filter(slot=>slot.seccionId).length;
             panel.innerHTML=`
                 <div class="plan-compare-head">
                     <div>
                         <strong>Vista comparativa</strong>
-                        <span>${seleccionadas} de ${comparadorCapacidad} secciones</span>
+                        <span data-compare-summary>${seleccionadas} de ${comparadorCapacidad} secciones</span>
                     </div>
                     <div class="plan-compare-toolbar">
                         <label>Grillas
                             <select class="form-select" data-compare-capacity>
-                                ${[2,4,6].map(n=>ctx.optionHTML(String(n),String(n),comparadorCapacidad===n)).join('')}
+                                ${[1,2,4,6].map(n=>ctx.optionHTML(String(n),String(n),comparadorCapacidad===n)).join('')}
                             </select>
                         </label>
                         <button class="btn btn-xs" type="button" data-compare-clear>Limpiar vista</button>
                     </div>
                 </div>
-                <div class="plan-compare-grid" style="--compare-columns:${comparadorCapacidad===2?2:comparadorCapacidad===4?2:3};">
-                    ${slots.map((id,i)=>id?renderTarjetaComparador(id,i):renderSlotComparadorVacio(i)).join('')}
+                <div class="plan-compare-grid" style="--compare-columns:${columnasComparador()};">
+                    ${slots.map((slot,i)=>slot.seccionId?renderTarjetaComparador(slot,i):renderSlotComparadorVacio(i)).join('')}
                 </div>
             `;
+            if(estabaOculto&&!reducirMovimiento){
+                panel.classList.remove('opening');
+                panel.style.maxHeight='none';
+                const altura=panel.scrollHeight;
+                panel.classList.add('opening');
+                panel.style.maxHeight='0px';
+                void panel.offsetHeight;
+                window.requestAnimationFrame(()=>{
+                    if(!comparadorActivo) return;
+                    panel.classList.remove('opening');
+                    panel.style.maxHeight=`${altura}px`;
+                });
+                comparadorAnimacionTimer=window.setTimeout(()=>{
+                    if(!comparadorActivo) return;
+                    panel.style.maxHeight='none';
+                    panel.classList.remove('opening');
+                },260);
+            }else{
+                panel.style.maxHeight='none';
+            }
             panel.querySelector('[data-compare-capacity]')?.addEventListener('change',e=>{
-                comparadorCapacidad=Math.max(2,Math.min(6,parseInt(e.target.value)||2));
+                const solicitada=parseInt(e.target.value)||2;
+                comparadorCapacidad=[1,2,4,6].includes(solicitada)?solicitada:2;
+                comparadorSlots.splice(0,comparadorSlots.length);
                 renderComparadorPlanificacion();
             });
             sincronizarValoresSelectoresComparador(panel);
@@ -658,9 +818,7 @@
                     const open=e.target.closest('[data-compare-open]');
                     if(open) return abrirSeccionComparador(open.dataset.compareOpen,{index:open.dataset.compareIndex});
                     const remove=e.target.closest('[data-compare-remove]');
-                    if(remove) return quitarSeccionComparador(remove.dataset.compareRemove);
-                    const cell=e.target.closest('[data-compare-cell-open]');
-                    if(cell) return abrirSeccionComparador(cell.dataset.compareSection,{index:cell.dataset.compareIndex,dia:cell.dataset.compareDia,bloque:cell.dataset.compareBloque});
+                    if(remove) return quitarSlotComparador(Number(remove.dataset.compareIndex));
                 });
                 panel.addEventListener('change',e=>{
                     const sel=e.target.closest('[data-compare-filter]');
@@ -713,15 +871,6 @@
             </div>`;
         }
 
-        function docenteNombreCorto(doc){
-            if(!doc) return 'Sin docente';
-            if(doc.id===ctx.DOCENTE_NN_ID) return 'Docente NN';
-            const nombre=String(doc.nombre||'').trim();
-            const apellido=String(doc.apellido||'').trim();
-            if(nombre&&apellido) return `${nombre.charAt(0)}. ${apellido}`;
-            return docenteNombre(doc);
-        }
-
         function renderSlotComparadorVacio(index){
             return `<article class="plan-compare-card plan-compare-card-empty" data-compare-index="${index}">
                 <div class="plan-compare-card-head"><div><strong>Espacio ${index+1}</strong><span>Selecciona una sección para comparar</span></div></div>
@@ -729,58 +878,68 @@
             </article>`;
         }
 
-        function renderTarjetaComparador(seccionId,index=0){
+        function renderMiniGrillaComparador(seccionId){
             const data=getData();
-            const {sec,nivel,carrera}=contextoSeccion(seccionId);
-            const titulo=sec?.nombre||nombreSeccion(seccionId);
-            const subtitulo=[carrera?.nombre,nivel?.nombre,sec?etiquetaJornada(jornadaSeccion(sec)):null].filter(Boolean).join(' · ');
             const planesComparador=Array.isArray(data.planificaciones)?data.planificaciones:[];
-            let ocupados=0, heredados=0;
+            let total=0, heredados=0;
             const filas=ctx.BLOQUES.map(b=>{
-                const celdas=ctx.DIAS.map((d,di)=>{
+                const celdas=ctx.DIAS.map((dia,di)=>{
                     const visible=planVisibleEnFuente(seccionId,di,b.n,planesComparador);
-                    const cellAttrs=`data-compare-cell-open data-compare-index="${index}" data-compare-section="${ctx.escapeAttr(seccionId)}" data-compare-dia="${di}" data-compare-bloque="${b.n}"`;
-                    if(!visible?.plan) return `<button class="compare-cell" type="button" ${cellAttrs} title="${ctx.escapeAttr(d)} B${b.n} · abrir sección"></button>`;
-                    ocupados++;
+                    if(!visible?.plan) return '<div class="vista-general-cell"></div>';
+                    total++;
                     if(visible.vinculado) heredados++;
                     const plan=visible.plan;
-                    const asig=data.asignaturas.find(a=>a.id===plan.asignaturaId);
-                    const sala=data.salas.find(s=>s.id===plan.salaId);
-                    const doc=data.docentes.find(d=>d.id===plan.docenteId);
+                    const asig=data.asignaturas.find(a=>mismoId(a.id,plan.asignaturaId));
+                    const doc=data.docentes.find(d=>mismoId(d.id,plan.docenteId));
+                    const sala=data.salas.find(s=>mismoId(s.id,plan.salaId));
                     const color=ctx.colorAsignaturaPlanhor?.(asig)||asig?.color||'var(--planhor-subject-neutral)';
+                    const docenteCorto=doc
+                        ? (mismoId(doc.id,ctx.DOCENTE_NN_ID)?'Docente NN':`${String(doc.nombre||'').charAt(0)}. ${doc.apellido||''}`.trim())
+                        : 'Sin docente';
                     const detalle=[
+                        `${dia} B${b.n}`,
                         [asig?.codigo,asig?.nombre].filter(Boolean).join(' - '),
-                        `${d} B${b.n}`,
-                        sala?.nombre?`Sala ${sala.nombre}`:'',
-                        doc?`Docente ${docenteNombre(doc)}`:'',
+                        `Docente: ${docenteNombre(doc)}`,
+                        `Sala: ${sala?.nombre||'Sin sala'}`,
                         visible.vinculado?`Heredada desde ${nombreSeccion(plan.seccionId)}`:''
                     ].filter(Boolean).join(' · ');
-                    return `<button class="compare-cell filled ${visible.vinculado?'linked':''}" type="button" ${cellAttrs} style="background:${ctx.escapeAttr(color)}" title="${ctx.escapeAttr(detalle)}">
+                    return `<div class="vista-general-cell filled ${visible.vinculado?'linked':''}" style="background:${ctx.escapeAttr(color)}" title="${ctx.escapeAttr(detalle)}">
                         <span>${ctx.escapeHTML(asig?.codigo||'?')}</span>
-                        <small>${ctx.escapeHTML(sala?.nombre||'Sin sala')}</small>
-                        <small>${ctx.escapeHTML(docenteNombreCorto(doc))}</small>
-                    </button>`;
+                        <span>${ctx.escapeHTML(docenteCorto)}</span>
+                        <span>${ctx.escapeHTML(sala?.nombre||'Sin sala')}</span>
+                    </div>`;
                 }).join('');
-                return `<div class="compare-time">B${b.n}</div>${celdas}`;
+                return `<div class="vista-general-time">B${b.n}</div>${celdas}`;
             }).join('');
-            return `<article class="plan-compare-card" data-section="${ctx.escapeAttr(seccionId)}" data-compare-index="${index}">
-                <div class="plan-compare-card-head">
-                    <div>
-                        <strong>${ctx.escapeHTML(titulo)}</strong>
-                        <span>${ctx.escapeHTML(subtitulo)}</span>
-                    </div>
-                    <div class="plan-compare-actions">
-                        <button class="btn btn-xs" type="button" data-compare-open="${ctx.escapeAttr(seccionId)}" data-compare-index="${index}">Editar</button>
-                        <button class="btn btn-xs" type="button" data-compare-remove="${ctx.escapeAttr(seccionId)}">Quitar</button>
-                    </div>
-                </div>
-                <div class="plan-compare-meta">${ocupados} bloque(s)${heredados?` · ${heredados} heredado(s)`:''}</div>
-                ${renderSelectoresSlotComparador(index)}
-                <div class="compare-schedule">
-                    <div class="compare-corner">B</div>
-                    ${ctx.DIAS.map(d=>`<div class="compare-day">${ctx.escapeHTML(d.slice(0,3))}</div>`).join('')}
+            return {
+                total,
+                heredados,
+                html:`<div class="vista-general-mini">
+                    <div class="vista-general-corner">B</div>
+                    ${ctx.DIAS.map(d=>`<div class="vista-general-day">${ctx.escapeHTML(d.slice(0,3))}</div>`).join('')}
                     ${filas}
+                </div>`
+            };
+        }
+
+        function renderTarjetaComparador(slot,index){
+            const seccionId=slot.seccionId;
+            const {sec,nivel,carrera}=contextoSeccionPorId(seccionId);
+            const seccionCanonica=sec?idTexto(sec.id):idTexto(seccionId);
+            const titulo=sec?.nombre||nombreSeccion(seccionId);
+            const subtitulo=[carrera?.nombre,nivel?.nombre,sec?etiquetaJornada(jornadaSeccion(sec)):null].filter(Boolean).join(' · ');
+            const mini=renderMiniGrillaComparador(seccionCanonica);
+            return `<article class="plan-compare-card" data-section="${ctx.escapeAttr(seccionCanonica)}" data-compare-index="${index}">
+                <div class="plan-compare-card-head">
+                    <div><strong>${ctx.escapeHTML(titulo)}</strong><span>${ctx.escapeHTML(subtitulo)}</span></div>
+                    <div class="plan-compare-actions">
+                        <button class="btn btn-xs" type="button" data-compare-open="${ctx.escapeAttr(seccionCanonica)}" data-compare-index="${index}">Editar</button>
+                        <button class="btn btn-xs" type="button" data-compare-remove data-compare-index="${index}">Quitar</button>
+                    </div>
                 </div>
+                <div class="plan-compare-meta">${mini.total} bloque(s)${mini.heredados?` · ${mini.heredados} heredado(s)`:''}</div>
+                ${renderSelectoresSlotComparador(index)}
+                <div class="plan-compare-body">${mini.html}</div>
             </article>`;
         }
 
@@ -795,7 +954,7 @@
             cell.style.backgroundColor=ctx.colorAsignaturaPlanhor?.(asig)||asig?.color||'var(--planhor-subject-neutral)';
             cell.innerHTML='';
             const codigo=document.createElement('span');
-            codigo.textContent=(meta.vinculado?'🔗 ':plan.fijo?'🔒 ':'')+(asig?.codigo||'?');
+            codigo.textContent=(meta.electivaObjetivo?'◇ ':meta.vinculado?'🔗 ':plan.fijo?'🔒 ':'')+(asig?.codigo||'?');
             const salaEl=document.createElement('small');
             salaEl.textContent=sala?.nombre||'?';
             const docenteEl=document.createElement('small');
@@ -810,7 +969,12 @@
                 cell.appendChild(compEl);
             }
             cell.append(salaEl,docenteEl);
-            if(meta.vinculado){
+            if(meta.electivaObjetivo){
+                const origen=document.createElement('small');
+                origen.className='linked-plan-source';
+                origen.textContent=meta.alternativas>1?`Ventana electiva · ${meta.alternativas} opciones`:'Electiva vinculada';
+                cell.appendChild(origen);
+            }else if(meta.vinculado){
                 const origen=document.createElement('small');
                 origen.className='linked-plan-source';
                 origen.textContent='Madre: '+nombreSeccion(plan.seccionId);
@@ -821,7 +985,7 @@
                 [asig?.codigo,asig?.nombre].filter(Boolean).join(' - '),
                 sala?.nombre?`Sala ${sala.nombre}`:'',
                 doc?(doc.id===ctx.DOCENTE_NN_ID?'Docente NN':`${doc.nombre||''} ${doc.apellido||''}`.trim()):'',
-                meta.vinculado?`Heredada desde ${nombreSeccion(plan.seccionId)}`:'',
+                meta.electivaObjetivo?`Electiva vinculada desde ${nombreSeccion(plan.seccionId)}`:meta.vinculado?`Heredada desde ${nombreSeccion(plan.seccionId)}`:'',
                 compNombre?`Componente ${compNombre}`:'',
                 explicacion
             ].filter(Boolean).join('. ');
@@ -883,10 +1047,10 @@
             const subtitulo=[
                 `${ctx.DIAS[plan.dia]} B${plan.bloque}${bloqueInfo?` · ${bloqueInfo.inicio}-${bloqueInfo.fin}`:''}`,
                 plan.tipoPresencial===false?'Virtual':'Presencial',
-                visible.vinculado?'Heredada':'Se dicta aquí'
+                visible.electivaObjetivo?'Ventana electiva':visible.vinculado?'Heredada':'Se dicta aquí'
             ].filter(Boolean).join(' · ');
             const filas=[
-                ['Sección', visible.vinculado?`${nombreSeccion(secId)} · madre ${nombreSeccion(plan.seccionId)}`:nombreSeccion(plan.seccionId)],
+                ['Sección', visible.electivaObjetivo?`${nombreSeccion(secId)} · origen ${nombreSeccion(plan.seccionId)}`:visible.vinculado?`${nombreSeccion(secId)} · madre ${nombreSeccion(plan.seccionId)}`:nombreSeccion(plan.seccionId)],
                 ['Docente', docenteNombre(doc)],
                 ['Sala', sala?.nombre||'Sin sala'],
                 compNombre?['Componente', compNombre]:null
@@ -1070,6 +1234,7 @@
                 aplicarOcupacionSalaCelda(cell,dia,bloque,visible.plan);
             }
             else if(data.modoPlan && secId && data.sel.docenteId) actualizarDisponibilidadCelda(cell,dia,bloque);
+            actualizarEstadoVacioPlanificador(secId,grid.querySelectorAll('.grid-cell.planned').length);
             pintarSeleccionBloques();
         }
 
@@ -1634,16 +1799,17 @@
             const plan=meta.plan;
             const grupo=meta.grupo;
             const asig=data.asignaturas.find(a=>a.id===plan.asignaturaId);
+            const esElectiva=!!meta.electivaObjetivo;
             const vinculadas=(grupo?.seccionesVinculadasIds||[]).map(nombreSeccion).join(', ')||'Sin secciones vinculadas';
             const popup=document.createElement('div');
             popup.className='action-popup';
             popup.innerHTML=`
                 <div class="action-popup-note">
-                    <strong>Bloque vinculado</strong>
-                    <span>${ctx.escapeHTML(asig?.codigo||'Asignatura')} se dicta desde ${ctx.escapeHTML(nombreSeccion(plan.seccionId))}. Para modificarlo debes ir a la sección madre.</span>
+                    <strong>${esElectiva?'Ventana electiva':'Bloque vinculado'}</strong>
+                    <span>${ctx.escapeHTML(asig?.codigo||'Asignatura')} se planifica desde ${ctx.escapeHTML(nombreSeccion(plan.seccionId))}. Para modificarlo debes abrir esa sección.</span>
                 </div>
-                <button id="popupIrMadre">Ir a sección madre</button>
-                <button id="popupVerVinculadas">Ver secciones vinculadas</button>`;
+                <button id="popupIrMadre">Ir a sección de origen</button>
+                <button id="popupVerVinculadas">${esElectiva?'Ver destinos':'Ver secciones vinculadas'}</button>`;
             document.body.appendChild(popup);
             posicionarPopupEnPuntero(popup,cell,evento);
             popupState._popupAbierto=popup; popupState._popupCell=cell;
@@ -1665,7 +1831,8 @@
                 ctx.toast('Sección madre abierta','info');
             };
             popup.querySelector('#popupVerVinculadas').onclick=()=>{
-                alert(`Sección madre: ${nombreSeccion(plan.seccionId)}\nVinculadas: ${vinculadas}`);
+                const destinos=esElectiva?[...new Set((data.vinculosElectivos||[]).filter(v=>v.asignaturaId===asig?.id&&v.seccionOrigenId===plan.seccionId).map(v=>v.seccionDestinoId))].map(nombreSeccion).join(', ')||'Sin destinos':vinculadas;
+                alert(`${esElectiva?'Sección de origen':'Sección madre'}: ${nombreSeccion(plan.seccionId)}\n${esElectiva?'Destinos':'Vinculadas'}: ${destinos}`);
                 cerrarPopupAccion();
             };
         }
@@ -1673,9 +1840,10 @@
         function cerrarPopupAccion() {
             const popupState = ctx.popupState;
             if(popupState._popupAbierto) {
-                popupState._popupAbierto.remove();
+                const popup=popupState._popupAbierto;
                 popupState._popupAbierto = null;
                 popupState._popupCell = null;
+                ctx.cerrarFlotante(popup,120);
             }
         }
 
@@ -1731,6 +1899,7 @@
             const data = getData();
             const indicePlan = ctx.getIndicePlan();
             const grid=document.getElementById('scheduleGrid'); grid.innerHTML='';
+            actualizarEstadoVacioPlanificador(data.sel.seccionId,1);
             grid.appendChild(ctx.createHeader());
             const mm=modoMovimiento; if(!mm) return;
             const secId=mm.seccionId, docId=mm.nuevoDocenteId;
@@ -3120,7 +3289,7 @@
                         const noAsignables=planActual.acciones.filter(a=>!a.cant).length;
                         if((parciales||noAsignables)&&!confirm(`Hay ${parciales} fila(s) parciales y ${noAsignables} no asignable(s). ¿Aplicar igualmente?`)) return;
                     }
-                    document.getElementById('modalContainer').innerHTML='';
+                    ctx.cerrarModal();
                     resolve(ok?planActual:null);
                 };
                 document.getElementById('btnCancelarAutoSeccion').onclick=()=>cerrar(false);
@@ -3174,7 +3343,7 @@
             ctx.toast(`✅ ${total} bloque(s) asignado(s)${avisos.length?`. Pendientes: ${avisos.join(', ')}.`:''}`,'success');
         }
 
-        function contextoSeccion(sec){
+        function contextoSeccionDesdeObjeto(sec){
             const data=getData();
             const nivel=data.niveles.find(n=>n.id===sec?.nivelId);
             const carrera=nivel?data.carreras.find(c=>c.id===nivel.carreraId):null;
@@ -3198,7 +3367,7 @@
             const data=getData();
             const original={...data.sel};
             const sec=data.secciones.find(s=>s.id===secId);
-            const ctxSec=contextoSeccion(sec);
+            const ctxSec=contextoSeccionDesdeObjeto(sec);
             if(!ctxSec.sec||!ctxSec.nivel||!ctxSec.carrera) return null;
             data.sel.area=areaCarrera(ctxSec.carrera);
             data.sel.carreraId=ctxSec.carrera.id;
@@ -3231,7 +3400,7 @@
 
         function seccionPendiente(sec){
             const data=getData();
-            const {nivel,carrera}=contextoSeccion(sec);
+            const {nivel,carrera}=contextoSeccionDesdeObjeto(sec);
             if(!nivel||!carrera) return false;
             const ids=asignaturasDeSeccion(sec.id);
             return ids.some(asigId=>{
@@ -5555,10 +5724,10 @@
                         resumen=calcularResumenAutoGeneral(opciones);
                         render();
                     });
-                    document.getElementById('btnCancelarAutoGeneral').onclick=()=>{document.getElementById('modalContainer').innerHTML='';resolve(null);};
+                    document.getElementById('btnCancelarAutoGeneral').onclick=()=>{ctx.cerrarModal();resolve(null);};
                     document.getElementById('btnDetalleAutoGeneral').onclick=abrirDetalleGeneral;
-                    document.getElementById('btnAplicarAutoGeneral').onclick=()=>{document.getElementById('modalContainer').innerHTML='';resolve(opciones);};
-                    document.getElementById('modalOverlay').onclick=(e)=>{if(e.target===e.currentTarget){document.getElementById('modalContainer').innerHTML='';resolve(null);}};
+                    document.getElementById('btnAplicarAutoGeneral').onclick=()=>{ctx.cerrarModal();resolve(opciones);};
+                    document.getElementById('modalOverlay').onclick=(e)=>{if(e.target===e.currentTarget){ctx.cerrarModal();resolve(null);}};
                     const autoGeneralModal=document.querySelector('.auto-general-modal');
                     if(autoGeneralModal) autoGeneralModal.scrollTop=autoGeneralModalScrollTop;
                     const scopeTree=document.querySelector('.auto-general-scope-tree');
@@ -5710,7 +5879,7 @@
                 const plan=aplicarFiltrosAutoGeneral(planBase,opciones);
                 omitidas+=plan.omitidas||0;
                 pendientes+=plan.pendientes.length;
-                const {nivel,carrera}=contextoSeccion(sec);
+                const {nivel,carrera}=contextoSeccionDesdeObjeto(sec);
                 data.sel.area=areaCarrera(carrera);
                 data.sel.carreraId=carrera.id;
                 data.sel.nivelId=nivel.id;
@@ -5803,6 +5972,13 @@
         function init(){
             const scheduleGrid=document.getElementById('scheduleGrid');
             scheduleGrid?.addEventListener('selectstart',(e)=>e.preventDefault());
+            document.getElementById('btnPlanEmptyAction')?.addEventListener('click',()=>{
+                const data=getData();
+                const accion=document.getElementById('btnPlanEmptyAction')?.dataset.action;
+                if(accion==='planificar') return document.getElementById('btnModoPlanificar')?.click();
+                const pendiente=[['area','planArea'],['carreraId','planCarrera'],['nivelId','planNivel'],['jornada','planJornada'],['seccionId','planSeccion']].find(([campo])=>!data.sel?.[campo]);
+                document.getElementById(pendiente?.[1]||'planSeccion')?.focus();
+            });
             const soportePointer=!!window.PointerEvent;
             const coordenadasEvento=(e)=>{
                 const src=e?.touches?.[0]||e?.changedTouches?.[0]||e;
@@ -6316,7 +6492,8 @@
             document.getElementById('btnAutoGeneral').onclick=autoAsignarGeneral;
             document.getElementById('btnOptimizarHorario').onclick=abrirOptimizacionHorario;
             document.getElementById('btnRevertirAutoRapido').onclick=deshacerUltimaAuto;
-            document.getElementById('btnCompararSeccion').onclick=()=>agregarSeccionComparador();
+            document.getElementById('btnCompararSeccion').onclick=alternarComparadorPlanificacion;
+            actualizarBotonComparador();
         }
 
         return {
