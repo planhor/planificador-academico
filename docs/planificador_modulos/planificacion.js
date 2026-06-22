@@ -4620,6 +4620,108 @@
             return movimientos.sort((a,b)=>b.peso-a.peso).slice(0,params.candidatos*params.destinos);
         }
 
+        function aplicarCambiosCandidatos(basePlanes,candidatos){
+            const cambios=new Map();
+            candidatos.forEach(candidato=>(candidato.cambios||[]).forEach(plan=>cambios.set(String(plan.id),plan)));
+            return basePlanes.map(plan=>cambios.has(String(plan.id))?Object.assign({},plan,cambios.get(String(plan.id))):Object.assign({},plan));
+        }
+
+        function candidatosMatematicosCompatibles(basePlanes,candidatos){
+            const ids=new Set();
+            for(const candidato of candidatos){
+                for(const id of candidato.planIds||[]){
+                    if(ids.has(String(id))) return false;
+                    ids.add(String(id));
+                }
+            }
+            const propuesta=aplicarCambiosCandidatos(basePlanes,candidatos);
+            for(const plan of propuesta){
+                if(!ids.has(String(plan.id))) continue;
+                if(!evaluarRestriccionesPlan(plan,plan.dia,plan.bloque,propuesta).valido) return false;
+            }
+            return true;
+        }
+
+        function prepararOptimizacionMatematica(opciones={}){
+            const data=getData();
+            const basePlanes=Array.isArray(opciones.basePlanificaciones)?opciones.basePlanificaciones:data.planificaciones;
+            const scoreInicial=scoreGlobalPlanificaciones(basePlanes);
+            const objetivoEfectivo=resolverObjetivoOptimizacion(scoreInicial,opciones.objetivo||'auto');
+            const params=parametrosSolverOptimizacion(opciones.profundidad||'equilibrado');
+            const secciones=new Set(seccionesAlcanceOptimizacion(opciones));
+            const estado={planes:basePlanes.map(p=>Object.assign({},p)),score:scoreInicial,movimientos:[],movidos:new Set()};
+            const basePorId=new Map(basePlanes.map(plan=>[String(plan.id),plan]));
+            const limite=opciones.profundidad==='profundo'?90:opciones.profundidad==='rapido'?35:60;
+            const candidatos=generarMovimientosOptimizacion(estado,secciones,Object.assign({},opciones,{objetivo:objetivoEfectivo}),params)
+                .slice(0,limite)
+                .map((movimiento,indice)=>{
+                    const cambios=movimiento.propuesta.filter(plan=>{
+                        const antes=basePorId.get(String(plan.id));
+                        return antes&&(Number(antes.dia)!==Number(plan.dia)||Number(antes.bloque)!==Number(plan.bloque));
+                    }).map(plan=>Object.assign({},plan));
+                    return {
+                        id:`m${indice+1}`,
+                        peso:Math.max(0.001,Number(movimiento.peso)||0.001),
+                        planIds:cambios.map(plan=>plan.id),
+                        cambios,
+                        movimiento:movimiento.movimiento
+                    };
+                }).filter(candidato=>candidato.cambios.length);
+            const incompatibles=[];
+            for(let i=0;i<candidatos.length;i++){
+                for(let j=i+1;j<candidatos.length;j++){
+                    if(!candidatosMatematicosCompatibles(basePlanes,[candidatos[i],candidatos[j]])) incompatibles.push([candidatos[i].id,candidatos[j].id]);
+                }
+            }
+            return {
+                basePlanes:basePlanes.map(p=>Object.assign({},p)),
+                scoreInicial,
+                objetivo:opciones.objetivo||'auto',
+                objetivoEfectivo,
+                profundidad:opciones.profundidad||'equilibrado',
+                maxMovimientos:Math.max(1,Math.min(30,Number(opciones.maxMovimientos)||8)),
+                candidatos,
+                incompatibles
+            };
+        }
+
+        function construirResultadoOptimizacionMatematica(preparacion,seleccionados=[]){
+            const elegidos=new Set((seleccionados||[]).map(String));
+            const ordenados=(preparacion.candidatos||[]).filter(c=>elegidos.has(String(c.id))).sort((a,b)=>b.peso-a.peso);
+            const aceptados=[];
+            let scoreAceptado=preparacion.scoreInicial;
+            for(const candidato of ordenados){
+                if(aceptados.length>=preparacion.maxMovimientos) break;
+                const tentativa=[...aceptados,candidato];
+                if(!candidatosMatematicosCompatibles(preparacion.basePlanes,tentativa)) continue;
+                const scoreTentativo=scoreGlobalPlanificaciones(aplicarCambiosCandidatos(preparacion.basePlanes,tentativa));
+                if(scoreTentativo.score<scoreAceptado.score||scoreTentativo.perdida>scoreAceptado.perdida) continue;
+                aceptados.push(candidato);
+                scoreAceptado=scoreTentativo;
+            }
+            const planificaciones=aplicarCambiosCandidatos(preparacion.basePlanes,aceptados);
+            const scoreFinal=scoreGlobalPlanificaciones(planificaciones);
+            return {
+                scoreInicial:preparacion.scoreInicial,
+                scoreFinal,
+                deltaScore:scoreFinal.score-preparacion.scoreInicial.score,
+                perdidaReducida:preparacion.scoreInicial.perdida-scoreFinal.perdida,
+                movimientos:aceptados.map(c=>c.movimiento),
+                planificaciones,
+                profundidad:preparacion.profundidad,
+                objetivo:preparacion.objetivo,
+                objetivoEfectivo:preparacion.objetivoEfectivo,
+                diagnosticoInicial:diagnosticoOptimizacionScore(preparacion.scoreInicial).label,
+                diagnosticoFinal:diagnosticoOptimizacionScore(scoreFinal).label,
+                rutasEvaluadas:(preparacion.candidatos||[]).length,
+                motor:'matematico',
+                candidatosMatematicos:(preparacion.candidatos||[]).length,
+                seleccionMatematica:ordenados.length,
+                seleccionValidada:aceptados.length,
+                busquedaLocal:null
+            };
+        }
+
         function simularOptimizacionHorario(opciones={}){
             const data=getData();
             const secciones=new Set(seccionesAlcanceOptimizacion(opciones));
@@ -4814,8 +4916,19 @@
             };
         }
 
+        function etiquetaMotorSolver(motor){
+            return {heuristico:'Heurístico',matematico:'Matemático (GLPK)',hibrido:'Híbrido'}[motor]||'Heurístico';
+        }
+
         function renderPreviewOptimizacion(sim){
-            if(!sim.movimientos.length) return `<div class="auto-plan-empty">No se encontraron movimientos que mejoren el score respetando los bloques fijos.</div>`;
+            const motor=sim.motor||'heuristico';
+            const tiempo=Number(sim.glpk?.tiempoMs||sim.hibrido?.tiempoMs)||0;
+            const estado=sim.glpk?.estado||sim.hibrido?.estado||'completado';
+            if(!sim.movimientos.length) return `<div class="auto-plan-preview">
+                <div><span>Motor</span><strong>${ctx.escapeHTML(etiquetaMotorSolver(motor))}</strong></div>
+                <div><span>Estado</span><strong>${ctx.escapeHTML(estado)}</strong></div>
+                ${tiempo?`<div><span>Tiempo</span><strong>${tiempo} ms</strong></div>`:''}
+            </div><div class="auto-plan-empty">No se encontraron movimientos que mejoren el score respetando los bloques fijos.</div>`;
             const resumenTipos=resumenTiposMovimientosOptimizacion(sim.movimientos);
             const explicacion=explicacionEscenarioOptimizacion(sim);
             return `<div class="auto-plan-preview">
@@ -4825,6 +4938,11 @@
                 <div><span>Costo duro</span><strong>${sim.scoreInicial.costoDuro||0} → ${sim.scoreFinal.costoDuro||0}</strong></div>
                 <div><span>Costo blando</span><strong>${sim.scoreInicial.costoBlando||0} → ${sim.scoreFinal.costoBlando||0}</strong></div>
                 <div><span>Movimientos</span><strong>${sim.movimientos.length}</strong></div>
+                <div><span>Motor</span><strong>${ctx.escapeHTML(etiquetaMotorSolver(motor))}</strong></div>
+                <div><span>Estado</span><strong>${ctx.escapeHTML(estado)}</strong></div>
+                ${tiempo?`<div><span>Tiempo</span><strong>${tiempo} ms</strong></div>`:''}
+                ${sim.glpk?.variables!==undefined?`<div><span>Modelo GLPK</span><strong>${Number(sim.glpk.variables)||0} var. · ${Number(sim.glpk.restricciones)||0} rest.</strong></div>`:''}
+                ${sim.hibrido?`<div><span>Etapas híbridas</span><strong>${Number(sim.hibrido.heuristico)||0} heur. · ${Number(sim.hibrido.matematico)||0} mat.</strong></div>`:''}
                 <div><span>Restricciones duras</span><strong>${sim.scoreInicial.restriccionesDuras||0} → ${sim.scoreFinal.restriccionesDuras||0}</strong></div>
                 <div><span>Fragmentación asignatura</span><strong>${sim.scoreInicial.fragmentacionAsignatura||0} → ${sim.scoreFinal.fragmentacionAsignatura||0}</strong></div>
                 <div><span>Ventanas asignatura</span><strong>${sim.scoreInicial.ventanasAsignatura||0} → ${sim.scoreFinal.ventanasAsignatura||0}</strong></div>
@@ -4928,7 +5046,7 @@
                         return `<button class="global-score-loss opt-scenario-card ${activo?'active':''}" data-escenario="${ctx.escapeAttr(e.meta.id)}" type="button">
                             <strong>${ctx.escapeHTML(e.meta.titulo)}</strong>
                             <span>${ctx.escapeHTML(e.meta.detalle)}</span>
-                            <span>Score ${sim.scoreInicial.score}% → ${sim.scoreFinal.score}% · ${viable?`${sim.movimientos.length} mov.`:'sin cambios'}</span>
+                            <span>${ctx.escapeHTML(etiquetaMotorSolver(sim.motor))} · Score ${sim.scoreInicial.score}% → ${sim.scoreFinal.score}% · ${viable?`${sim.movimientos.length} mov.`:'sin cambios'}</span>
                             <span>${sim.perdidaReducida>0?`Reduce pérdida ${sim.perdidaReducida}`:'Sin mejora detectada'}</span>
                         </button>`;
                     }).join('')}
@@ -4954,7 +5072,7 @@
         function ejecutarSolverEnWorker(opciones,objetivos=[]){
             if(typeof Worker==='undefined') return Promise.reject(new Error('solver-worker-no-disponible'));
             cancelarWorkerOptimizacion();
-            const worker=new Worker('planificador_modulos/solver-worker.js?v=20260621-fase3-worker');
+            const worker=new Worker('planificador_modulos/solver-worker.js?v=20260622-glpk5');
             const id=`solver-${Date.now()}-${Math.random().toString(36).slice(2)}`;
             return new Promise((resolve,reject)=>{
                 const limpiar=()=>{
@@ -4996,9 +5114,14 @@
             }catch(error){
                 if(error?.code==='solver-worker-cancelado') throw error;
                 console.warn('Worker de optimización no disponible; se usa el motor local.',error);
-                return opciones.compararEscenarios
+                const fallback=opciones.compararEscenarios
                     ? generarEscenariosOptimizacion(opciones)
                     : [{meta:metas[0],sim:simularOptimizacionIterativa(opciones)}];
+                fallback.forEach(item=>{
+                    item.sim.motor='heuristico';
+                    item.sim.fallbackMotor={solicitado:opciones.motorSolver||'heuristico',motivo:String(error?.message||error)};
+                });
+                return fallback;
             }
         }
 
@@ -5041,7 +5164,8 @@
                 objetivo:document.getElementById('optObjetivo')?.value||'auto',
                 incluirVirtuales:document.getElementById('optIncluirVirtuales')?.checked!==false,
                 compararEscenarios:document.getElementById('optCompararEscenarios')?.checked!==false,
-                usarEtapas:document.getElementById('optUsarEtapas')?.checked!==false
+                usarEtapas:document.getElementById('optUsarEtapas')?.checked!==false,
+                motorSolver:['heuristico','matematico','hibrido'].includes(document.getElementById('optMotorSolver')?.value)?document.getElementById('optMotorSolver').value:'heuristico'
             });
             const mostrarCalculando=()=>{
                 const cont=document.getElementById('optPreview');
@@ -5121,6 +5245,14 @@
                     </div>
                     <div class="auto-general-form">
                         <div class="form-group">
+                            <label class="form-label">Motor</label>
+                            <select class="form-select" id="optMotorSolver">
+                                ${ctx.optionHTML('heuristico','Heurístico',getData().configuracion?.motorSolver==='heuristico'||!getData().configuracion?.motorSolver)}
+                                ${ctx.optionHTML('matematico','Matemático (GLPK)',getData().configuracion?.motorSolver==='matematico')}
+                                ${ctx.optionHTML('hibrido','Híbrido',getData().configuracion?.motorSolver==='hibrido')}
+                            </select>
+                        </div>
+                        <div class="form-group">
                             <label class="form-label">Alcance</label>
                             <select class="form-select" id="optAlcance">
                                 <option value="seccion" ${opcionesIniciales.alcance==='seccion'?'selected':''}>Sección actual</option>
@@ -5171,7 +5303,7 @@
                         <button class="btn btn-primary" id="btnOptAplicar">Aplicar optimización</button>
                     </div>
                 </div></div>`;
-            ['optAlcance','optMaxMovimientos','optPasadas','optProfundidad','optObjetivo','optIncluirVirtuales','optCompararEscenarios','optUsarEtapas'].forEach(id=>document.getElementById(id).onchange=programarCalculo);
+            ['optMotorSolver','optAlcance','optMaxMovimientos','optPasadas','optProfundidad','optObjetivo','optIncluirVirtuales','optCompararEscenarios','optUsarEtapas'].forEach(id=>document.getElementById(id).onchange=programarCalculo);
             programarCalculo();
             document.getElementById('btnOptCancelar').onclick=()=>{ cancelarWorkerOptimizacion(); ctx.cerrarModal(); };
             document.getElementById('modalOverlay').onclick=(e)=>{if(e.target===e.currentTarget){ cancelarWorkerOptimizacion(); ctx.cerrarModal(); }};
@@ -5201,6 +5333,9 @@
                     porEtapas:!!sim.porEtapas,
                     objetivo:sim.objetivo||opciones.objetivo,
                     objetivoEfectivo:sim.objetivoEfectivo,
+                    motor:sim.motor||opciones.motorSolver||'heuristico',
+                    glpk:sim.glpk||null,
+                    hibrido:sim.hibrido||null,
                     movimientos:sim.movimientos.length,
                     scoreAntes:sim.scoreInicial.score,
                     scoreDespues:sim.scoreFinal.score,
@@ -6687,6 +6822,8 @@
             scoreGlobalPlanificaciones,
             simularOptimizacionHorario,
             simularOptimizacionIterativa,
+            prepararOptimizacionMatematica,
+            construirResultadoOptimizacionMatematica,
             init
         };
     }

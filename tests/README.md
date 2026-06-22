@@ -18,6 +18,7 @@ Cobertura actual:
 - Gestor con filas informativas, planes completos y relaciones externas por ID.
 - Integridad, fragmentación, combinación de tres vías y protección regresiva de Firebase.
 - Pruebas de humo de pestañas, IDs, orden de módulos, controles visuales y exportaciones Excel.
+- GLPK/WASM local, MILP mínimo, preparación matemática académica, selección validada y contrato del modo híbrido.
 
 Las exportaciones JPG/PDF y la navegación autenticada requieren validación visual en navegador porque dependen de Firebase, canvas y descarga de archivos.
 
@@ -36,3 +37,9 @@ node tests/benchmarks/modulos-masivos.js
 ```
 
 La Fase 3.3 conserva ese benchmark para comparar los índices del score y valida el contrato del Worker, su fallback y la cobertura de asignaturas heredadas.
+
+El solver matemático se valida con:
+
+```bash
+node --test tests/solver-glpk.test.js
+```

@@ -261,6 +261,7 @@ window._appRuntimeInicializada = true;
             cuidarCriticas:true,
             cuidarAyudantias:true
         },
+        motorSolver:'heuristico',
         solverPesos:{
             topesDuros:'obligatorio',
             bloquesFaltantes:'obligatorio',
@@ -1150,6 +1151,7 @@ window._appRuntimeInicializada = true;
         if(data.ultimaAutoEjecucion && (!Array.isArray(data.ultimaAutoEjecucion.ids) || !data.ultimaAutoEjecucion.ids.length)) data.ultimaAutoEjecucion=null;
         data.configuracion.autoPlanificacion = Object.assign({}, CONFIG_DEFAULT.autoPlanificacion, data.configuracion.autoPlanificacion || {});
         if(!['balanceada','compacta','docente'].includes(data.configuracion.autoPlanificacion.estrategiaPredeterminada)) data.configuracion.autoPlanificacion.estrategiaPredeterminada='balanceada';
+        data.configuracion.motorSolver=['heuristico','matematico','hibrido'].includes(data.configuracion.motorSolver)?data.configuracion.motorSolver:CONFIG_DEFAULT.motorSolver;
         data.configuracion.solverPesos = Object.assign({}, CONFIG_DEFAULT.solverPesos, data.configuracion.solverPesos || {});
         const normalizarNivelSolver=(valor, fallback='media')=>{
             const mapaLegacy={'desactivado':'ignorar','bajo':'baja','medio':'media','alto':'alta','muy-alto':'obligatorio'};

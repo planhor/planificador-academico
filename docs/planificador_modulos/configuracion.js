@@ -1,6 +1,9 @@
 (function(){
     function createConfiguracion(ctx){
         const getData = ctx.getData;
+        const AUTOR_PROYECTO='Gerald Andrade Roldán';
+        const CORREO_PROYECTO='andrade_ing@outlook.es';
+        const SITIO_PROYECTO='https://planhor.github.io/planificador-academico/';
 
         function resumenMemoriaPlanificacion(){
             const data=getData();
@@ -186,15 +189,18 @@
 
                             <section id="ayuda-solver">
                                 <h4>Solver y optimización</h4>
-                                <p>El solver mejora horarios ya cargados. No reemplaza tu criterio; te da propuestas medibles.</p>
+                                <p>El optimizador mejora horarios ya cargados mediante tres motores seleccionables. No reemplaza el criterio académico: compara propuestas y solicita confirmación antes de aplicarlas.</p>
                                 <ul>
+                                    <li><strong>Heurístico:</strong> aplica la búsqueda local explicable de Planhor. Es rápido y se mantiene como opción estable.</li>
+                                    <li><strong>Matemático (GLPK):</strong> selecciona mediante programación lineal entera la mejor combinación entre movimientos factibles. Se ejecuta localmente en el navegador mediante WebAssembly.</li>
+                                    <li><strong>Híbrido:</strong> usa primero la heurística y después GLPK para refinar la propuesta. Si el motor matemático no está disponible, conserva el resultado heurístico.</li>
                                     <li><strong>Restricciones duras:</strong> no deberían romperse: docente ocupado, sala ocupada, jornada, descanso, disponibilidad, sección ocupada.</li>
                                     <li><strong>Restricciones blandas:</strong> penalizan: ventanas, fragmentación, TRO2, Docente NN, virtuales fuera de preferencia.</li>
                                     <li><strong>Costo total:</strong> costo duro + costo blando. Mientras más bajo, mejor.</li>
                                     <li><strong>Escenarios:</strong> permite comparar balanceado, estudiantes, docentes, conflictos o recursos.</li>
-                                    <li><strong>Solver por etapas:</strong> primero factibilidad, luego compactación, docentes y recursos.</li>
+                                    <li><strong>Diagnóstico:</strong> informa motor utilizado, tiempo, puntuación, variables, restricciones y mejoras detectadas.</li>
                                 </ul>
-                                <p><strong>Ejemplo:</strong> si una asignatura de 72 horas queda separada, el solver puede intentar moverla como asignatura completa para compactarla.</p>
+                                <p><strong>Alcance actual:</strong> GLPK interviene en <em>Optimizar</em>; Auto-asignatura, Auto-sección y Auto-general conservan el motor heurístico. El modelo matemático optimiza movimientos candidatos, no reconstruye todavía todo el horario desde cero.</p>
                             </section>
 
                             <section id="ayuda-reportes">
@@ -231,6 +237,12 @@
                                     <li>Antes de cambios grandes, exporta JSON. Es la forma más completa de respaldo.</li>
                                     <li>Usa el solver como segunda mirada: si la propuesta no tiene sentido académico, ajusta pesos o aplica solo lo que aporte.</li>
                                 </ul>
+                                <div class="dev-facts">
+                                    <div><strong>Proyecto</strong><span>Planhor · Planificador Académico</span></div>
+                                    <div><strong>Autor y dirección</strong><span>${ctx.escapeHTML(AUTOR_PROYECTO)}</span></div>
+                                    <div><strong>Contacto</strong><span><a href="mailto:${ctx.escapeAttr(CORREO_PROYECTO)}">${ctx.escapeHTML(CORREO_PROYECTO)}</a></span></div>
+                                    <div><strong>Sitio web</strong><span><a href="${ctx.escapeAttr(SITIO_PROYECTO)}" target="_blank" rel="noopener noreferrer">${ctx.escapeHTML(SITIO_PROYECTO)}</a></span></div>
+                                </div>
                             </section>
                         </div>
                     </div>
@@ -256,7 +268,7 @@
                     <div class="modal-header help-header">
                         <div>
                             <h3>Desarrollo de Planificador Académico</h3>
-                            <p>Memoria técnica y metodológica del proyecto creado y dirigido por la Coordinación Académica del Proyecto.</p>
+                            <p>Memoria técnica y metodológica del proyecto creado y dirigido por ${ctx.escapeHTML(AUTOR_PROYECTO)}.</p>
                         </div>
                         <button class="btn btn-sm" id="btnCerrarDesarrollo" type="button">Cerrar</button>
                     </div>
@@ -281,12 +293,14 @@
                             <section id="dev-resumen">
                                 <h4>Resumen ejecutivo</h4>
                                 <p><strong>Planificador Académico</strong> es una aplicación especializada para crear, revisar, optimizar y exportar planificación horaria académica. Fue construida como una herramienta real de coordinación, no como una maqueta: incorpora carreras, niveles, jornadas, secciones, asignaturas, docentes, salas, gestor institucional, reportes, respaldo, sincronización y solver de optimización.</p>
-                                <p>El proyecto fue guiado por la Coordinación Académica del Proyecto mediante una iteración continua basada en problemas reales de planificación: fusiones, secciones madre, asignaturas heredadas, Docente NN, TRO2, bloques virtuales, jornada diurna/vespertina, cargas docentes, transversales, electivas y criterios humanos de planificación.</p>
+                                <p>El proyecto fue guiado por ${ctx.escapeHTML(AUTOR_PROYECTO)} mediante una iteración continua basada en problemas reales de planificación: fusiones, secciones madre, asignaturas heredadas, Docente NN, TRO2, bloques virtuales, jornada diurna/vespertina, cargas docentes, transversales, electivas y criterios humanos de planificación.</p>
                                 <div class="dev-facts">
                                     <div><strong>Nombre</strong><span>Planificador Académico</span></div>
-                                    <div><strong>Dirección funcional</strong><span>Coordinación Académica del Proyecto</span></div>
+                                    <div><strong>Autor y dirección funcional</strong><span>${ctx.escapeHTML(AUTOR_PROYECTO)}</span></div>
+                                    <div><strong>Contacto</strong><span><a href="mailto:${ctx.escapeAttr(CORREO_PROYECTO)}">${ctx.escapeHTML(CORREO_PROYECTO)}</a></span></div>
+                                    <div><strong>Sitio web</strong><span><a href="${ctx.escapeAttr(SITIO_PROYECTO)}" target="_blank" rel="noopener noreferrer">${ctx.escapeHTML(SITIO_PROYECTO)}</a></span></div>
                                     <div><strong>Iteraciones</strong><span>Más de 200 ajustes y decisiones acumuladas</span></div>
-                                    <div><strong>Estado</strong><span>Sistema local avanzado con sincronización y optimización</span></div>
+                                    <div><strong>Estado</strong><span>Aplicación web modular con sincronización y optimización heurística, matemática e híbrida</span></div>
                                 </div>
                             </section>
 
@@ -307,7 +321,7 @@
                                     <li>Se agregó manejo de Docente NN y TRO2 como estados provisorios, no como cierre final.</li>
                                     <li>Se maduró la lógica de secciones fusionadas, heredadas y secciones madre.</li>
                                     <li>Se incorporaron importadores/exportadores de docentes, salas, asignaturas y secciones.</li>
-                                    <li>Se rediseñó el solver desde heurística simple hacia un motor por costos, etapas y escenarios.</li>
+                                    <li>Se rediseñó el solver desde heurística simple hacia motores heurístico, matemático GLPK e híbrido, con costos, etapas y escenarios.</li>
                                 </ul>
                                 <p>El resultado no fue una construcción lineal: fue una refinación progresiva donde cada error observado se transformó en una regla, alerta, interfaz o mejora de datos.</p>
                             </section>
@@ -376,8 +390,12 @@
 
                             <section id="dev-solver">
                                 <h4>Solver y optimización</h4>
-                                <p>El solver evolucionó desde una auto-planificación básica hacia un motor heurístico avanzado. No depende de servidor ni de OR-Tools, por lo que funciona localmente y evita costos de infraestructura.</p>
+                                <p>El solver evolucionó desde una auto-planificación básica hacia tres motores complementarios: heurístico, matemático GLPK e híbrido. Todos funcionan localmente en el navegador, sin servidor de optimización ni costos de infraestructura.</p>
                                 <ul>
+                                    <li><strong>Heurístico:</strong> explora movimientos y vecindarios con las reglas académicas existentes.</li>
+                                    <li><strong>Matemático:</strong> GLPK 5 ejecutado mediante WebAssembly resuelve un modelo entero sobre candidatos factibles.</li>
+                                    <li><strong>Híbrido:</strong> construye una base heurística y usa GLPK para seleccionar una combinación mejor.</li>
+                                    <li><strong>Ejecución aislada:</strong> el cálculo matemático usa Web Worker cuando está disponible y cuenta con fallback controlado.</li>
                                     <li><strong>Pesos configurables:</strong> permiten ajustar prioridades sin modificar código.</li>
                                     <li><strong>Restricciones duras:</strong> bloquean movimientos inviables.</li>
                                     <li><strong>Restricciones blandas:</strong> generan costo, pero no bloquean.</li>
@@ -388,6 +406,7 @@
                                     <li><strong>Solver por etapas:</strong> factibilidad, compactación, docentes y recursos.</li>
                                     <li><strong>Explicabilidad:</strong> cada propuesta muestra qué mejora, qué queda pendiente y por qué se propone.</li>
                                 </ul>
+                                <p>El modelo GLPK vigente optimiza movimientos candidatos del horario cargado; no afirma garantizar todavía el óptimo global de una planificación institucional completa. La decisión final permanece siempre en manos de la persona coordinadora.</p>
                             </section>
 
                             <section id="dev-reportes">
@@ -430,7 +449,7 @@ Debe tener un planificador visual por carrera, nivel, jornada y sección, con gr
 
 Debe incluir Docente NN y TRO2 como recursos provisorios. Debe mostrar asignaturas heredadas desde una sección madre y permitir navegar a la sección que planifica. Debe incluir dashboard, reportes, ficha docente, vista horario y exportación a Excel, PDF y JPG.
 
-Debe incluir auto-planificación por asignatura, sección y general, con criterios configurables. Debe tener solver de optimización local sin backend, con restricciones duras y blandas, pesos configurables, función objetivo costo total = costo duro + costo blando, comparación de escenarios, reoptimización por pasadas, vecindarios de movimiento, búsqueda local mejorada, solver por etapas, auditoría, memoria y explicación de cada propuesta.
+Debe incluir auto-planificación por asignatura, sección y general, con criterios configurables. Debe ofrecer tres motores de optimización seleccionables: heurístico, matemático con GLPK ejecutado localmente mediante WebAssembly e híbrido heurístico-matemático. Debe funcionar sin backend de optimización, aislar el cálculo pesado en Web Worker cuando sea posible, conservar fallback seguro, aplicar restricciones duras y blandas, pesos configurables, función objetivo, escenarios, auditoría, memoria, diagnóstico y confirmación humana antes de aplicar propuestas.
 
 Restricciones duras: topes de docente, topes de sala, disponibilidad, descanso docente, jornada, bloque fijo, sección ocupada y máximo diario docente de 13 bloques totales incluyendo presenciales y virtuales. Restricciones blandas: ventanas de estudiantes, ventanas docentes, compactación de asignatura, distribución semanal, Docente NN, TRO2, virtuales fuera de preferencia y carga diaria alta.
 
@@ -439,7 +458,8 @@ La interfaz debe ser profesional, sobria, modular, con desplazamiento horizontal
 
                             <section id="dev-creditos">
                                 <h4>Créditos y dirección del proyecto</h4>
-                                <p>Proyecto dirigido funcionalmente por <strong>Coordinación Académica del Proyecto</strong>, construido a partir de necesidades reales de planificación académica y madurado mediante más de 200 iteraciones de prueba, corrección y mejora.</p>
+                                <p>Proyecto creado y dirigido funcionalmente por <strong>${ctx.escapeHTML(AUTOR_PROYECTO)}</strong>, construido a partir de necesidades reales de planificación académica y madurado mediante más de 200 iteraciones de prueba, corrección y mejora.</p>
+                                <p><strong>Correo:</strong> <a href="mailto:${ctx.escapeAttr(CORREO_PROYECTO)}">${ctx.escapeHTML(CORREO_PROYECTO)}</a><br><strong>Sitio web:</strong> <a href="${ctx.escapeAttr(SITIO_PROYECTO)}" target="_blank" rel="noopener noreferrer">${ctx.escapeHTML(SITIO_PROYECTO)}</a></p>
                                 <p>La primera base fue explorada con apoyo de DeepSeek. La evolución posterior incorporó criterios de planificación reales, arquitectura modular, validaciones, exportaciones, gestor institucional, dashboard, reportes, memoria, auditoría y un solver local avanzado.</p>
                                 <p>El valor principal del proyecto está en convertir conocimiento experto de coordinación académica en reglas, interfaces y automatizaciones utilizables por otras personas.</p>
                             </section>
@@ -1000,6 +1020,7 @@ La interfaz debe ser profesional, sobria, modular, con desplazamiento horizontal
             document.getElementById('btnAbrirEditorTemas')?.addEventListener('click',abrirEditorTemas);
             function abrirMotorPlanificacion(){
                 let draft=Object.assign({},solverDefault,cfg.solverPesos||{});
+                let motorDraft=['heuristico','matematico','hibrido'].includes(cfg.motorSolver)?cfg.motorSolver:'heuristico';
                 Object.keys(solverDefault).forEach(k=>draft[k]=normalizarNivelSolver(draft[k],solverDefault[k]));
                 const renderMotor=()=>{
                     const html=solverGrupos.map(grupo=>`
@@ -1020,6 +1041,17 @@ La interfaz debe ser profesional, sobria, modular, con desplazamiento horizontal
                                 <div class="modal-header">
                                     <h3>Motor de planificación</h3>
                                     <p>Estos criterios guían la auto-planificación y el solver. Puedes ajustar el borrador y guardar solo si estás conforme.</p>
+                                </div>
+                                <div class="motor-engine-selector">
+                                    <div>
+                                        <label class="form-label" for="cfgMotorSolver">Motor predeterminado</label>
+                                        <small>El heurístico permanece como opción segura durante la validación de GLPK.</small>
+                                    </div>
+                                    <select class="form-select" id="cfgMotorSolver">
+                                        ${ctx.optionHTML('heuristico','Heurístico',motorDraft==='heuristico')}
+                                        ${ctx.optionHTML('matematico','Matemático (GLPK)',motorDraft==='matematico')}
+                                        ${ctx.optionHTML('hibrido','Híbrido',motorDraft==='hibrido')}
+                                    </select>
                                 </div>
                                 <div class="motor-scale">
                                     <span><b>Obligatorio</b> criterio estructural</span>
@@ -1045,6 +1077,9 @@ La interfaz debe ser profesional, sobria, modular, con desplazamiento horizontal
                         const key=sel.dataset.solverKey;
                         draft[key]=normalizarNivelSolver(sel.value,solverDefault[key]||'media');
                     }));
+                    document.getElementById('cfgMotorSolver')?.addEventListener('change',e=>{
+                        motorDraft=['heuristico','matematico','hibrido'].includes(e.target.value)?e.target.value:'heuristico';
+                    });
                     document.getElementById('btnCancelarMotor')?.addEventListener('click',cerrar);
                     document.getElementById('btnRestaurarMotor')?.addEventListener('click',async()=>{
                         const ok=ctx.confirmarAccionCritica
@@ -1058,14 +1093,17 @@ La interfaz debe ser profesional, sobria, modular, con desplazamiento horizontal
                             : confirm('¿Restaurar los criterios iniciales del motor? Podrás confirmar con Guardar.');
                         if(!ok) return;
                         draft=Object.assign({},solverDefault);
+                        motorDraft='heuristico';
                         renderMotor();
                     });
                     document.getElementById('btnGuardarMotor')?.addEventListener('click',()=>{
                         const limpio={};
                         Object.keys(solverDefault).forEach(k=>limpio[k]=normalizarNivelSolver(draft[k],solverDefault[k]));
                         cfg.solverPesos=limpio;
+                        cfg.motorSolver=motorDraft;
                         data.configuracion=data.configuracion||{};
                         data.configuracion.solverPesos=Object.assign({},limpio);
+                        data.configuracion.motorSolver=motorDraft;
                         ctx.guardar();
                         ctx.renderDashboard();
                         ctx.detectarConflictos();

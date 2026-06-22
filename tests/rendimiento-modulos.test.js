@@ -61,6 +61,22 @@ test('el solver real ejecuta una búsqueda rápida sobre un alcance acotado', ()
     assert.ok(medicion.ms < 5000, `Solver acotado demasiado lento: ${medicion.ms.toFixed(1)} ms`);
 });
 
+test('el modelo matemático prepara un alcance acotado sin bloquear la suite', () => {
+    const data = crearDatosMasivos({ carreras: 1, nivelesPorCarrera: 1, seccionesPorNivel: 2, docentes: 20, salas: 15 });
+    data.sel.carreraId = data.carreras[0].id;
+    data.sel.nivelId = data.niveles[0].id;
+    data.sel.seccionId = data.secciones[0].id;
+    const { api } = crearPlanificacionPrueba(data);
+    const medicion = medir(() => api.prepararOptimizacionMatematica({
+        alcance: 'seccion', profundidad: 'rapido', maxMovimientos: 2, objetivo: 'balanceado'
+    }));
+
+    assert.ok(Array.isArray(medicion.resultado.candidatos));
+    assert.ok(Array.isArray(medicion.resultado.incompatibles));
+    assert.ok(medicion.resultado.candidatos.length <= 35);
+    assert.ok(medicion.ms < 5000, `Preparación matemática demasiado lenta: ${medicion.ms.toFixed(1)} ms`);
+});
+
 test('los índices del score conservan la cobertura de asignaturas heredadas', () => {
     const data = crearDatosMasivos({ carreras: 1, nivelesPorCarrera: 1, seccionesPorNivel: 2, asignaturasPorNivel: 1, docentes: 4, salas: 4 });
     const madre = data.secciones[0];

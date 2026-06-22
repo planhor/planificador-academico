@@ -103,6 +103,19 @@ test('el historial agrupa por operación o revisión sin mezclar momentos distin
     assert.match(reportes, /\[operacion,ev\.accion,ev\.usuario,p\.seccionId,p\.asignaturaId\]/);
 });
 
+test('el motor permite escoger heurístico, matemático o híbrido con fallback seguro', () => {
+    const app = fs.readFileSync(path.join(DOCS, 'planificador_modulos/app.js'), 'utf8');
+    const configuracion = fs.readFileSync(path.join(DOCS, 'planificador_modulos/configuracion.js'), 'utf8');
+    assert.match(app, /motorSolver:'heuristico'/);
+    for (const motor of ['heuristico', 'matematico', 'hibrido']) {
+        assert.match(configuracion, new RegExp(`optionHTML\\('${motor}'`));
+    }
+    const planificacion = fs.readFileSync(path.join(DOCS, 'planificador_modulos/planificacion.js'), 'utf8');
+    assert.match(planificacion, /id="optMotorSolver"/);
+    assert.match(planificacion, /etiquetaMotorSolver/);
+    assert.match(planificacion, /fallbackMotor/);
+});
+
 function crearXlsxFalso() {
     const escritos = [];
     const letra = indice => String.fromCharCode(65 + indice);
