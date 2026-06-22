@@ -184,9 +184,22 @@
 
         const EXPORT_WIDTH = 1510;
 
+        function reforzarGrillasExportacion(raiz){
+            if(!raiz) return;
+            raiz.querySelectorAll('table').forEach(tabla=>{
+                tabla.style.setProperty('border-collapse','collapse','important');
+                tabla.style.setProperty('border','1px solid #aebec9','important');
+            });
+            raiz.querySelectorAll('th,td').forEach(celda=>{
+                celda.style.setProperty('border','1px solid #aebec9','important');
+            });
+        }
+
         async function capturarFichaFija(elemento){
             const wrapper=document.createElement('div');
             const clon=elemento.cloneNode(true);
+            const exportId='planhorFichaExportRoot';
+            wrapper.id=exportId;
             wrapper.style.position='absolute';
             wrapper.style.left='-20000px';
             wrapper.style.top='0';
@@ -199,7 +212,8 @@
             wrapper.appendChild(clon);
             document.body.appendChild(wrapper);
             await new Promise(resolve=>requestAnimationFrame(resolve));
-            ctx.sanitizarNodoExportacion?.(clon,clon);
+            ctx.sanitizarNodoExportacion?.(wrapper,wrapper);
+            reforzarGrillasExportacion(wrapper);
             try{
                 return await html2canvas(wrapper,{
                     scale:2,
@@ -209,7 +223,14 @@
                     height:wrapper.scrollHeight,
                     windowWidth:EXPORT_WIDTH,
                     scrollX:0,
-                    scrollY:0
+                    scrollY:0,
+                    onclone:documentoClonado=>{
+                        const raiz=documentoClonado.getElementById(exportId);
+                        if(raiz){
+                            ctx.sanitizarNodoExportacion?.(raiz,raiz);
+                            reforzarGrillasExportacion(raiz);
+                        }
+                    }
                 });
             }finally{
                 wrapper.remove();

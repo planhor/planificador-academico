@@ -10,7 +10,7 @@
     <link rel="apple-touch-icon" sizes="180x180" href="planificador_modulos/icono-planhor-180.png?v=5">
     <link rel="manifest" href="planificador_modulos/site.webmanifest?v=2">
     <meta name="theme-color" content="#245f67">
-<link rel="stylesheet" href="planificador_modulos/estilos.css?v=20260620-menu-suave">
+<link rel="stylesheet" href="planificador_modulos/estilos.css?v=20260621-fase34-virtualizacion">
 </head>
 <body>
 <div id="appRoot" style="display:none;">
@@ -31,6 +31,7 @@
         <button class="btn btn-sm" id="btnGestionarTemps" title="Gestionar temporadas">📅 Temporadas</button>
         <span id="indicadorPaleta" style="font-size:0.75rem;color:var(--text-secondary);padding:4px 8px;border-radius:var(--radius-sm);border:1px solid var(--border);"></span>
         <span id="syncStatus" class="sync-status sync-status-waiting" title="Estado de conexión"><span class="sync-dot"></span><span id="syncStatusText">Conectando</span></span>
+        <span id="syncLastRemote" class="sync-last-remote" title="Aún no hay un guardado remoto confirmado">Nube: --</span>
         <span id="saveStatus" class="save-status" aria-live="polite"></span>
         <div class="dropdown">
             <button class="btn btn-sm" id="btnExportar">📤 Exportar</button>
@@ -478,14 +479,14 @@ onAuthStateChanged(auth, async (user) => {
 </script>
 
 <script src="planificador_modulos/utils.js"></script>
-<script src="planificador_modulos/sync.js?v=20260610-puntos-recuperacion-criticos"></script>
+<script src="planificador_modulos/sync.js?v=20260621-fase41-trazabilidad"></script>
 <script src="planificador_modulos/exportaciones.js?v=20260608-subsecciones-reportes"></script>
 <script src="planificador_modulos/vista-horario.js?v=20260619-vista-general-mini"></script>
-<script src="planificador_modulos/reportes.js?v=20260620-fase9-cierre"></script>
-<script src="planificador_modulos/ficha-docente.js?v=20260616-vista-general-export-layout"></script>
+<script src="planificador_modulos/reportes.js?v=20260621-fase41-trazabilidad"></script>
+<script src="planificador_modulos/ficha-docente.js?v=20260620-export-grillas"></script>
 <script src="planificador_modulos/entidades.js?v=20260620-tiempos-ui"></script>
-<script src="planificador_modulos/planificacion.js?v=20260620-tiempos-ui"></script>
+<script src="planificador_modulos/planificacion.js?v=20260621-fase3-worker"></script>
 <script src="planificador_modulos/configuracion.js?v=20260620-fase9-cierre"></script>
-<script src="planificador_modulos/app.js?v=20260620-tiempos-ui"></script>
+<script src="planificador_modulos/app.js?v=20260621-fase41-trazabilidad"></script>
 </body>
 </html>

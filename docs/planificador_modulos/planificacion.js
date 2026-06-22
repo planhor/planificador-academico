@@ -176,6 +176,7 @@
         }
 
         function refrescarDespuesCambioPlanificacion(){
+            actualizarProgresoPlan();
             ctx.actualizarReporte?.();
             ctx.actualizarVista?.();
             ctx.renderDashboard?.();
@@ -483,15 +484,15 @@
         function planesVisiblesAsignaturaSeccion(asigId,seccionId,planes=null){
             const data=getData();
             const fuente=planes||data.planificaciones;
-            const propios=fuente.filter(p=>p.seccionId===seccionId&&p.asignaturaId===asigId);
+            const propios=fuente.filter(p=>mismoId(p.seccionId,seccionId)&&mismoId(p.asignaturaId,asigId));
             const grupos=(ctx.getGruposDictacion?.()||[]).filter(g=>
-                g.seccionMadreId!==seccionId &&
-                g.seccionesVinculadasIds?.includes(seccionId) &&
-                (g.asignaturaId===asigId || g.asignaturasEquivalentesIds?.includes(asigId))
+                !mismoId(g.seccionMadreId,seccionId) &&
+                g.seccionesVinculadasIds?.some(id=>mismoId(id,seccionId)) &&
+                (mismoId(g.asignaturaId,asigId) || g.asignaturasEquivalentesIds?.some(id=>mismoId(id,asigId)))
             );
             const heredados=grupos.flatMap(g=>{
                 const ids=[g.asignaturaId,...(g.asignaturasEquivalentesIds||[])].filter(Boolean);
-                return fuente.filter(p=>p.seccionId===g.seccionMadreId&&ids.includes(p.asignaturaId));
+                return fuente.filter(p=>mismoId(p.seccionId,g.seccionMadreId)&&ids.some(id=>mismoId(id,p.asignaturaId)));
             });
             return [...propios,...heredados];
         }
@@ -1080,7 +1081,11 @@
 
         function textoPlanesDocente(planes){
             const data=getData();
-            return planes.map(p=>data.asignaturas.find(a=>a.id===p.asignaturaId)?.codigo||'Asig.').filter(Boolean).join(' · ');
+            return planes.map(p=>{
+                const asig=data.asignaturas.find(a=>a.id===p.asignaturaId);
+                const sec=data.secciones.find(s=>s.id===p.seccionId);
+                return [asig?.codigo||'Asig.',sec?.nombre||''].filter(Boolean).join(' ');
+            }).filter(Boolean).join(' · ');
         }
 
         function planesSalaEn(salaId,dia,bloque,opciones={}){
@@ -3625,16 +3630,77 @@
             return {costoDuro,costoBlando,costoTotal,score};
         }
 
+        function crearIndicesScoreSolver(planificaciones){
+            const data=getData();
+            const agregar=(mapa,clave,plan)=>{
+                if(!mapa.has(clave)) mapa.set(clave,[]);
+                mapa.get(clave).push(plan);
+            };
+            const porSeccionAsig=new Map();
+            const porSeccionDia=new Map();
+            const porDocenteDia=new Map();
+            planificaciones.forEach(plan=>{
+                agregar(porSeccionAsig,`${plan.seccionId}|${plan.asignaturaId}`,plan);
+                agregar(porSeccionDia,`${plan.seccionId}|${plan.dia}`,plan);
+                if(plan.docenteId) agregar(porDocenteDia,`${plan.docenteId}|${plan.dia}`,plan);
+            });
+
+            const especificas=new Map();
+            (data.asignaturaSeccion||[]).forEach(rel=>{
+                if(!especificas.has(rel.seccionId)) especificas.set(rel.seccionId,[]);
+                especificas.get(rel.seccionId).push(rel.asignaturaId);
+            });
+            const porNivelCarrera=new Map();
+            (data.asignaturaCarreraNivel||[]).forEach(rel=>{
+                const key=`${rel.carreraId}|${rel.nivelId}`;
+                if(!porNivelCarrera.has(key)) porNivelCarrera.set(key,[]);
+                porNivelCarrera.get(key).push(rel.asignaturaId);
+            });
+            const niveles=new Map(data.niveles.map(n=>[String(n.id),n]));
+            const asignaturasPorSeccion=new Map();
+            data.secciones.forEach(sec=>{
+                const directas=especificas.get(sec.id)||[];
+                const nivel=niveles.get(String(sec.nivelId));
+                const ids=directas.length?directas:(porNivelCarrera.get(`${nivel?.carreraId}|${sec.nivelId}`)||[]);
+                asignaturasPorSeccion.set(sec.id,[...new Set(ids)]);
+            });
+            return {porSeccionAsig,porSeccionDia,porDocenteDia,asignaturasPorSeccion};
+        }
+
+        function planesVisiblesAsignaturaScore(asigId,seccionId,indices){
+            const propios=indices.porSeccionAsig.get(`${seccionId}|${asigId}`)||[];
+            const heredados=gruposVinculadosDeSeccion(seccionId).flatMap(grupo=>{
+                const ids=[grupo.asignaturaId,...(grupo.asignaturasEquivalentesIds||[])].filter(Boolean);
+                if(!ids.some(id=>mismoId(id,asigId))) return [];
+                return ids.flatMap(id=>indices.porSeccionAsig.get(`${grupo.seccionMadreId}|${id}`)||[]);
+            });
+            return [...propios,...heredados];
+        }
+
+        function planesVisiblesSeccionDiaScore(seccionId,dia,indices){
+            const data=getData();
+            const propios=indices.porSeccionDia.get(`${seccionId}|${dia}`)||[];
+            const heredados=gruposVinculadosDeSeccion(seccionId).flatMap(grupo=>{
+                const ids=new Set([grupo.asignaturaId,...(grupo.asignaturasEquivalentesIds||[])].filter(Boolean).map(String));
+                return (indices.porSeccionDia.get(`${grupo.seccionMadreId}|${dia}`)||[]).filter(plan=>ids.has(String(plan.asignaturaId)));
+            });
+            const electivas=(data.vinculosElectivos||[])
+                .filter(v=>mismoId(v.seccionDestinoId,seccionId))
+                .flatMap(v=>(indices.porSeccionAsig.get(`${v.seccionOrigenId}|${v.asignaturaId}`)||[]).filter(plan=>Number(plan.dia)===Number(dia)));
+            return [...propios,...heredados,...electivas];
+        }
+
         function scoreGlobalPlanificaciones(planificaciones){
             const data=getData();
+            const indices=crearIndicesScoreSolver(planificaciones);
             let requeridos=0, planificados=0;
             data.secciones.forEach(sec=>{
-                const asigIds=asignaturasDeSeccion(sec.id);
+                const asigIds=indices.asignaturasPorSeccion.get(sec.id)||[];
                 asigIds.forEach(asigId=>{
                     const asig=data.asignaturas.find(a=>a.id===asigId);
                     if(!asig) return;
                     const req=(Number(asig.bloquesPresenciales)||0)+(Number(asig.bloquesVirtuales)||0);
-                    const hechos=planesVisiblesAsignaturaSeccion(asigId,sec.id,planificaciones).length;
+                    const hechos=planesVisiblesAsignaturaScore(asigId,sec.id,indices).length;
                     requeridos+=req;
                     planificados+=Math.min(hechos,req);
                 });
@@ -3643,14 +3709,14 @@
             let ventanasSeccion=0, ventanasDocente=0, diasCargados=0, ventanasAsignatura=0, fragmentacionAsignatura=0, fueraJornada=0;
             data.secciones.forEach(sec=>{
                 for(let dia=0;dia<ctx.DIAS.length;dia++){
-                    const bloques=planesVisiblesSeccionDia(sec.id,dia,planificaciones).map(p=>p.bloque);
+                    const bloques=planesVisiblesSeccionDiaScore(sec.id,dia,indices).map(p=>p.bloque);
                     ventanasSeccion+=contarVentanasGlobal(bloques);
                     if(bloques.length>=9) diasCargados++;
                 }
-                asignaturasDeSeccion(sec.id).forEach(asigId=>{
+                (indices.asignaturasPorSeccion.get(sec.id)||[]).forEach(asigId=>{
                     const asig=data.asignaturas.find(a=>a.id===asigId);
                     if(!asig || asig.distribucion==='dividida') return;
-                    const planesAsig=planesVisiblesAsignaturaSeccion(asigId,sec.id,planificaciones).filter(p=>p.tipoPresencial!==false);
+                    const planesAsig=planesVisiblesAsignaturaScore(asigId,sec.id,indices).filter(p=>p.tipoPresencial!==false);
                     if(planesAsig.length<2) return;
                     const porDia=new Map();
                     planesAsig.forEach(p=>{
@@ -3666,7 +3732,7 @@
             });
             data.docentes.filter(d=>d.id!==ctx.DOCENTE_NN_ID).forEach(doc=>{
                 for(let dia=0;dia<ctx.DIAS.length;dia++){
-                    const bloques=planificaciones.filter(p=>p.docenteId===doc.id&&p.dia===dia).map(p=>p.bloque);
+                    const bloques=(indices.porDocenteDia.get(`${doc.id}|${dia}`)||[]).map(p=>p.bloque);
                     ventanasDocente+=contarVentanasGlobal(bloques);
                     if(bloques.length>=9) diasCargados++;
                 }
@@ -4871,6 +4937,83 @@
             </div>`;
         }
 
+        let workerOptimizacionActivo=null;
+
+        function cancelarWorkerOptimizacion(){
+            if(!workerOptimizacionActivo) return;
+            const activo=workerOptimizacionActivo;
+            workerOptimizacionActivo=null;
+            activo.cancelar();
+        }
+
+        function snapshotSolverWorker(data){
+            const campos=['carreras','niveles','secciones','asignaturas','docentes','salas','asignaturaCarreraNivel','asignaturaSeccion','planificaciones','gruposDictacion','vinculosElectivos','configuracion','sel'];
+            return Object.fromEntries(campos.map(campo=>[campo,JSON.parse(JSON.stringify(data[campo]??(campo==='configuracion'||campo==='sel'?{}:[])))]));
+        }
+
+        function ejecutarSolverEnWorker(opciones,objetivos=[]){
+            if(typeof Worker==='undefined') return Promise.reject(new Error('solver-worker-no-disponible'));
+            cancelarWorkerOptimizacion();
+            const worker=new Worker('planificador_modulos/solver-worker.js?v=20260621-fase3-worker');
+            const id=`solver-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+            return new Promise((resolve,reject)=>{
+                const limpiar=()=>{
+                    clearTimeout(timer);
+                    worker.terminate();
+                    if(workerOptimizacionActivo?.worker===worker) workerOptimizacionActivo=null;
+                };
+                const timer=setTimeout(()=>{
+                    limpiar();
+                    reject(new Error('solver-worker-timeout'));
+                },180000);
+                const cancelar=()=>{
+                    limpiar();
+                    const error=new Error('solver-worker-cancelado');
+                    error.code='solver-worker-cancelado';
+                    reject(error);
+                };
+                workerOptimizacionActivo={worker,reject,cancelar};
+                worker.onmessage=evento=>{
+                    if(evento.data?.id!==id) return;
+                    limpiar();
+                    if(evento.data.ok) resolve(evento.data.resultados||[]);
+                    else reject(new Error(evento.data.error||'solver-worker-error'));
+                };
+                worker.onerror=evento=>{
+                    limpiar();
+                    reject(new Error(evento.message||'solver-worker-error'));
+                };
+                worker.postMessage({id,data:snapshotSolverWorker(getData()),opciones,objetivos});
+            });
+        }
+
+        async function calcularOptimizacionAsincrona(opciones){
+            const metas=opciones.compararEscenarios?escenariosBaseOptimizacion():[{id:opciones.objetivo||'auto',titulo:'Propuesta',detalle:''}];
+            try{
+                const resultados=await ejecutarSolverEnWorker(opciones,metas.map(meta=>meta.id));
+                const porObjetivo=new Map(resultados.map(item=>[item.objetivo,item.sim]));
+                return metas.map(meta=>({meta,sim:porObjetivo.get(meta.id)})).filter(item=>item.sim);
+            }catch(error){
+                if(error?.code==='solver-worker-cancelado') throw error;
+                console.warn('Worker de optimización no disponible; se usa el motor local.',error);
+                return opciones.compararEscenarios
+                    ? generarEscenariosOptimizacion(opciones)
+                    : [{meta:metas[0],sim:simularOptimizacionIterativa(opciones)}];
+            }
+        }
+
+        function firmaPlanificacionesSolver(planes){
+            let hash=2166136261;
+            (planes||[]).forEach(plan=>{
+                const texto=[plan.id,plan.seccionId,plan.asignaturaId,plan.docenteId,plan.salaId,plan.dia,plan.bloque,plan.fijo?1:0].join('|');
+                for(let i=0;i<texto.length;i++){
+                    hash^=texto.charCodeAt(i);
+                    hash=Math.imul(hash,16777619);
+                }
+            });
+            return `${(planes||[]).length}:${(hash>>>0).toString(16)}`;
+        }
+
         function abrirOptimizacionHorario(){
             const data=getData();
             if(!data.planificaciones.some(p=>!p.fijo)) return ctx.toast('No hay bloques no fijos para optimizar','info');
@@ -4888,6 +5031,8 @@
             let ultimosEscenarios=[];
             let escenarioSeleccionado=null;
             let timerCalculo=null;
+            let secuenciaCalculo=0;
+            let ultimaFirmaBase='';
             const leerOpciones=()=>({
                 alcance:document.getElementById('optAlcance')?.value||opcionesIniciales.alcance,
                 maxMovimientos:Number(document.getElementById('optMaxMovimientos')?.value)||8,
@@ -4917,23 +5062,39 @@
                     if(aplicar) aplicar.disabled=!esc.sim.movimientos.length;
                 });
             };
-            const calcular=()=>{
+            const calcular=async(secuenciaSolicitada=null)=>{
+                const secuencia=secuenciaSolicitada??++secuenciaCalculo;
                 const opciones={
                     ...leerOpciones()
                 };
+                const firmaBase=firmaPlanificacionesSolver(getData().planificaciones);
+                let escenarios;
+                try{
+                    escenarios=await calcularOptimizacionAsincrona(opciones);
+                }catch(error){
+                    if(error?.code==='solver-worker-cancelado') return null;
+                    throw error;
+                }
+                if(secuencia!==secuenciaCalculo) return null;
+                if(firmaBase!==firmaPlanificacionesSolver(getData().planificaciones)){
+                    ctx.toast('La planificación cambió durante el cálculo. Se actualizará la propuesta.','info');
+                    programarCalculo();
+                    return null;
+                }
                 let sim;
-                ultimosEscenarios=[];
+                ultimosEscenarios=opciones.compararEscenarios?escenarios:[];
                 if(opciones.compararEscenarios){
-                    ultimosEscenarios=generarEscenariosOptimizacion(opciones);
                     const mejor=mejorEscenarioOptimizacion(ultimosEscenarios);
                     escenarioSeleccionado=escenarioSeleccionado&&ultimosEscenarios.some(e=>e.meta.id===escenarioSeleccionado)?escenarioSeleccionado:mejor?.meta.id;
                     sim=(ultimosEscenarios.find(e=>e.meta.id===escenarioSeleccionado)||mejor)?.sim;
                 }else{
-                    sim=simularOptimizacionIterativa(opciones);
+                    sim=escenarios[0]?.sim;
                     escenarioSeleccionado=null;
                 }
+                if(!sim) return null;
                 ultimaSim=sim;
                 ultimasOpciones=opciones;
+                ultimaFirmaBase=firmaBase;
                 const cont=document.getElementById('optPreview');
                 if(cont) cont.innerHTML=opciones.compararEscenarios?renderEscenariosOptimizacion(ultimosEscenarios,escenarioSeleccionado):renderPreviewOptimizacion(sim);
                 if(opciones.compararEscenarios) enlazarEscenarios();
@@ -4943,8 +5104,14 @@
             };
             const programarCalculo=()=>{
                 clearTimeout(timerCalculo);
+                cancelarWorkerOptimizacion();
+                const secuencia=++secuenciaCalculo;
                 mostrarCalculando();
-                timerCalculo=setTimeout(calcular,40);
+                timerCalculo=setTimeout(()=>calcular(secuencia).catch(error=>{
+                    const cont=document.getElementById('optPreview');
+                    if(cont) cont.innerHTML='<div class="auto-plan-empty">No se pudo calcular la propuesta. Revisa los criterios e intenta nuevamente.</div>';
+                    ctx.toast(`No se pudo optimizar: ${error?.message||'error desconocido'}`,'error');
+                }),40);
             };
             modal.innerHTML=`
                 <div class="modal-overlay" id="modalOverlay"><div class="modal modal-wide">
@@ -5006,12 +5173,13 @@
                 </div></div>`;
             ['optAlcance','optMaxMovimientos','optPasadas','optProfundidad','optObjetivo','optIncluirVirtuales','optCompararEscenarios','optUsarEtapas'].forEach(id=>document.getElementById(id).onchange=programarCalculo);
             programarCalculo();
-            document.getElementById('btnOptCancelar').onclick=()=>ctx.cerrarModal();
-            document.getElementById('modalOverlay').onclick=(e)=>{if(e.target===e.currentTarget)ctx.cerrarModal();};
-            document.getElementById('btnOptAplicar').onclick=()=>{
+            document.getElementById('btnOptCancelar').onclick=()=>{ cancelarWorkerOptimizacion(); ctx.cerrarModal(); };
+            document.getElementById('modalOverlay').onclick=(e)=>{if(e.target===e.currentTarget){ cancelarWorkerOptimizacion(); ctx.cerrarModal(); }};
+            document.getElementById('btnOptAplicar').onclick=async()=>{
                 const opcionesActuales=leerOpciones();
-                const debeRecalcular=!ultimaSim||JSON.stringify(opcionesActuales)!==JSON.stringify(ultimasOpciones);
-                const resultado=debeRecalcular?calcular():{opciones:ultimasOpciones,sim:ultimaSim};
+                const debeRecalcular=!ultimaSim||ultimaFirmaBase!==firmaPlanificacionesSolver(data.planificaciones)||JSON.stringify(opcionesActuales)!==JSON.stringify(ultimasOpciones);
+                const resultado=debeRecalcular?await calcular():{opciones:ultimasOpciones,sim:ultimaSim};
+                if(!resultado) return;
                 const {opciones,sim}=resultado;
                 if(!sim.movimientos.length) return ctx.toast('No hay mejoras para aplicar con estos criterios','info');
                 ctx.pushUndo();
@@ -6516,6 +6684,9 @@
             actualizarSelectoresPlan,
             actualizarProgresoPlan,
             validarSeleccionManual,
+            scoreGlobalPlanificaciones,
+            simularOptimizacionHorario,
+            simularOptimizacionIterativa,
             init
         };
     }

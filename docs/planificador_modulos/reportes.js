@@ -2556,6 +2556,10 @@
                 const nombre=typeof evOrEmail==='object'?(evOrEmail.usuarioNombre||data.configuracion?.perfilesUsuarios?.[email]?.nombre):data.configuracion?.perfilesUsuarios?.[email]?.nombre;
                 return nombre&&nombre!==email?`${nombre} (${email})`:(email||'');
             };
+            const temporadaEvento=(ev)=>{
+                const temporada=data.temporadas?.find(t=>String(t.id)===String(ev?.temporadaId));
+                return temporada?`${temporada.temporada} ${temporada.anio}`:(ev?.temporadaId||'Sin temporada');
+            };
             const diaBloque=(plan)=>{
                 if(!plan||plan.dia===undefined) return '';
                 const ab={Lunes:'Lu',Martes:'Ma','Miércoles':'Mi',Jueves:'Ju',Viernes:'Vi','Sábado':'Sa'};
@@ -2596,7 +2600,8 @@
             const claveGrupoEvento=(ev)=>{
                 const p=planBaseEvento(ev);
                 if(!eventoAgrupable(ev)||!p) return ev.id||`${ev.ts}_${ev.accion}`;
-                return [ev.accion,ev.usuario,p.seccionId,p.asignaturaId].join('|');
+                const operacion=ev.operacionId||ev.revisionId||String(ev.ts||'').slice(0,19)||ev.id;
+                return [operacion,ev.accion,ev.usuario,p.seccionId,p.asignaturaId].join('|');
             };
             const agruparEventos=(eventos)=>{
                 const grupos=[];
@@ -2643,7 +2648,7 @@
                 const detalle=detalleEvento(ev);
                 if(accionActual&&ev.accion!==accionActual) return false;
                 if(usuarioActual&&ev.usuario!==usuarioActual) return false;
-                if(busqueda&&!`${ev.accion||''} ${ev.usuario||''} ${detalle}`.toLowerCase().includes(busqueda)) return false;
+                if(busqueda&&!`${ev.accion||''} ${ev.usuario||''} ${ev.motivo||''} ${detalle}`.toLowerCase().includes(busqueda)) return false;
                 return true;
             });
             const gruposTodos=agruparEventos(eventos);
@@ -2654,15 +2659,17 @@
             const grupos=gruposTodos.slice(inicio,inicio+historialTamano);
             const detalleGrupo=(grupo)=>{
                 const ev=grupo.primero;
-                if(!eventoAgrupable(ev)||grupo.eventos.length===1) return detalleEvento(ev);
+                const motivo=[...new Set(grupo.eventos.map(e=>String(e.motivo||'').trim()).filter(Boolean))].join(' · ');
+                const anexarMotivo=texto=>motivo?`${texto} · Motivo: ${motivo}`:texto;
+                if(!eventoAgrupable(ev)||grupo.eventos.length===1) return anexarMotivo(detalleEvento(ev));
                 const p=planBaseEvento(ev);
                 const ctxPlan=contextoPlan(p);
                 if(ev.accion==='bloque_movido'){
                     const movs=grupo.eventos.map(e=>`${diaBloque(e.detalle?.antes)} → ${diaBloque(e.detalle?.despues)}`).filter(Boolean).join(', ');
-                    return `${ctxPlan.seccion} · ${ctxPlan.asignatura} · ${ctxPlan.docente} · ${movs}`;
+                    return anexarMotivo(`${ctxPlan.seccion} · ${ctxPlan.asignatura} · ${ctxPlan.docente} · ${movs}`);
                 }
                 const bloques=grupo.eventos.map(e=>diaBloque(e.detalle?.plan)).filter(Boolean).join(', ');
-                return `${ctxPlan.seccion} · ${ctxPlan.asignatura} · ${ctxPlan.docente} · ${ctxPlan.sala} · ${bloques}`;
+                return anexarMotivo(`${ctxPlan.seccion} · ${ctxPlan.asignatura} · ${ctxPlan.docente} · ${ctxPlan.sala} · ${bloques}`);
             };
             const accionGrupo=(grupo)=>{
                 const ev=grupo.primero;
@@ -2674,13 +2681,16 @@
                 return `${ev.accion} (${n})`;
             };
             const exportarHistorialFiltrado=()=>{
-                const filas=[['Fecha','Usuario','Acción','Detalle']];
+                const filas=[['Fecha','Usuario','Temporada','Versión','Acción','Motivo','Detalle']];
                 gruposTodos.forEach(grupo=>{
                     const ev=grupo.primero;
                     filas.push([
                         ev.ts?new Date(ev.ts).toLocaleString():'',
                         usuarioLabel(ev),
+                        temporadaEvento(ev),
+                        ev.revisionId||'',
                         accionGrupo(grupo),
+                        [...new Set(grupo.eventos.map(e=>e.motivo).filter(Boolean))].join(' · '),
                         detalleGrupo(grupo)
                     ]);
                 });
@@ -2726,13 +2736,14 @@
                 ${controles}
                 <div class="report-summary">${inicio+1}-${inicio+grupos.length} de ${gruposTodos.length} grupo(s) · ${eventos.length} evento(s) filtrado(s) de ${eventosBase.length} · página ${historialPagina}/${totalPaginas}</div>
                 <table class="report-table historial-table">
-                    <thead><tr><th>Fecha</th><th>Usuario</th><th>Acción</th><th>Detalle</th></tr></thead>
+                    <thead><tr><th>Fecha</th><th>Usuario</th><th>Temporada / versión</th><th>Acción</th><th>Detalle</th></tr></thead>
                     <tbody>${grupos.map(grupo=>{
                         const ev=grupo.primero;
                         const detalle=detalleGrupo(grupo);
                         return `<tr>
                             <td>${ctx.escapeHTML(ev.ts?new Date(ev.ts).toLocaleString():'')}</td>
                             <td>${ctx.escapeHTML(usuarioLabel(ev))}</td>
+                            <td title="${ctx.escapeAttr(ev.revisionId||'Sin versión histórica')}">${ctx.escapeHTML(`${temporadaEvento(ev)} · ${ev.revisionId?String(ev.revisionId).slice(0,12):'Anterior'}`)}</td>
                             <td>${ctx.escapeHTML(accionGrupo(grupo))}</td>
                             <td>${ctx.escapeHTML(detalle)}</td>
                         </tr>`;

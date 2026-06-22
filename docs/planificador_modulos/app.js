@@ -383,6 +383,15 @@ window._appRuntimeInicializada = true;
         }
     }
 
+    function setLastRemoteSave(fecha,autor='usuario') {
+        const el=document.getElementById('syncLastRemote');
+        if(!el||!fecha) return;
+        const valor=new Date(fecha);
+        if(Number.isNaN(valor.getTime())) return;
+        el.textContent=`Nube: ${valor.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}`;
+        el.title=`Último guardado remoto: ${valor.toLocaleString()} · ${autor}`;
+    }
+
     function setCambiosPendientes(pendiente) {
         hayGuardadoPendiente = !!pendiente;
     }
@@ -402,7 +411,7 @@ window._appRuntimeInicializada = true;
         else setSyncStatus('online','Conectado');
     }
 
-    window.addEventListener('online',()=>actualizarEstadoConexion('online'));
+    window.addEventListener('online',()=>actualizarEstadoConexion('waiting','Reconectando'));
     window.addEventListener('offline',()=>actualizarEstadoConexion('offline'));
     window.addEventListener('beforeunload',(e)=>{
         if(!hayGuardadoPendiente) return;
@@ -424,6 +433,7 @@ window._appRuntimeInicializada = true;
         setCambiosPendientes,
         setSyncStatus: actualizarEstadoConexion,
         setSaveStatus,
+        setLastRemoteSave,
         toast
     });
     function guardar(opciones={}) { return Sync.guardar(opciones); }
@@ -432,6 +442,7 @@ window._appRuntimeInicializada = true;
     function listarSnapshotsRecuperacion() { return Sync.listarSnapshotsRecuperacion?.() || []; }
     function obtenerSnapshotRecuperacion(id) { return Sync.obtenerSnapshotRecuperacion?.(id) || null; }
     function crearPuntoRecuperacion(motivo='punto_recuperacion') { return Sync.crearSnapshotActual?.(motivo) || false; }
+    function guardarRestauracionLocal(motivo='restauracion_local') { return Sync.guardarRestauracionLocal?.(motivo) || Promise.resolve(false); }
     function hayConflictoRemoto() { return Sync.hayConflictoRemoto(); }
 
     const LIBRERIAS_EXTERNAS = {
@@ -813,11 +824,15 @@ window._appRuntimeInicializada = true;
         if(!Array.isArray(data.auditoria)) data.auditoria=[];
         const usuario = window._fb?.auth?.currentUser?.email || window._usuarioActual || 'Sin usuario';
         const usuarioNombre = data.configuracion?.perfilesUsuarios?.[usuario]?.nombre || usuario;
+        const motivo = detalle&&typeof detalle==='object' ? String(detalle.motivo||detalle.razon||'').trim().slice(0,300) : '';
         data.auditoria.push({
             id:genId(),
             ts:new Date().toISOString(),
             usuario,
             usuarioNombre,
+            temporadaId:data.sel?.temporadaId||data.configuracion?.temporadaActualId||'',
+            revisionId:'',
+            motivo,
             accion,
             detalle
         });
@@ -1412,17 +1427,24 @@ window._appRuntimeInicializada = true;
 
     function sanitizarNodoExportacion(origen,destino){
         if(!origen || !destino || origen.nodeType!==1 || destino.nodeType!==1) return;
-        const cs=getComputedStyle(origen);
+        const vista=origen.ownerDocument?.defaultView||window;
+        const cs=vista.getComputedStyle(origen);
+        const fijar=(propiedad,valor)=>destino.style.setProperty(propiedad,valor,'important');
         const bgImage=String(cs.backgroundImage||'');
         const bgColor=colorExportableHtml2Canvas(cs.backgroundColor,'transparent');
-        destino.style.color=colorExportableHtml2Canvas(cs.color,'#102840');
-        destino.style.backgroundColor=bgColor==='transparent'&&bgImage!=='none' ? primerColorExportable(bgImage,'#ffffff') : bgColor;
-        if(bgImage.includes('color(') || bgImage.includes('color-mix(')) destino.style.backgroundImage='none';
+        fijar('color',colorExportableHtml2Canvas(cs.color,'#102840'));
+        fijar('background-color',bgColor==='transparent'&&bgImage!=='none' ? primerColorExportable(bgImage,'#ffffff') : bgColor);
+        if(bgImage.includes('color(') || bgImage.includes('color-mix(')) fijar('background-image','none');
         ['Top','Right','Bottom','Left'].forEach(lado=>{
-            destino.style[`border${lado}Color`]=colorExportableHtml2Canvas(cs[`border${lado}Color`],'#d9e4ec');
+            fijar(`border-${lado.toLowerCase()}-color`,colorExportableHtml2Canvas(cs[`border${lado}Color`],'#d9e4ec'));
         });
-        destino.style.outlineColor=colorExportableHtml2Canvas(cs.outlineColor,'#0b7f86');
-        if(String(cs.boxShadow||'').includes('color(') || String(cs.boxShadow||'').includes('color-mix(')) destino.style.boxShadow='none';
+        fijar('outline-color',colorExportableHtml2Canvas(cs.outlineColor,'#0b7f86'));
+        fijar('text-decoration-color',colorExportableHtml2Canvas(cs.textDecorationColor,'#102840'));
+        fijar('caret-color',colorExportableHtml2Canvas(cs.caretColor,'#102840'));
+        fijar('column-rule-color',colorExportableHtml2Canvas(cs.columnRuleColor,'#d9e4ec'));
+        if(String(cs.boxShadow||'').includes('color(') || String(cs.boxShadow||'').includes('color-mix(')) fijar('box-shadow','none');
+        if(String(cs.textShadow||'').includes('color(') || String(cs.textShadow||'').includes('color-mix(')) fijar('text-shadow','none');
+        if(String(cs.filter||'').includes('color(') || String(cs.filter||'').includes('color-mix(')) fijar('filter','none');
         const hijosOrigen=Array.from(origen.children||[]);
         const hijosDestino=Array.from(destino.children||[]);
         hijosDestino.forEach((hijo,i)=>sanitizarNodoExportacion(hijosOrigen[i],hijo));
@@ -1978,6 +2000,36 @@ window._appRuntimeInicializada = true;
             return null;
         }
     }
+    function resumenPuntoRecuperacion(datos){
+        const campos=['carreras','niveles','secciones','asignaturas','docentes','salas','planificaciones','gruposDictacion'];
+        const temporadasDatos=datos?.temporadaData&&typeof datos.temporadaData==='object' ? Object.values(datos.temporadaData).filter(Boolean) : [];
+        const resumen={};
+        campos.forEach(campo=>{
+            resumen[campo]=temporadasDatos.length
+                ? temporadasDatos.reduce((total,temp)=>total+(Array.isArray(temp?.[campo])?temp[campo].length:0),0)
+                : (Array.isArray(datos?.[campo])?datos[campo].length:0);
+        });
+        resumen.temporadas=Array.isArray(datos?.temporadas)?datos.temporadas.length:0;
+        return resumen;
+    }
+    function formatoTamanoRecuperacion(bytes){
+        const total=Number(bytes)||0;
+        if(!total) return 'Tamaño no disponible';
+        if(total<1024) return `${total} B`;
+        if(total<1024*1024) return `${(total/1024).toFixed(1)} KB`;
+        return `${(total/(1024*1024)).toFixed(1)} MB`;
+    }
+    function descargarPuntoRecuperacion(datos,fecha=''){
+        const blob=new Blob([JSON.stringify(datos,null,2)],{type:'application/json;charset=utf-8'});
+        const url=URL.createObjectURL(blob);
+        const enlace=document.createElement('a');
+        enlace.href=url;
+        enlace.download=`Planhor_Recuperacion_${String(fecha||new Date().toISOString()).slice(0,19).replace(/[:T]/g,'-')}.json`;
+        document.body.appendChild(enlace);
+        enlace.click();
+        enlace.remove();
+        setTimeout(()=>URL.revokeObjectURL(url),500);
+    }
     function restaurarRespaldoLocal(){
         const respaldo=obtenerRespaldoLocal();
         const snapshots=listarSnapshotsRecuperacion();
@@ -1988,13 +2040,15 @@ window._appRuntimeInicializada = true;
         const opciones=[];
         snapshots.forEach(s=>{
             const r=s.resumen||{};
-            const resumen=`${Number(r.planificaciones)||0} plan. · ${Number(r.secciones)||0} secc. · ${Number(r.asignaturas)||0} asig.`;
             opciones.push({
                 id:s.id,
                 tipo:'snapshot',
                 titulo:s.motivo==='antes_de_aplicar_firebase'?'Antes de aplicar Firebase':'Recuperación automática',
                 fecha:s.fecha||'',
-                resumen
+                autor:s.savedBy||'usuario',
+                tamanoBytes:Number(s.tamanoBytes)||0,
+                integridad:s.integridad||'historico',
+                resumen:`${Number(r.planificaciones)||0} bloques · ${Number(r.secciones)||0} secciones · ${Number(r.asignaturas)||0} asignaturas`
             });
         });
         if(respaldo){
@@ -2003,54 +2057,127 @@ window._appRuntimeInicializada = true;
                 tipo:'importacion',
                 titulo:'Antes de importar respaldo',
                 fecha:respaldo.fecha||'',
+                autor:'Respaldo local',
+                tamanoBytes:0,
+                integridad:'historico',
                 resumen:resumenImportacion(respaldo.datos).map(([k,v])=>`${k}: ${v}`).join(' · ')
             });
         }
+        const indiceInicial=opciones.findIndex(op=>op.integridad!=='invalido');
         const filas=opciones.map((op,i)=>`
-            <label class="recovery-option" style="display:block;border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;cursor:pointer;background:${i===0?'var(--surface-soft)':'var(--surface)'};">
-                <div style="display:flex;gap:8px;align-items:flex-start;">
-                    <input type="radio" name="recoveryOption" value="${escapeAttr(op.tipo+'|'+op.id)}" ${i===0?'checked':''} style="margin-top:4px;">
+            <label class="recovery-option ${i===indiceInicial?'selected':''} ${op.integridad==='invalido'?'disabled':''}">
+                <div class="recovery-option-main">
+                    <input type="radio" name="recoveryOption" value="${escapeAttr(op.tipo+'|'+op.id)}" ${i===indiceInicial?'checked':''} ${op.integridad==='invalido'?'disabled':''}>
                     <div>
                         <strong>${escapeHTML(op.titulo)}</strong>
-                        <div style="font-size:0.78rem;color:var(--text-secondary);">${escapeHTML(op.fecha?new Date(op.fecha).toLocaleString():'Fecha no disponible')}</div>
-                        <div style="font-size:0.78rem;color:var(--text-secondary);margin-top:3px;">${escapeHTML(op.resumen||'Sin resumen')}</div>
+                        <div class="recovery-option-meta">${escapeHTML(op.fecha?new Date(op.fecha).toLocaleString():'Fecha no disponible')} · ${escapeHTML(op.autor)}</div>
+                        <div class="recovery-option-summary">${escapeHTML(op.resumen||'Sin resumen')} · ${op.integridad==='valido'?'Integridad verificada':op.integridad==='invalido'?'Copia dañada':'Copia histórica sin checksum'}</div>
                     </div>
                 </div>
             </label>`).join('');
         document.getElementById('modalContainer').innerHTML=`
-        <div class="modal-overlay" id="modalOverlay"><div class="modal">
-            <h3>Restaurar punto de recuperación</h3>
-            <p style="font-size:0.85rem;color:var(--text-secondary);margin:0 0 10px;">Selecciona el punto que quieres recuperar.</p>
-            <div style="max-height:320px;overflow:auto;margin-bottom:12px;">${filas}</div>
-            <p style="font-size:0.8rem;color:var(--text-secondary);margin:0 0 12px;">Esto reemplazará los datos actuales y luego intentará guardarlos en Firebase. Si Firebase no responde, quedarán como pendiente local.</p>
-            <div style="display:flex;gap:8px;justify-content:flex-end;">
-                <button class="btn btn-sm" id="btnCancelarRestauracion">Cancelar</button>
-                <button class="btn btn-primary btn-sm" id="btnConfirmarRestauracion">Restaurar</button>
+        <div class="modal-overlay" id="modalOverlay"><div class="modal modal-wide recovery-manager-modal">
+            <div class="modal-header">
+                <h3>Puntos de recuperación</h3>
+                <p>Compara y descarga antes de restaurar. Firebase no se modificará automáticamente.</p>
+            </div>
+            <div class="recovery-manager-grid">
+                <div class="recovery-list">${filas}</div>
+                <div class="recovery-preview" id="recoveryPreview"></div>
+            </div>
+            <div class="modal-actions split-actions">
+                <button class="btn btn-sm" id="btnDescargarRecuperacion">Descargar respaldo</button>
+                <div class="action-right">
+                    <button class="btn btn-sm" id="btnCancelarRestauracion">Cancelar</button>
+                    <button class="btn btn-primary btn-sm" id="btnConfirmarRestauracion">Restaurar localmente</button>
+                </div>
             </div>
         </div></div>`;
+        const opcionSeleccionada=()=>{
+            const valor=document.querySelector('input[name="recoveryOption"]:checked')?.value||'';
+            const [tipo,id]=valor.split('|');
+            return opciones.find(op=>op.tipo===tipo&&op.id===id)||null;
+        };
+        const datosSeleccionados=()=>{
+            const op=opcionSeleccionada();
+            if(!op) return null;
+            const origen=op.tipo==='snapshot'?obtenerSnapshotRecuperacion(op.id):respaldo;
+            return origen?.datos||null;
+        };
+        const actualizarComparacion=()=>{
+            document.querySelectorAll('.recovery-option').forEach(label=>label.classList.toggle('selected',!!label.querySelector('input:checked')));
+            const op=opcionSeleccionada();
+            const elegido=datosSeleccionados();
+            const preview=document.getElementById('recoveryPreview');
+            if(!preview||!op||!elegido){ if(preview) preview.textContent='No se pudo leer este punto.'; return; }
+            const actual=resumenPuntoRecuperacion(data);
+            const anterior=resumenPuntoRecuperacion(elegido);
+            const etiquetas={planificaciones:'Bloques',secciones:'Secciones',asignaturas:'Asignaturas',docentes:'Docentes',salas:'Salas',gruposDictacion:'Grupos de dictación',temporadas:'Temporadas'};
+            const filasComparacion=Object.entries(etiquetas).map(([campo,label])=>{
+                const diferencia=(Number(anterior[campo])||0)-(Number(actual[campo])||0);
+                return `<tr><td>${escapeHTML(label)}</td><td>${Number(actual[campo])||0}</td><td>${Number(anterior[campo])||0}</td><td class="${diferencia<0?'negative':diferencia>0?'positive':''}">${diferencia>0?'+':''}${diferencia}</td></tr>`;
+            }).join('');
+            preview.innerHTML=`
+                <h4>Comparación</h4>
+                <div class="recovery-preview-meta">${escapeHTML(op.fecha?new Date(op.fecha).toLocaleString():'Fecha no disponible')} · ${escapeHTML(formatoTamanoRecuperacion(op.tamanoBytes))}</div>
+                <table><thead><tr><th>Contenido</th><th>Actual</th><th>Recuperación</th><th>Diferencia</th></tr></thead><tbody>${filasComparacion}</tbody></table>
+                <p>La restauración reemplazará primero los datos de este navegador. La nube quedará intacta hasta una confirmación posterior.</p>`;
+        };
         const cerrar=()=>cerrarModal();
         document.getElementById('btnCancelarRestauracion').onclick=cerrar;
         document.getElementById('modalOverlay').onclick=(e)=>{ if(e.target===e.currentTarget) cerrar(); };
-        document.getElementById('btnConfirmarRestauracion').onclick=()=>{
-            const valor=document.querySelector('input[name="recoveryOption"]:checked')?.value||'';
-            const [tipo,id]=valor.split('|');
-            const elegido=tipo==='snapshot' ? obtenerSnapshotRecuperacion(id) : respaldo;
-            const datos=elegido?.datos ? prepararDatosImportados(elegido.datos) : null;
+        document.querySelectorAll('input[name="recoveryOption"]').forEach(input=>input.addEventListener('change',actualizarComparacion));
+        document.getElementById('btnDescargarRecuperacion').onclick=()=>{
+            const op=opcionSeleccionada();
+            const elegido=datosSeleccionados();
+            if(!op||!elegido) return toast('No se pudo leer el punto de recuperación','error');
+            descargarPuntoRecuperacion(elegido,op.fecha);
+            toast('Respaldo descargado','success');
+        };
+        document.getElementById('btnConfirmarRestauracion').onclick=async()=>{
+            const op=opcionSeleccionada();
+            const elegido=datosSeleccionados();
+            const datos=elegido ? prepararDatosImportados(elegido) : null;
             if(!datos) return toast('No se pudo leer el punto de recuperación','error');
+            const ok=await confirmarAccionCritica({
+                titulo:'Restaurar datos locales',
+                mensaje:'El punto seleccionado reemplazará el estado actual de este navegador.',
+                queHara:`Restaurará la copia de ${op?.fecha?new Date(op.fecha).toLocaleString():'fecha no disponible'}.`,
+                afectara:'Datos académicos, planificación y temporadas locales.',
+                noTocara:'Firebase hasta que lo confirmes por separado.',
+                seguridad:'Se creará un punto del estado actual antes de restaurar.',
+                confirmarTexto:'Restaurar localmente',
+                peligro:true
+            });
+            if(!ok) return;
+            crearPuntoRecuperacion('antes_de_restaurar');
             aplicarDatosImportados(datos);
             asegurarEstructuraImportada();
             normalizarDatos();
             reconstruirIndices();
-            guardar({forzar:true, sobrescribirRemoto:true, motivo:'restaurar_respaldo_local', snapshotForzado:true});
+            const guardadoLocal=await guardarRestauracionLocal('restaurar_punto_recuperacion');
+            if(!guardadoLocal) return toast('No se pudo guardar la restauración local','error');
             actualizarSelectorTemporada();
             aplicarPaleta();
             aplicarFuente();
             actualizarIndicadorPaleta();
             refrescarTodo();
-            cerrarModal();
-            toast('Punto de recuperación restaurado','success');
+            await cerrarModal();
+            toast('Punto restaurado localmente. Firebase no fue modificado.','success');
             actualizarEstadoRespaldoLocal();
+            const sincronizar=await confirmarAccionCritica({
+                titulo:'Sincronizar restauración',
+                mensaje:'La restauración ya está segura en este navegador.',
+                queHara:'Comparará esta copia con Firebase antes de publicarla.',
+                afectara:'La nube solo si la comparación resulta segura o resuelves sus conflictos.',
+                noTocara:'La copia local recién restaurada.',
+                confirmarTexto:'Comparar y sincronizar',
+                cancelarTexto:'Más tarde',
+                peligro:false
+            });
+            if(sincronizar) await recargarDesdeFirestore();
         };
+        actualizarComparacion();
     }
     function confirmarImportacion(imported, nombreArchivo){
         return new Promise(resolve=>{
@@ -4594,7 +4721,10 @@ window._appRuntimeInicializada = true;
         }
     }
     document.querySelectorAll('.dropdown-menu').forEach(menu=>menu.addEventListener('click',(e)=>{
-        const action=e.target.dataset.action; if(action) ejecutarAccionMenu(action); menu.classList.remove('show');
+        const item=e.target.closest?.('[data-action]');
+        const action=item&&menu.contains(item)?item.dataset.action:'';
+        if(action) ejecutarAccionMenu(action);
+        menu.classList.remove('show');
     }));
     document.addEventListener('click',(e)=>{if(!e.target.closest('.dropdown')) document.querySelectorAll('.dropdown-menu').forEach(m=>m.classList.remove('show'));});
     document.addEventListener('click',(e)=>{if(!e.target.closest('.search-box')) document.querySelectorAll('.search-results').forEach(r=>{ r.classList.remove('show'); r.querySelectorAll('li').forEach(li=>li.classList.remove('kb-focus')); });});
