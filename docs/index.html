@@ -10,7 +10,7 @@
     <link rel="apple-touch-icon" sizes="180x180" href="planificador_modulos/icono-planhor-180.png?v=5">
     <link rel="manifest" href="planificador_modulos/site.webmanifest?v=2">
     <meta name="theme-color" content="#245f67">
-<link rel="stylesheet" href="planificador_modulos/estilos.css?v=20260622-solver-hibrido">
+<link rel="stylesheet" href="planificador_modulos/estilos.css?v=20260702-config-ordenada">
 </head>
 <body>
 <div id="appRoot" style="display:none;">
@@ -164,9 +164,19 @@
     </div>
     <div class="tab-panel" id="panelReportes">
         <div class="card">
+            <div class="form-group"><label class="form-label">Familia de reporte</label><select class="form-select" id="reporteCategoria">
+                <option value="todos">Todos los reportes</option>
+                <option value="pendientes">Pendientes operativos</option>
+                <option value="validacion">Validación y calidad</option>
+                <option value="recursos">Recursos y software</option>
+                <option value="planificacion">Planificación y asignaturas</option>
+                <option value="docentes">Docentes y carga</option>
+                <option value="gestor">Gestor / fusiones</option>
+            </select></div>
             <div class="form-group"><label class="form-label">Tipo de reporte</label><select class="form-select" id="reporteTipo">
                 <option value="tro2">Asignaturas en TRO2</option>
                 <option value="docenteNN">Asignaturas con Docente NN</option>
+                <option value="asignaturasPlanificadas">Reporte de asignatura</option>
                 <option value="criticas">Asignaturas críticas / ayudantías</option>
                 <option value="transversales">Transversales / coordinación externa</option>
                 <option value="conflictos">Conflictos de docente / sala</option>
@@ -178,6 +188,7 @@
                 <option value="subseccionesAsignatura">Subsecciones de asignatura</option>
                 <option value="horasNegociacion">Horas negociables por asignatura</option>
                 <option value="observacionesPlanificacion">Observaciones de planificación</option>
+                <option value="seguimientoPlanificacion">Seguimiento de planificación</option>
                 <option value="calidadHorario">Calidad de horario</option>
                 <option value="incompletas">Asignaturas con planificación incompleta</option>
                 <option value="cargaDocente">Resumen de carga docente</option>
@@ -309,8 +320,10 @@
         <div class="selection-panel">
             <div class="form-group"><label class="form-label">Especialidad</label><select class="form-select" id="fichaEspFiltro"><option value="">-- Especialidad --</option></select></div>
             <div class="form-group" style="flex:1;min-width:200px;"><label class="form-label">Docente</label><select class="form-select" id="fichaDocente"></select></div>
+            <button class="btn btn-sm" id="btnLimpiarFichaDocente">Limpiar vista</button>
             <button class="btn btn-sm" id="btnExportarFichaPDF">📄 Exportar PDF</button>
             <button class="btn btn-sm" id="btnExportarFichaJPG">🖼️ Exportar JPG</button>
+            <button class="btn btn-sm" id="btnExportarTodasFichasPDF">📚 Exportar todas PDF</button>
         </div>
         <div id="fichaContenido" style="display:none;"></div>
     </div>
@@ -321,6 +334,15 @@
 <div class="toast-container" id="toastContainer"></div>
 <div id="modalContainer"></div>
 </div><!-- fin appRoot -->
+<div id="startupSyncOverlay" class="startup-sync-overlay" style="display:none;" role="status" aria-live="polite" aria-modal="true">
+    <div class="startup-sync-card">
+        <img src="planificador_modulos/assets/brand/planhor_logo_horizontal_transparente.png" alt="Planhor">
+        <div class="startup-sync-spinner" aria-hidden="true"></div>
+        <h2 id="startupSyncTitle">Sincronizando con la nube</h2>
+        <p id="startupSyncText">Estamos verificando Firebase antes de habilitar la edición. Esto protege tus datos y evita sobrescrituras.</p>
+        <span id="startupSyncDetail">Conectando...</span>
+    </div>
+</div>
 
 <!-- Firebase SDK -->
 <script type="module">
@@ -343,6 +365,28 @@ const db = getFirestore(firebaseApp);
 
 // Exponer al scope global para que el script principal los use
 window._fb = { auth, db, doc, setDoc, getDoc, onSnapshot, runTransaction, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail, EmailAuthProvider, reauthenticateWithCredential, updatePassword };
+
+window._planhorStartupSync = {
+    show(detalle='Conectando...') {
+        const overlay = document.getElementById('startupSyncOverlay');
+        const detail = document.getElementById('startupSyncDetail');
+        if (detail) detail.textContent = detalle;
+        if (overlay) overlay.style.display = 'flex';
+    },
+    set(detalle) {
+        const detail = document.getElementById('startupSyncDetail');
+        if (detail) detail.textContent = detalle || 'Sincronizando...';
+    },
+    hide() {
+        const overlay = document.getElementById('startupSyncOverlay');
+        if (!overlay) return;
+        overlay.classList.add('closing');
+        setTimeout(()=>{
+            overlay.style.display = 'none';
+            overlay.classList.remove('closing');
+        }, 180);
+    }
+};
 
 // Pantalla de login
 function mostrarLogin(error='') {
@@ -463,6 +507,7 @@ function ocultarLogin(user) {
 onAuthStateChanged(auth, async (user) => {
     if (user) {
         ocultarLogin(user);
+        window._planhorStartupSync?.show('Validando sesión y datos remotos...');
         // Iniciar la app solo si aún no fue iniciada
         if (!window._appIniciada) {
             if (window._iniciarApp) {
@@ -473,20 +518,21 @@ onAuthStateChanged(auth, async (user) => {
             }
         }
     } else {
+        window._planhorStartupSync?.hide();
         mostrarLogin();
     }
 });
 </script>
 
 <script src="planificador_modulos/utils.js"></script>
-<script src="planificador_modulos/sync.js?v=20260621-fase41-trazabilidad"></script>
+<script src="planificador_modulos/sync.js?v=20260626-startup-sync"></script>
 <script src="planificador_modulos/exportaciones.js?v=20260608-subsecciones-reportes"></script>
-<script src="planificador_modulos/vista-horario.js?v=20260619-vista-general-mini"></script>
-<script src="planificador_modulos/reportes.js?v=20260621-fase41-trazabilidad"></script>
-<script src="planificador_modulos/ficha-docente.js?v=20260620-export-grillas"></script>
+<script src="planificador_modulos/vista-horario.js?v=20260701-texto-bloques-vistas"></script>
+<script src="planificador_modulos/reportes.js?v=20260702-integridad-dashboard-reparar"></script>
+<script src="planificador_modulos/ficha-docente.js?v=20260701-texto-bloques-vistas"></script>
 <script src="planificador_modulos/entidades.js?v=20260620-tiempos-ui"></script>
-<script src="planificador_modulos/planificacion.js?v=20260622-solver-hibrido"></script>
-<script src="planificador_modulos/configuracion.js?v=20260622-ayuda-desarrollo"></script>
-<script src="planificador_modulos/app.js?v=20260622-solver-hibrido"></script>
+<script src="planificador_modulos/planificacion.js?v=20260701-texto-bloques"></script>
+<script src="planificador_modulos/configuracion.js?v=20260702-config-ordenada"></script>
+<script src="planificador_modulos/app.js?v=20260701-texto-bloques-vistas"></script>
 </body>
 </html>

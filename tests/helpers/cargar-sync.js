@@ -15,7 +15,8 @@ function cargarSyncPrueba() {
                 fusionarTresVias,
                 validarSobrescrituraSegura,
                 asignarRevisionAuditoria,
-                verificarIntegridadSnapshot
+                verificarIntegridadSnapshot,
+                clasificarErrorSync
             },
             guardar,`;
     const original = fs.readFileSync(ruta, 'utf8');

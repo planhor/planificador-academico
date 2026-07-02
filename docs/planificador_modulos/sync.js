@@ -24,6 +24,9 @@
         let estadoFormalSync='reconectando';
         let reintentoNumero=0;
         let reintentoTimer=null;
+        let reintentoVerificacionRemota=false;
+        let reconexionActiva=null;
+        let colaSnapshotRemoto=Promise.resolve();
         let comparacionAutomaticaActiva=false;
         const RETRY_DELAYS=[800,2000,5000,10000,30000];
 
@@ -35,9 +38,11 @@
                 local_modificado:['warning','Local modificado'],
                 pendiente:['warning','Pendiente'],
                 reconectando:['saving','Reconectando'],
+                verificando:['waiting','Verificando nube'],
                 comparando:['waiting','Comparando'],
                 sincronizado:['online','Sincronizado'],
                 conflicto:['warning','Conflicto'],
+                error_acceso:['warning','Revisa acceso'],
                 modo_local:['warning','Modo local'],
                 sin_conexion:['offline','Sin conexión']
             };
@@ -51,6 +56,7 @@
         }
         function reiniciarReintentos(){
             reintentoNumero=0;
+            reintentoVerificacionRemota=false;
             if(reintentoTimer){ clearTimeout(reintentoTimer); reintentoTimer=null; }
         }
         function registrarRevisionLocal(revisionId){
@@ -798,6 +804,34 @@
             if (codigo === 'unauthenticated') return 'La sesión no está autenticada para guardar.';
             return `Firestore: ${codigo}${mensaje ? ' · ' + mensaje : ''}`;
         }
+        function clasificarErrorSync(e) {
+            if (e?.message === 'conflicto-remoto' || e?.message === 'sobrescritura-regresiva') return 'conflicto';
+            const codigo=String(e?.code||e?.name||'').replace(/^firestore\//,'').toLowerCase();
+            if (codigo === 'payload-integrity') return 'integridad';
+            if (['permission-denied','unauthenticated'].includes(codigo)) return 'acceso';
+            if (['unavailable','deadline-exceeded','aborted','cancelled','resource-exhausted','internal','unknown','network-request-failed'].includes(codigo)) return 'transitorio';
+            const mensaje=String(e?.message||'').toLowerCase();
+            if (/network|offline|timeout|timed out|connection|fetch/.test(mensaje)) return 'transitorio';
+            return 'transitorio';
+        }
+        function manejarFalloRemoto(e,cabecera={}) {
+            const tipoError=clasificarErrorSync(e);
+            conflictoRemoto = tipoError==='conflicto';
+            versionRemotaConocida = Math.max(versionRemotaConocida, Number(cabecera._version)||0);
+            const hayPendiente=!!leerPendienteLocal()?.json;
+            ctx.setCambiosPendientes?.(hayPendiente);
+            if(tipoError==='acceso') establecerEstadoSync('error_acceso');
+            else if(tipoError==='conflicto') establecerEstadoSync('conflicto');
+            else establecerEstadoSync(tipoError==='integridad'?'verificando':(navigator.onLine?'reconectando':'sin_conexion'));
+            ctx.setSaveStatus?.('error',tipoError==='acceso'?'Acceso pendiente':(tipoError==='conflicto'?'Conflicto':'Nube no aplicada'),false);
+            const revision = String(cabecera._revisionId || cabecera._version || 'desconocida');
+            if (integridadRemotaAvisada !== revision) {
+                integridadRemotaAvisada = revision;
+                ctx.toast(`${describirErrorFirebase(e)} Tu avance local permanece protegido.`, 'error');
+            }
+            console.error('Actualización remota rechazada:', e);
+            if(tipoError==='integridad'||tipoError==='transitorio') programarReintento({verificarRemoto:true});
+        }
         async function aplicarRemoto(remoto, jsonRemoto) {
             const data = getData();
             const localAntes = JSON.stringify(crearSnapshotCompartido(data));
@@ -994,11 +1028,12 @@
             finally { comparacionAutomaticaActiva=false; }
         }
         function instalarSnapshot(ref, onSnapshot) {
-            onSnapshot(ref, {includeMetadataChanges:true}, async (snapLive) => {
-                if (!snapLive.exists()) return;
-                if (snapLive.metadata?.hasPendingWrites) return;
-                const cabecera = snapLive.data() || {};
-                try {
+            onSnapshot(ref, {includeMetadataChanges:true}, (snapLive) => {
+                colaSnapshotRemoto=colaSnapshotRemoto.catch(()=>{}).then(async()=>{
+                    if (!snapLive.exists()) return;
+                    if (snapLive.metadata?.hasPendingWrites) return;
+                    const cabecera = snapLive.data() || {};
+                    try {
                     const remoto = await leerRemotoConsistente(ref);
                     if(!remoto) return;
                     const jsonRemoto = JSON.stringify(remoto);
@@ -1035,6 +1070,7 @@
                     if (!remoto._version || remoto._version > (getData()._version || 0)) {
                         establecerEstadoSync('comparando');
                         await aplicarRemoto(remoto, jsonRemoto);
+                        modoLocalInicio=false;
                         ctx.normalizarDatos?.();
                         ctx.reconstruirIndices(); ctx.refrescarTodo();
                         reiniciarReintentos();
@@ -1043,20 +1079,9 @@
                         const quien = remoto._savedBy || 'El otro usuario';
                         ctx.toast(`🔄 ${quien} actualizó los datos`, 'info');
                     }
-                } catch(e) {
-                    conflictoRemoto = true;
-                    versionRemotaConocida = Math.max(versionRemotaConocida, Number(cabecera._version)||0);
-                    ctx.setCambiosPendientes?.(true);
-                    establecerEstadoSync('conflicto','Integridad pendiente');
-                    ctx.setSaveStatus?.('error','Nube no aplicada',false);
-                    const revision = String(cabecera._revisionId || cabecera._version || 'desconocida');
-                    if (integridadRemotaAvisada !== revision) {
-                        integridadRemotaAvisada = revision;
-                        ctx.toast(`${describirErrorFirebase(e)} Tu avance local permanece protegido.`, 'error');
-                    }
-                    console.error('Actualización remota rechazada por integridad:', e);
-                }
-            });
+                    } catch(e) { manejarFalloRemoto(e,cabecera); }
+                });
+            },(e)=>manejarFalloRemoto(e));
         }
         async function recargarDesdeFirestore(silencioso=false) {
             const opciones = typeof silencioso === 'object' ? silencioso : { silencioso: !!silencioso };
@@ -1154,6 +1179,7 @@
                 ctx.setCambiosPendientes?.(true);
                 establecerEstadoSync('modo_local');
                 ctx.setSaveStatus?.('error','Guardado local',false);
+                programarReintento({verificarRemoto:true});
                 return false;
             }
             ctx.setCambiosPendientes?.(true);
@@ -1251,8 +1277,9 @@
                 return false;
             }
         }
-        function programarReintento(){
-            if(reintentoTimer||conflictoRemoto||!leerPendienteLocal()?.json) return;
+        function programarReintento(opciones={}){
+            if(opciones.verificarRemoto) reintentoVerificacionRemota=true;
+            if(reintentoTimer||conflictoRemoto||(!leerPendienteLocal()?.json&&!reintentoVerificacionRemota)) return;
             if(!navigator.onLine){ establecerEstadoSync('sin_conexion'); return; }
             const indice=Math.min(reintentoNumero,RETRY_DELAYS.length-1);
             const demora=RETRY_DELAYS[indice];
@@ -1260,12 +1287,20 @@
             establecerEstadoSync('reconectando',`Reconectando ${Math.min(reintentoNumero,RETRY_DELAYS.length)}/${RETRY_DELAYS.length}`);
             reintentoTimer=setTimeout(async()=>{
                 reintentoTimer=null;
-                const ok=await reintentarPendienteLocal();
+                const ok=leerPendienteLocal()?.json
+                    ? await reintentarPendienteLocal()
+                    : await recargarDesdeFirestore({silencioso:true,automatico:true});
                 if(ok) reiniciarReintentos();
                 else if(!conflictoRemoto) programarReintento();
             },demora);
         }
         async function reintentarPendienteLocal() {
+            if(reconexionActiva) return reconexionActiva;
+            reconexionActiva=ejecutarReintentoPendienteLocal();
+            try { return await reconexionActiva; }
+            finally { reconexionActiva=null; }
+        }
+        async function ejecutarReintentoPendienteLocal() {
             const pendiente = leerPendienteLocal();
             if (!pendiente?.json) return false;
             if (conflictoRemoto) {
@@ -1292,11 +1327,17 @@
         if (typeof window !== 'undefined' && !window._planificadorSyncRetryInstalado) {
             window._planificadorSyncRetryInstalado = true;
             window.addEventListener('online', () => {
-                programarReintento();
+                programarReintento({verificarRemoto:modoLocalInicio});
             });
             window.addEventListener('offline',()=>{
                 if(reintentoTimer){ clearTimeout(reintentoTimer); reintentoTimer=null; }
                 establecerEstadoSync('sin_conexion');
+            });
+            window.addEventListener('focus',()=>{
+                if(navigator.onLine&&(modoLocalInicio||leerPendienteLocal()?.json||estadoFormalSync!=='sincronizado')) programarReintento({verificarRemoto:true});
+            });
+            if(typeof document!=='undefined') document.addEventListener('visibilitychange',()=>{
+                if(document.visibilityState==='visible'&&navigator.onLine&&(modoLocalInicio||leerPendienteLocal()?.json||estadoFormalSync!=='sincronizado')) programarReintento({verificarRemoto:true});
             });
         }
         async function cargar() {
@@ -1306,6 +1347,7 @@
             let conectadoNube = false;
             while (!conectadoNube) {
                 establecerEstadoSync('reconectando');
+                window._planhorStartupSync?.set('Conectando con Firebase...');
                 ctx.setSaveStatus?.('saving','Sincronizando con la nube...',false);
                 const { db, doc, onSnapshot } = window._fb;
                 const ref = doc(db, 'planificador', 'datos');
@@ -1313,6 +1355,7 @@
                     const remoto=await leerRemotoConsistente(ref);
                     if (remoto) {
                         establecerEstadoSync('comparando');
+                        window._planhorStartupSync?.set('Comparando versión local y nube...');
                         const jsonRemoto=JSON.stringify(remoto);
                         if(pendienteInicio?.json&&pendienteInicio.json!==jsonRemoto){
                             const localPendiente=JSON.parse(pendienteInicio.json);
@@ -1333,23 +1376,30 @@
                     }
                     const hayPendiente=!!leerPendienteLocal()?.json;
                     establecerEstadoSync(hayPendiente?'pendiente':'sincronizado');
+                    window._planhorStartupSync?.set(hayPendiente?'Hay cambios locales pendientes protegidos.':'Datos sincronizados.');
                     ctx.setCambiosPendientes?.(hayPendiente);
                     ctx.setSaveStatus?.(hayPendiente?'error':'success',hayPendiente?'Pendiente local':'✓ Sincronizado',!hayPendiente);
                     modoLocalInicio = false;
                     instalarSnapshot(ref, onSnapshot);
                     conectadoNube = true;
                 } catch(e) {
+                    window._planhorStartupSync?.set('Firebase no respondió. Esperando decisión segura...');
                     establecerEstadoSync(navigator.onLine?'pendiente':'sin_conexion');
                     ctx.setSaveStatus?.('error','Sin sincronizar',false);
                     console.warn('Sincronización inicial no disponible:', e);
                     const decision = await pedirModoLocal(e, hayDatosLocales());
                     if (decision === 'retry') continue;
                     if (decision === 'local') {
-                        cargarLocal(data);
+                        window._planhorStartupSync?.set('Activando modo local protegido...');
+                        const localCargado=cargarLocal(data);
                         modoLocalInicio = true;
+                        if(localCargado&&cacheLocal.estado?.json) await guardarPendienteLocal(cacheLocal.estado.json);
                         establecerEstadoSync('modo_local');
                         ctx.setSaveStatus?.('error','Modo local',false);
-                        ctx.toast('Modo local activado. Los datos de este navegador no reemplazarán la nube hasta que guardes o sincronices intencionalmente.', 'info');
+                        ctx.setCambiosPendientes?.(!!leerPendienteLocal()?.json);
+                        instalarSnapshot(ref,onSnapshot);
+                        programarReintento({verificarRemoto:true});
+                        ctx.toast('Modo local activado. Al recuperar Firebase, la app comparará ambas versiones antes de sincronizar.', 'info');
                     }
                     break;
                 }

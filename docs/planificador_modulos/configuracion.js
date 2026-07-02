@@ -928,16 +928,46 @@ La interfaz debe ser profesional, sobria, modular, con desplazamiento horizontal
                 </div>
                 <div class="config-section">
                     <h4>App y sincronización</h4>
-                    <p class="modal-help">Firebase guarda solo cuando realizas una modificación. No existe respaldo periódico automático, para evitar pisar cambios de otra cuenta.</p>
-                    <div class="form-row">
-                        <div class="form-group"><label class="form-label">Excel predeterminado</label><select class="form-select" id="cfgExportacionExcel">
-                            <option value="xlsx" ${(cfg.exportacionExcel||'xlsx')==='xlsx'?'selected':''}>Avanzado (.xlsx)</option>
-                            <option value="html" ${cfg.exportacionExcel==='html'?'selected':''}>Compatible (.xls)</option>
-                        </select></div>
+                    <div class="config-subsection">
+                        <h5>Preferencias generales</h5>
+                        <div class="form-row config-two-cols">
+                            <div class="form-group"><label class="form-label">Excel predeterminado</label><select class="form-select" id="cfgExportacionExcel">
+                                <option value="xlsx" ${(cfg.exportacionExcel||'xlsx')==='xlsx'?'selected':''}>Avanzado (.xlsx)</option>
+                                <option value="html" ${cfg.exportacionExcel==='html'?'selected':''}>Compatible (.xls)</option>
+                            </select></div>
+                            <div class="form-group"><label class="form-label">Tipografía</label><select class="form-select" id="cfgFuenteApp">
+                                ${Object.entries(ctx.FUENTES_APP||{}).map(([id,fuente])=>ctx.optionHTML(id,fuente.nombre,(cfg.fuenteApp||'segoe')===id)).join('')}
+                            </select></div>
+                        </div>
                     </div>
-                    <div class="form-group"><label class="form-label">Tipografía</label><select class="form-select" id="cfgFuenteApp">
-                        ${Object.entries(ctx.FUENTES_APP||{}).map(([id,fuente])=>ctx.optionHTML(id,fuente.nombre,(cfg.fuenteApp||'segoe')===id)).join('')}
-                    </select></div>
+                    <div class="config-subsection">
+                        <h5>Texto en bloques</h5>
+                        <p class="modal-help compact">Define de forma independiente cómo se leen las asignaturas en cada grilla.</p>
+                        <div class="form-row config-three-cols">
+                            <div class="form-group"><label class="form-label">Planificación</label><select class="form-select" id="cfgFormatoTextoBloque">
+                                <option value="codigo" ${(cfg.formatoTextoBloque||'codigo_nombre_resumido')==='codigo'?'selected':''}>Solo código</option>
+                                <option value="nombre" ${cfg.formatoTextoBloque==='nombre'?'selected':''}>Nombre</option>
+                                <option value="codigo_nombre" ${cfg.formatoTextoBloque==='codigo_nombre'?'selected':''}>Código y nombre</option>
+                                <option value="codigo_nombre_resumido" ${(!cfg.formatoTextoBloque||cfg.formatoTextoBloque==='codigo_nombre_resumido')?'selected':''}>Código y nombre resumido</option>
+                            </select></div>
+                            <div class="form-group"><label class="form-label">Vista Horarios</label><select class="form-select" id="cfgFormatoTextoBloqueVista">
+                                <option value="codigo" ${(cfg.formatoTextoBloqueVistaHorario||'codigo')==='codigo'?'selected':''}>Solo código</option>
+                                <option value="nombre" ${cfg.formatoTextoBloqueVistaHorario==='nombre'?'selected':''}>Nombre</option>
+                                <option value="codigo_nombre" ${cfg.formatoTextoBloqueVistaHorario==='codigo_nombre'?'selected':''}>Código y nombre</option>
+                                <option value="codigo_nombre_resumido" ${cfg.formatoTextoBloqueVistaHorario==='codigo_nombre_resumido'?'selected':''}>Código y nombre resumido</option>
+                            </select></div>
+                            <div class="form-group"><label class="form-label">Ficha Docente</label><select class="form-select" id="cfgFormatoTextoBloqueFicha">
+                                <option value="codigo" ${(cfg.formatoTextoBloqueFichaDocente||'codigo')==='codigo'?'selected':''}>Solo código</option>
+                                <option value="nombre" ${cfg.formatoTextoBloqueFichaDocente==='nombre'?'selected':''}>Nombre</option>
+                                <option value="codigo_nombre" ${cfg.formatoTextoBloqueFichaDocente==='codigo_nombre'?'selected':''}>Código y nombre</option>
+                                <option value="codigo_nombre_resumido" ${cfg.formatoTextoBloqueFichaDocente==='codigo_nombre_resumido'?'selected':''}>Código y nombre resumido</option>
+                            </select></div>
+                        </div>
+                    </div>
+                    <div class="config-subsection subtle">
+                        <h5>Sincronización</h5>
+                        <p class="modal-help compact">Firebase guarda solo cuando realizas una modificación. No existe respaldo periódico automático, para evitar pisar cambios de otra cuenta.</p>
+                    </div>
                 </div>
                 <div class="config-section">
                     <h4>Temas</h4>
@@ -1163,6 +1193,9 @@ La interfaz debe ser profesional, sobria, modular, con desplazamiento horizontal
                 cfg.horasDescanso=parseInt(document.getElementById('cfgHorasDescanso').value)||12;
                 cfg.sabadoHastaBloque=parseInt(document.getElementById('cfgSabadoBloque').value)||16;
                 cfg.exportacionExcel=document.getElementById('cfgExportacionExcel').value;
+                cfg.formatoTextoBloque=document.getElementById('cfgFormatoTextoBloque')?.value||'codigo_nombre_resumido';
+                cfg.formatoTextoBloqueVistaHorario=document.getElementById('cfgFormatoTextoBloqueVista')?.value||'codigo';
+                cfg.formatoTextoBloqueFichaDocente=document.getElementById('cfgFormatoTextoBloqueFicha')?.value||'codigo';
                 cfg.fuenteApp=document.getElementById('cfgFuenteApp').value;
                 const perfilEmail=document.getElementById('cfgPerfilEmail')?.value||emailActual;
                 const perfilNombre=(document.getElementById('cfgPerfilNombre')?.value||'').trim();
@@ -1212,6 +1245,7 @@ La interfaz debe ser profesional, sobria, modular, con desplazamiento horizontal
                 ctx.aplicarPaleta();
                 ctx.guardar();
                 ctx.cerrarModal();
+                ctx.refrescarTodo?.();
                 ctx.renderDashboard();
                 ctx.detectarConflictos();
                 ctx.toast('Configuración actualizada','success');

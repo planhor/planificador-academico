@@ -297,17 +297,42 @@
         }
 
         function planVisibleEnFuente(seccionId,dia,bloque,planes=null){
-            const data=getData();
-            const fuente=planes||data.planificaciones;
-            const propio=planes
-                ? fuente.find(p=>mismoId(p.seccionId,seccionId)&&Number(p.dia)===Number(dia)&&Number(p.bloque)===Number(bloque))
-                : ctx.getIndicePlan()[`${seccionId}_${dia}_${bloque}`];
-            if(propio) return {plan:propio, vinculado:false, grupo:null, seccionVistaId:seccionId};
-            return planVinculadoEn(seccionId,dia,bloque,fuente)||planElectivoObjetivoEn(seccionId,dia,bloque,fuente);
+            return planesVisiblesEnFuente(seccionId,dia,bloque,planes)[0]||null;
         }
 
         function planVisibleEn(seccionId,dia,bloque){
             return planVisibleEnFuente(seccionId,dia,bloque);
+        }
+
+        function planesVisiblesEnFuente(seccionId,dia,bloque,planes=null){
+            const data=getData();
+            const fuente=planes||data.planificaciones;
+            const diaNum=Number(dia), bloqueNum=Number(bloque);
+            const propios=fuente
+                .filter(p=>mismoId(p.seccionId,seccionId)&&Number(p.dia)===diaNum&&Number(p.bloque)===bloqueNum)
+                .map(p=>({plan:p, vinculado:false, grupo:null, seccionVistaId:seccionId}));
+            const heredados=gruposVinculadosDeSeccion(seccionId).flatMap(g=>{
+                const ids=[g.asignaturaId,...(g.asignaturasEquivalentesIds||[])].filter(Boolean);
+                return fuente
+                    .filter(p=>mismoId(p.seccionId,g.seccionMadreId)&&ids.some(id=>mismoId(id,p.asignaturaId))&&Number(p.dia)===diaNum&&Number(p.bloque)===bloqueNum)
+                    .map(p=>({plan:p, grupo:g, vinculado:true, seccionVistaId:seccionId, seccionOrigenId:g.seccionMadreId}));
+            });
+            const electivas=planesElectivosObjetivoEn(seccionId,dia,bloque,fuente).map(x=>({
+                plan:x.plan,
+                vinculado:true,
+                electivaObjetivo:true,
+                alternativas:1,
+                seccionVistaId:seccionId,
+                seccionOrigenId:x.plan.seccionId
+            }));
+            const vistos=new Set();
+            return [...propios,...heredados,...electivas].filter(meta=>{
+                const p=meta.plan;
+                const key=[p.id,p.dia,p.bloque,p.asignaturaId,p.seccionId,p.componenteId||'',meta.electivaObjetivo?'E':''].join('|');
+                if(vistos.has(key)) return false;
+                vistos.add(key);
+                return true;
+            });
         }
 
         function seccionOcupadaVisible(seccionId,dia,bloque,opciones={}){
@@ -368,7 +393,70 @@
 
         function relacionAsignaturaSeccion(asigId,seccionId){
             const data=getData();
-            return (data.asignaturaSeccion||[]).find(r=>r.asignaturaId===asigId&&r.seccionId===seccionId)||null;
+            return (data.asignaturaSeccion||[]).find(r=>mismoId(r.asignaturaId,asigId)&&mismoId(r.seccionId,seccionId))||null;
+        }
+
+        function idGestorBloqueVisible(plan,visible=null){
+            if(!plan) return '';
+            if(visible?.grupo?.idGestorSeccion) return String(visible.grupo.idGestorSeccion||'').trim();
+            const seccionRelacionId=visible?.electivaObjetivo
+                ? (visible.seccionOrigenId||plan.seccionId)
+                : plan.seccionId;
+            const rel=relacionAsignaturaSeccion(plan.asignaturaId,seccionRelacionId);
+            if(rel?.idGestor) return String(rel.idGestor).trim();
+            if(rel?.idGestorDesvinculado) return String(rel.idGestorDesvinculado).trim();
+            const grupo=ctx.getGrupoDictacionAsignaturaSeccion?.(plan.asignaturaId,seccionRelacionId);
+            return String(grupo?.idGestorSeccion||'').trim();
+        }
+
+        function planesMismaAsignaturaBloque(plan){
+            const data=getData();
+            if(!plan) return [];
+            const porComponente=!!plan.componenteId;
+            return data.planificaciones.filter(p=>
+                mismoId(p.seccionId,plan.seccionId) &&
+                mismoId(p.asignaturaId,plan.asignaturaId) &&
+                (!porComponente || mismoId(p.componenteId||'',plan.componenteId||''))
+            );
+        }
+
+        function esPlanGestionExterna(plan,visible=null){
+            const data=getData();
+            const asig=data.asignaturas.find(a=>mismoId(a.id,plan?.asignaturaId));
+            const rel=relacionAsignaturaSeccion(plan?.asignaturaId,plan?.seccionId);
+            return !!(
+                visible?.vinculado ||
+                asig?.controlHorario==='coordinacion-externa' ||
+                String(rel?.origen||'').includes('externa') ||
+                String(rel?.origen||'').includes('heredada') ||
+                plan?.estadoGestionExterna
+            );
+        }
+
+        function actualizarSeguimientoPlan(plan,cambios={},resumen='Seguimiento actualizado'){
+            const data=getData();
+            const relacionados=planesMismaAsignaturaBloque(plan);
+            if(!relacionados.length) return;
+            ctx.pushUndo?.({tipo:'seguimiento_planificacion',resumen,afecta:`${relacionados.length} bloque(s)`});
+            const ahora=new Date().toISOString();
+            relacionados.forEach(p=>{
+                Object.assign(p,cambios,{seguimientoActualizadoEn:ahora});
+                if(!p.revisionMarcada) delete p.revisionMarcada;
+                if(!p.estadoGestionExterna) delete p.estadoGestionExterna;
+            });
+            ctx.auditoria?.('seguimiento_planificacion_actualizado',{
+                seccionId:plan.seccionId,
+                asignaturaId:plan.asignaturaId,
+                componenteId:plan.componenteId||'',
+                cantidad:relacionados.length,
+                cambios
+            });
+            ctx.guardar();
+            ctx.reconstruirIndices();
+            construirGrilla();
+            actualizarSelectoresPlan();
+            refrescarDespuesCambioPlanificacion();
+            ctx.toast(resumen,'success');
         }
 
         function componentesAsignaturaSeccion(asigId,seccionId){
@@ -564,12 +652,13 @@
                 grid.appendChild(ctx.createTimeCell(b));
                 ctx.DIAS.forEach((d,di)=>{
                     const cell=document.createElement('div'); cell.className='grid-cell'; cell.dataset.dia=di; cell.dataset.bloque=b.n;
-                    const visible=secId?planVisibleEn(secId,di,b.n):null;
-                    if(visible?.plan){
-                        totalVisible++;
-                        aplicarEstadoCelda(cell,visible.plan,visible);
-                        aplicarOcupacionDocenteCelda(cell,di,b.n,visible.plan);
-                        aplicarOcupacionSalaCelda(cell,di,b.n,visible.plan);
+                    const visibles=secId?planesVisiblesEnFuente(secId,di,b.n):[];
+                    if(visibles.length){
+                        totalVisible+=visibles.length;
+                        if(visibles.length>1) aplicarEstadoCeldaMultiple(cell,visibles);
+                        else aplicarEstadoCelda(cell,visibles[0].plan,visibles[0]);
+                        aplicarOcupacionDocenteCelda(cell,di,b.n,visibles[0].plan);
+                        aplicarOcupacionSalaCelda(cell,di,b.n,visibles[0].plan);
                     }
                     else if(data.modoPlan && secId && data.sel.docenteId) actualizarDisponibilidadCelda(cell,di,b.n);
                     grid.appendChild(cell);
@@ -807,7 +896,7 @@
             panel.querySelector('[data-compare-capacity]')?.addEventListener('change',e=>{
                 const solicitada=parseInt(e.target.value)||2;
                 comparadorCapacidad=[1,2,4,6].includes(solicitada)?solicitada:2;
-                comparadorSlots.splice(0,comparadorSlots.length);
+                if(comparadorSlots.length>comparadorCapacidad) comparadorSlots.length=comparadorCapacidad;
                 renderComparadorPlanificacion();
             });
             sincronizarValoresSelectoresComparador(panel);
@@ -949,13 +1038,15 @@
             cell.classList.add('planned');
             if(meta.vinculado) cell.classList.add('linked-plan');
             if(plan.fijo) cell.classList.add('fixed-plan');
+            if(plan.revisionMarcada) cell.classList.add('plan-review-marked');
+            if(plan.estadoGestionExterna) cell.classList.add(`plan-external-${plan.estadoGestionExterna}`);
             const asig=data.asignaturas.find(a=>a.id===plan.asignaturaId);
             const sala=data.salas.find(s=>s.id===plan.salaId);
             const doc=data.docentes.find(d=>d.id===plan.docenteId);
             cell.style.backgroundColor=ctx.colorAsignaturaPlanhor?.(asig)||asig?.color||'var(--planhor-subject-neutral)';
             cell.innerHTML='';
             const codigo=document.createElement('span');
-            codigo.textContent=(meta.electivaObjetivo?'◇ ':meta.vinculado?'🔗 ':plan.fijo?'🔒 ':'')+(asig?.codigo||'?');
+            codigo.textContent=(meta.electivaObjetivo?'◇ ':meta.vinculado?'🔗 ':plan.fijo?'🔒 ':'')+nombreCortoAsignatura(asig);
             const salaEl=document.createElement('small');
             salaEl.textContent=sala?.nombre||'?';
             const docenteEl=document.createElement('small');
@@ -981,6 +1072,12 @@
                 origen.textContent='Madre: '+nombreSeccion(plan.seccionId);
                 cell.appendChild(origen);
             }
+            if(plan.revisionMarcada || plan.estadoGestionExterna){
+                const marca=document.createElement('small');
+                marca.className='plan-followup-label';
+                marca.textContent=plan.estadoGestionExterna==='acordada'?'Acordada':plan.estadoGestionExterna==='gestion'?'En gestión':'Revisar';
+                cell.appendChild(marca);
+            }
             const explicacion=textoExplicacionAuto(plan.explicacionAuto);
             const aria=[
                 [asig?.codigo,asig?.nombre].filter(Boolean).join(' - '),
@@ -993,10 +1090,144 @@
             if(aria) cell.setAttribute('aria-label',aria);
         }
 
+        function aplicarEstadoCeldaMultiple(cell,visibles){
+            const data = getData();
+            cell.classList.add('planned','multi-plan-cell');
+            if(visibles.some(v=>v.vinculado)) cell.classList.add('linked-plan');
+            if(visibles.some(v=>v.plan?.fijo)) cell.classList.add('fixed-plan');
+            cell.style.backgroundColor='';
+            cell.innerHTML='';
+            const wrap=document.createElement('div');
+            wrap.className='multi-plan-stack';
+            visibles.slice(0,4).forEach(meta=>{
+                const plan=meta.plan;
+                const asig=data.asignaturas.find(a=>mismoId(a.id,plan.asignaturaId));
+                const sala=data.salas.find(s=>mismoId(s.id,plan.salaId));
+                const doc=data.docentes.find(d=>mismoId(d.id,plan.docenteId));
+                const idGestor=idGestorBloqueVisible(plan,meta);
+                const item=document.createElement('div');
+                item.className='multi-plan-item'+(meta.vinculado?' linked':'');
+                if(plan.revisionMarcada) item.classList.add('plan-review-marked');
+                if(plan.estadoGestionExterna) item.classList.add(`plan-external-${plan.estadoGestionExterna}`);
+                item.style.backgroundColor=ctx.colorAsignaturaPlanhor?.(asig)||asig?.color||'var(--planhor-subject-neutral)';
+                item.title=[
+                    [asig?.codigo,asig?.nombre].filter(Boolean).join(' - '),
+                    idGestor?`ID ${idGestor}`:'',
+                    meta.vinculado?`Heredada desde ${nombreSeccion(plan.seccionId)}`:'',
+                    sala?.nombre||'Sin sala',
+                    docenteNombre(doc)
+                ].filter(Boolean).join(' · ');
+                item.innerHTML=`
+                    <span>${ctx.escapeHTML((meta.electivaObjetivo?'◇ ':meta.vinculado?'🔗 ':plan.fijo?'🔒 ':'')+nombreCortoAsignatura(asig,24))}</span>
+                    <small>${ctx.escapeHTML(sala?.nombre||'?')}</small>
+                    <small>${ctx.escapeHTML(doc?(mismoId(doc.id,ctx.DOCENTE_NN_ID)?'Docente NN':`${String(doc.nombre||'').charAt(0)}. ${doc.apellido||''}`.trim()):'?')}</small>
+                `;
+                wrap.appendChild(item);
+            });
+            if(visibles.length>4){
+                const more=document.createElement('small');
+                more.className='multi-plan-more';
+                more.textContent=`+${visibles.length-4} más`;
+                wrap.appendChild(more);
+            }
+            cell.appendChild(wrap);
+            cell.setAttribute('aria-label',`${visibles.length} bloques planificados en el mismo horario`);
+        }
+
         function docenteNombre(doc){
             if(!doc) return 'Sin docente';
             if(doc.id===ctx.DOCENTE_NN_ID) return 'Docente NN';
             return `${doc.nombre||''} ${doc.apellido||''}`.trim()||'Sin docente';
+        }
+
+        function nombreCortoAsignatura(asig,maxNombre=30){
+            const codigo=String(asig?.codigo||'').trim();
+            const nombre=String(asig?.nombre||'').trim();
+            const formato=getData().configuracion?.formatoTextoBloque||'codigo_nombre_resumido';
+            const truncar=(texto,max=maxNombre)=>{
+                const limpio=String(texto||'').replace(/\s+/g,' ').trim();
+                if(limpio.length<=max) return limpio;
+                return limpio.slice(0,Math.max(1,max-3)).trimEnd()+'...';
+            };
+            if(formato==='codigo') return codigo||'?';
+            if(!nombre) return codigo||'?';
+            if(formato==='nombre') return truncar(nombre,maxNombre);
+            if(formato==='codigo_nombre') return codigo?`${codigo} - ${truncar(nombre,maxNombre)}`:truncar(nombre,maxNombre);
+            const abreviarPalabra=(palabra,indice)=>{
+                const limpia=String(palabra||'').trim();
+                if(!limpia) return '';
+                const lower=limpia.toLowerCase();
+                const mapa={
+                    programable:'Prog.',
+                    programables:'Prog.',
+                    instrumentacion:'Inst.',
+                    instrumentación:'Inst.',
+                    electromecanica:'Electromec.',
+                    electromecánica:'Electromec.',
+                    industrial:'Ind.',
+                    industriales:'Ind.',
+                    administracion:'Admin.',
+                    administración:'Admin.',
+                    electricidad:'Elect.',
+                    electrica:'Eléc.',
+                    eléctrica:'Eléc.',
+                    electricas:'Eléc.',
+                    eléctricas:'Eléc.',
+                    electronica:'Electrónica',
+                    electrónica:'Electrónica',
+                    conversion:'Conv.',
+                    conversión:'Conv.',
+                    seguridad:'Seg.',
+                    mantenimiento:'Mant.',
+                    automatizados:'Autom.',
+                    complejos:'Compl.',
+                    computador:'Comp.'
+                };
+                if(mapa[lower]) return mapa[lower];
+                if(indice>0 && limpia.length>9) return limpia.slice(0,5)+'.';
+                return limpia;
+            };
+            const palabras=nombre.replace(/\s+/g,' ').split(' ').filter(Boolean);
+            let salida=[];
+            for(let i=0;i<palabras.length;i++){
+                const p=palabras[i];
+                salida.push(abreviarPalabra(p,salida.length));
+                const texto=salida.join(' ');
+                if(texto.length>=maxNombre && salida.filter(x=>!['de','del','la','las','el','los','en','a','para','y','e'].includes(String(x).toLowerCase())).length>=2) break;
+            }
+            if(!salida.length) salida=palabras.slice(0,2).map((p,i)=>abreviarPalabra(p,i));
+            let corto=salida.join(' ').trim();
+            if(corto.length>maxNombre){
+                const partes=corto.split(' ');
+                while(partes.length>2 && partes.join(' ').length>maxNombre) partes.pop();
+                corto=partes.join(' ');
+                if(corto.length>maxNombre) corto=corto.slice(0,Math.max(8,maxNombre-1)).trim()+'.';
+            }
+            return codigo?`${codigo} - ${corto}`:corto;
+        }
+
+        function seleccionarContextoBloque(plan,{mensaje=null}={}){
+            const data=getData();
+            if(!plan) return;
+            data.sel.seccionId=plan.seccionId;
+            const sec=data.secciones.find(s=>mismoId(s.id,plan.seccionId));
+            if(sec){
+                data.sel.nivelId=sec.nivelId;
+                const nivel=data.niveles.find(n=>mismoId(n.id,sec.nivelId));
+                data.sel.carreraId=nivel?.carreraId||data.sel.carreraId;
+                const carrera=data.carreras.find(c=>mismoId(c.id,data.sel.carreraId));
+                data.sel.area=carrera?areaCarrera(carrera):data.sel.area;
+                data.sel.jornada=jornadaSeccion(sec);
+            }
+            data.sel.asignaturaId=plan.asignaturaId;
+            data.sel.docenteId=plan.docenteId;
+            data.sel.componenteId=plan.componenteId||null;
+            data.sel.tipo=plan.tipoPresencial===false?'virtual':'presencial';
+            data.sel.salaId=plan.tipoPresencial===false?ctx.SALA_VIRTUAL_ID:plan.salaId;
+            actualizarSelectoresPlan();
+            construirGrilla();
+            actualizarProgresoPlan();
+            ctx.toast(mensaje||'Bloque seleccionado para continuar la edición.','info');
         }
 
         function asegurarTooltipPlan(){
@@ -1044,6 +1275,7 @@
             const doc=data.docentes.find(d=>d.id===plan.docenteId);
             const compNombre=nombreComponentePlan(plan);
             const bloqueInfo=ctx.getBloque(plan.bloque);
+            const idGestor=idGestorBloqueVisible(plan,visible);
             const titulo=[asig?.codigo,asig?.nombre].filter(Boolean).join(' - ')||'Asignatura';
             const subtitulo=[
                 `${ctx.DIAS[plan.dia]} B${plan.bloque}${bloqueInfo?` · ${bloqueInfo.inicio}-${bloqueInfo.fin}`:''}`,
@@ -1052,6 +1284,8 @@
             ].filter(Boolean).join(' · ');
             const filas=[
                 ['Sección', visible.electivaObjetivo?`${nombreSeccion(secId)} · origen ${nombreSeccion(plan.seccionId)}`:visible.vinculado?`${nombreSeccion(secId)} · madre ${nombreSeccion(plan.seccionId)}`:nombreSeccion(plan.seccionId)],
+                idGestor?['ID sección', idGestor]:null,
+                (plan.revisionMarcada||plan.estadoGestionExterna)?['Seguimiento', plan.estadoGestionExterna==='acordada'?'Acordada':plan.estadoGestionExterna==='gestion'?'En gestión':'Marcada para revisión']:null,
                 ['Docente', docenteNombre(doc)],
                 ['Sala', sala?.nombre||'Sin sala'],
                 compNombre?['Componente', compNombre]:null
@@ -1230,13 +1464,14 @@
             const grid=document.getElementById('scheduleGrid');
             const cell=grid.querySelector(`.grid-cell[data-dia="${dia}"][data-bloque="${bloque}"]`);
             if(!cell) return;
-            cell.classList.remove('planned','linked-plan','fixed-plan','available','unavailable-docente','teacher-busy','teacher-busy-overlay','room-busy','room-busy-overlay'); cell.style.backgroundColor=''; cell.innerHTML=''; cell.title=''; cell.removeAttribute('aria-label');
+            cell.classList.remove('planned','linked-plan','fixed-plan','multi-plan-cell','plan-review-marked','plan-external-gestion','plan-external-acordada','available','unavailable-docente','teacher-busy','teacher-busy-overlay','room-busy','room-busy-overlay'); cell.style.backgroundColor=''; cell.innerHTML=''; cell.title=''; cell.removeAttribute('aria-label');
             const secId=data.sel.seccionId;
-            const visible=secId?planVisibleEn(secId,dia,bloque):null;
-            if(visible?.plan){
-                aplicarEstadoCelda(cell,visible.plan,visible);
-                aplicarOcupacionDocenteCelda(cell,dia,bloque,visible.plan);
-                aplicarOcupacionSalaCelda(cell,dia,bloque,visible.plan);
+            const visibles=secId?planesVisiblesEnFuente(secId,dia,bloque):[];
+            if(visibles.length){
+                if(visibles.length>1) aplicarEstadoCeldaMultiple(cell,visibles);
+                else aplicarEstadoCelda(cell,visibles[0].plan,visibles[0]);
+                aplicarOcupacionDocenteCelda(cell,dia,bloque,visibles[0].plan);
+                aplicarOcupacionSalaCelda(cell,dia,bloque,visibles[0].plan);
             }
             else if(data.modoPlan && secId && data.sel.docenteId) actualizarDisponibilidadCelda(cell,dia,bloque);
             actualizarEstadoVacioPlanificador(secId,grid.querySelectorAll('.grid-cell.planned').length);
@@ -1547,17 +1782,23 @@
             const rect=cell.getBoundingClientRect();
             const eventoDentroCelda=Number.isFinite(evento?.clientX)&&Number.isFinite(evento?.clientY)&&
                 evento.clientX>=rect.left&&evento.clientX<=rect.right&&evento.clientY>=rect.top&&evento.clientY<=rect.bottom;
-            const x=eventoDentroCelda?evento.clientX:rect.right;
-            const y=eventoDentroCelda?evento.clientY:rect.top;
+            const scrollX=window.scrollX||document.documentElement.scrollLeft||0;
+            const scrollY=window.scrollY||document.documentElement.scrollTop||0;
+            const x=eventoDentroCelda?(Number(evento.pageX)||evento.clientX+scrollX):rect.right+scrollX+8;
+            const y=eventoDentroCelda?(Number(evento.pageY)||evento.clientY+scrollY):rect.top+scrollY+8;
             const margen=8;
             const ancho=popup.offsetWidth||240;
             const alto=popup.offsetHeight||220;
-            let left=rect.right+margen;
-            if(left+ancho>window.innerWidth-margen) left=rect.left-ancho-margen;
-            if(left<margen) left=Math.min(Math.max(margen,x-margen),window.innerWidth-ancho-margen);
-            let top=y-margen;
-            if(top+alto>window.innerHeight-margen) top=window.innerHeight-alto-margen;
-            if(top<margen) top=margen;
+            const minLeft=scrollX+margen;
+            const maxLeft=scrollX+window.innerWidth-ancho-margen;
+            const minTop=scrollY+margen;
+            const maxTop=scrollY+window.innerHeight-alto-margen;
+            let left=x+margen;
+            if(left+ancho>scrollX+window.innerWidth-margen) left=x-ancho-margen;
+            if(left<minLeft) left=Math.min(Math.max(minLeft,x-margen),maxLeft);
+            let top=y+margen;
+            if(top+alto>scrollY+window.innerHeight-margen) top=maxTop;
+            if(top<minTop) top=minTop;
             popup.style.left=`${Math.round(left)}px`;
             popup.style.top=`${Math.round(top)}px`;
         }
@@ -1572,57 +1813,74 @@
             if (popupState._popupAbierto && popupState._popupCell === cell) { cerrarPopupAccion(); return; }
             cerrarPopupAccion();
             const popup = document.createElement('div'); popup.className = 'action-popup';
+            const idGestor=idGestorBloqueVisible(plan,meta);
+            const mostrarExterna=esPlanGestionExterna(plan,meta);
             popup.innerHTML = `
-                ${plan.explicacionAuto?`<div class="action-popup-note"><strong>Explicación</strong><span>${ctx.escapeHTML(textoExplicacionAuto(plan.explicacionAuto))}</span></div>`:''}
                 ${notaCapacidadPlan(plan)}
                 ${data.modoPlan?`
-                    <button id="popupToggleFijo">${plan.fijo?'🔓 Desbloquear bloque':'🔒 Fijar bloque'}</button>
                     <button id="popupMoverAsignatura">🔄 Mover asignatura</button>
-                    <button id="popupCambiarDocente">Cambiar docente</button>
-                    <button id="popupCambiarSala">Cambiar sala</button>
-                    <button id="popupEditarNota">${plan.nota?'Editar observación':'Agregar observación'}</button>
-                    <button id="popupEliminarBloque">Eliminar este bloque</button>
-                    <button id="popupEliminarTodos">Eliminar todos</button>
+                    <div class="action-popup-submenu">
+                        <button type="button">Gestión ›</button>
+                        <div class="action-popup-submenu-panel">
+                            <button id="popupToggleFijo">${plan.fijo?'🔓 Desbloquear bloque':'🔒 Fijar bloque'}</button>
+                            <button id="popupCambiarDocente">Cambiar docente</button>
+                            <button id="popupCambiarSala">Cambiar sala</button>
+                            <button id="popupEditarNota">${plan.nota?'Editar observación':'Agregar observación'}</button>
+                            <button id="popupMarcarRevision">${plan.revisionMarcada?'Quitar marca de revisión':'Marcar para revisión'}</button>
+                            ${mostrarExterna?`
+                                <button id="popupGestionExterna">${plan.estadoGestionExterna==='gestion'?'Quitar estado en gestión':'Marcar en gestión'}</button>
+                                <button id="popupAcordarExterna">${plan.estadoGestionExterna==='acordada'?'Quitar estado acordada':'Marcar como acordada'}</button>
+                            `:''}
+                            <button id="popupEliminarBloque">Eliminar este bloque</button>
+                            <button id="popupEliminarTodos">Eliminar todos</button>
+                        </div>
+                    </div>
+                    <div class="action-popup-submenu">
+                        <button type="button">Acciones ›</button>
+                        <div class="action-popup-submenu-panel">
+                            <button id="popupPrepararBloque">Seleccionar bloque</button>
+                            <button id="popupIrSeccion">Abrir en Secciones</button>
+                            <button id="popupBuscarId" ${idGestor?'':'disabled'}>Buscar ID sección</button>
+                            ${mostrarExterna?`<button id="popupIrIdPendiente" ${idGestor?'':'disabled'}>Ir a ID pendiente</button>`:''}
+                        </div>
+                    </div>
                 `:`
                     <div class="action-popup-note"><strong>Solo consulta</strong><span>Activa Modo Planificación para mover, cambiar docente, cambiar sala, fijar o eliminar este bloque.</span></div>
                     <button id="popupPrepararBloque">Seleccionar este bloque</button>
+                    <div class="action-popup-submenu">
+                        <button type="button">Acciones ›</button>
+                        <div class="action-popup-submenu-panel">
+                            <button id="popupIrSeccion">Abrir en Secciones</button>
+                            <button id="popupBuscarId" ${idGestor?'':'disabled'}>Buscar ID sección</button>
+                            ${mostrarExterna?`<button id="popupIrIdPendiente" ${idGestor?'':'disabled'}>Ir a ID pendiente</button>`:''}
+                        </div>
+                    </div>
                 `}`;
             document.body.appendChild(popup);
             posicionarPopupEnPuntero(popup,cell,evento);
             popupState._popupAbierto = popup; popupState._popupCell = cell;
             requestAnimationFrame(()=>{ if(window._kbInitPopup) window._kbInitPopup(); });
             if(data.modoPlan){
+                popup.querySelector('#popupPrepararBloque').onclick=()=>{ seleccionarContextoBloque(plan,{mensaje:'Bloque seleccionado para seguir planificando.'}); cerrarPopupAccion(); };
                 popup.querySelector('#popupToggleFijo').onclick = () => { alternarBloqueFijo(plan); cerrarPopupAccion(); };
                 popup.querySelector('#popupMoverAsignatura').onclick = () => { iniciarModoMovimiento(plan); cerrarPopupAccion(); };
                 popup.querySelector('#popupCambiarDocente').onclick = () => { cambiarDocenteAsignatura(plan); cerrarPopupAccion(); };
                 popup.querySelector('#popupCambiarSala').onclick = () => { cambiarSalaAsignatura(plan); cerrarPopupAccion(); };
                 popup.querySelector('#popupEditarNota').onclick = () => { editarNotaPlanificacion(plan); cerrarPopupAccion(); };
+                popup.querySelector('#popupMarcarRevision').onclick = () => { actualizarSeguimientoPlan(plan,{revisionMarcada:!plan.revisionMarcada},plan.revisionMarcada?'Marca de revisión quitada':'Marcada para revisión'); cerrarPopupAccion(); };
+                popup.querySelector('#popupGestionExterna')?.addEventListener('click',()=>{ actualizarSeguimientoPlan(plan,{estadoGestionExterna:plan.estadoGestionExterna==='gestion'?'':'gestion'},plan.estadoGestionExterna==='gestion'?'Estado en gestión quitado':'Marcada en gestión'); cerrarPopupAccion(); });
+                popup.querySelector('#popupAcordarExterna')?.addEventListener('click',()=>{ actualizarSeguimientoPlan(plan,{estadoGestionExterna:plan.estadoGestionExterna==='acordada'?'':'acordada'},plan.estadoGestionExterna==='acordada'?'Estado acordada quitado':'Marcada como acordada'); cerrarPopupAccion(); });
                 popup.querySelector('#popupEliminarBloque').onclick = () => { if(confirm('¿Eliminar este bloque?')) eliminarBloque(plan); cerrarPopupAccion(); actualizarSelectoresPlan(); };
                 popup.querySelector('#popupEliminarTodos').onclick = () => { const porComponente=!!plan.componenteId; if(confirm(porComponente?'¿Eliminar todos los bloques no fijos de este componente?':'¿Eliminar todos los bloques no fijos de esta asignatura?')){ ctx.pushUndo(); const coincide=p => !p.fijo && p.asignaturaId === plan.asignaturaId && p.seccionId === plan.seccionId && (!porComponente || String(p.componenteId||'')===String(plan.componenteId||'')); const eliminados=data.planificaciones.filter(coincide); data.planificaciones = data.planificaciones.filter(p => !coincide(p)); ctx.auditoria?.('bloques_eliminados_asignatura',{cantidad:eliminados.length,seccionId:plan.seccionId,asignaturaId:plan.asignaturaId,componenteId:plan.componenteId||'',bloques:eliminados,respetaFijos:true}); ctx.guardar(); ctx.reconstruirIndices(); construirGrilla(); actualizarSelectoresPlan(); refrescarDespuesCambioPlanificacion(); } cerrarPopupAccion(); };
             } else {
                 popup.querySelector('#popupPrepararBloque').onclick=()=>{
-                    data.sel.seccionId=plan.seccionId;
-                    const sec=data.secciones.find(s=>s.id===plan.seccionId);
-                    if(sec){
-                        data.sel.nivelId=sec.nivelId;
-                        const nivel=data.niveles.find(n=>n.id===sec.nivelId);
-                        data.sel.carreraId=nivel?.carreraId||data.sel.carreraId;
-                        const carrera=data.carreras.find(c=>c.id===data.sel.carreraId);
-                        data.sel.area=carrera?areaCarrera(carrera):data.sel.area;
-                        data.sel.jornada=jornadaSeccion(sec);
-                    }
-                    data.sel.asignaturaId=plan.asignaturaId;
-                    data.sel.docenteId=plan.docenteId;
-                    data.sel.componenteId=plan.componenteId||null;
-                    data.sel.tipo=plan.tipoPresencial===false?'virtual':'presencial';
-                    data.sel.salaId=plan.tipoPresencial===false?ctx.SALA_VIRTUAL_ID:plan.salaId;
-                    actualizarSelectoresPlan();
-                    construirGrilla();
-                    actualizarProgresoPlan();
+                    seleccionarContextoBloque(plan,{mensaje:'Bloque seleccionado. Activa Modo Planificación para modificarlo.'});
                     cerrarPopupAccion();
-                    ctx.toast('Bloque seleccionado. Activa Modo Planificación para modificarlo.','info');
                 };
             }
+            popup.querySelector('#popupIrSeccion')?.addEventListener('click',()=>{ cerrarPopupAccion(); ctx.irASeccionesDesdeGestor?.({seccionId:secVistaId||plan.seccionId,asignaturaId:plan.asignaturaId,idGestor}); });
+            popup.querySelector('#popupBuscarId')?.addEventListener('click',()=>{ cerrarPopupAccion(); ctx.irAGestorId?.(idGestor); });
+            popup.querySelector('#popupIrIdPendiente')?.addEventListener('click',()=>{ cerrarPopupAccion(); ctx.irAGestorId?.(idGestor); });
         }
 
         function resumenSeleccionBloques(){
@@ -1805,6 +2063,7 @@
             const grupo=meta.grupo;
             const asig=data.asignaturas.find(a=>a.id===plan.asignaturaId);
             const esElectiva=!!meta.electivaObjetivo;
+            const idGestor=idGestorBloqueVisible(plan,meta);
             const vinculadas=(grupo?.seccionesVinculadasIds||[]).map(nombreSeccion).join(', ')||'Sin secciones vinculadas';
             const popup=document.createElement('div');
             popup.className='action-popup';
@@ -1813,8 +2072,23 @@
                     <strong>${esElectiva?'Ventana electiva':'Bloque vinculado'}</strong>
                     <span>${ctx.escapeHTML(asig?.codigo||'Asignatura')} se planifica desde ${ctx.escapeHTML(nombreSeccion(plan.seccionId))}. Para modificarlo debes abrir esa sección.</span>
                 </div>
-                <button id="popupIrMadre">Ir a sección de origen</button>
-                <button id="popupVerVinculadas">${esElectiva?'Ver destinos':'Ver secciones vinculadas'}</button>`;
+                <div class="action-popup-submenu">
+                    <button type="button">Gestión ›</button>
+                    <div class="action-popup-submenu-panel">
+                        <button id="popupMarcarRevision">${plan.revisionMarcada?'Quitar marca de revisión':'Marcar para revisión'}</button>
+                        <button id="popupGestionExterna">${plan.estadoGestionExterna==='gestion'?'Quitar estado en gestión':'Marcar en gestión'}</button>
+                        <button id="popupAcordarExterna">${plan.estadoGestionExterna==='acordada'?'Quitar estado acordada':'Marcar como acordada'}</button>
+                    </div>
+                </div>
+                <div class="action-popup-submenu">
+                    <button type="button">Acciones ›</button>
+                    <div class="action-popup-submenu-panel">
+                        <button id="popupIrMadre">Ir a sección de origen</button>
+                        <button id="popupVerVinculadas">${esElectiva?'Ver destinos':'Ver secciones vinculadas'}</button>
+                        <button id="popupBuscarId" ${idGestor?'':'disabled'}>Buscar ID sección</button>
+                        <button id="popupIrIdPendiente" ${idGestor?'':'disabled'}>Ir a ID pendiente</button>
+                    </div>
+                </div>`;
             document.body.appendChild(popup);
             posicionarPopupEnPuntero(popup,cell,evento);
             popupState._popupAbierto=popup; popupState._popupCell=cell;
@@ -1835,11 +2109,16 @@
                 cerrarPopupAccion();
                 ctx.toast('Sección madre abierta','info');
             };
+            popup.querySelector('#popupMarcarRevision').onclick=()=>{ actualizarSeguimientoPlan(plan,{revisionMarcada:!plan.revisionMarcada},plan.revisionMarcada?'Marca de revisión quitada':'Marcada para revisión'); cerrarPopupAccion(); };
+            popup.querySelector('#popupGestionExterna').onclick=()=>{ actualizarSeguimientoPlan(plan,{estadoGestionExterna:plan.estadoGestionExterna==='gestion'?'':'gestion'},plan.estadoGestionExterna==='gestion'?'Estado en gestión quitado':'Marcada en gestión'); cerrarPopupAccion(); };
+            popup.querySelector('#popupAcordarExterna').onclick=()=>{ actualizarSeguimientoPlan(plan,{estadoGestionExterna:plan.estadoGestionExterna==='acordada'?'':'acordada'},plan.estadoGestionExterna==='acordada'?'Estado acordada quitado':'Marcada como acordada'); cerrarPopupAccion(); };
             popup.querySelector('#popupVerVinculadas').onclick=()=>{
                 const destinos=esElectiva?[...new Set((data.vinculosElectivos||[]).filter(v=>v.asignaturaId===asig?.id&&v.seccionOrigenId===plan.seccionId).map(v=>v.seccionDestinoId))].map(nombreSeccion).join(', ')||'Sin destinos':vinculadas;
                 alert(`${esElectiva?'Sección de origen':'Sección madre'}: ${nombreSeccion(plan.seccionId)}\n${esElectiva?'Destinos':'Vinculadas'}: ${destinos}`);
                 cerrarPopupAccion();
             };
+            popup.querySelector('#popupBuscarId')?.addEventListener('click',()=>{ cerrarPopupAccion(); ctx.irAGestorId?.(idGestor); });
+            popup.querySelector('#popupIrIdPendiente')?.addEventListener('click',()=>{ cerrarPopupAccion(); ctx.irAGestorId?.(idGestor); });
         }
 
         function cerrarPopupAccion() {

@@ -165,3 +165,14 @@ test('Sync verifica puntos de recuperación y conserva compatibilidad histórica
     assert.equal(sync.verificarIntegridadSnapshot({ json: `${json}x`, checksum }), 'invalido');
     assert.equal(sync.verificarIntegridadSnapshot({ json }), 'historico');
 });
+
+test('Sync distingue fallos transitorios, integridad, acceso y conflictos reales', () => {
+    const sync = cargarSyncPrueba();
+
+    assert.equal(sync.clasificarErrorSync({ code: 'unavailable' }), 'transitorio');
+    assert.equal(sync.clasificarErrorSync({ code: 'firestore/network-request-failed' }), 'transitorio');
+    assert.equal(sync.clasificarErrorSync({ code: 'payload-integrity' }), 'integridad');
+    assert.equal(sync.clasificarErrorSync({ code: 'permission-denied' }), 'acceso');
+    assert.equal(sync.clasificarErrorSync({ code: 'unauthenticated' }), 'acceso');
+    assert.equal(sync.clasificarErrorSync({ message: 'conflicto-remoto' }), 'conflicto');
+});

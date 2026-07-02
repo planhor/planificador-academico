@@ -240,11 +240,59 @@ window._appRuntimeInicializada = true;
         const fuente=FUENTES_APP[id] || FUENTES_APP[CONFIG_DEFAULT.fuenteApp] || FUENTES_APP.sistema;
         document.documentElement.style.setProperty('--font', fuente.valor);
     }
+    function formatearTextoBloqueAsignatura(asig,{formato='codigo_nombre_resumido',maxNombre=30}={}){
+        const codigo=String(asig?.codigo||'').trim();
+        const nombre=String(asig?.nombre||'').replace(/\s+/g,' ').trim();
+        const truncar=(texto,max=maxNombre)=>{
+            const limpio=String(texto||'').replace(/\s+/g,' ').trim();
+            if(limpio.length<=max) return limpio;
+            return limpio.slice(0,Math.max(1,max-3)).trimEnd()+'...';
+        };
+        if(formato==='codigo') return codigo||'?';
+        if(!nombre) return codigo||'?';
+        if(formato==='nombre') return truncar(nombre,maxNombre);
+        if(formato==='codigo_nombre') return codigo?`${codigo} - ${truncar(nombre,maxNombre)}`:truncar(nombre,maxNombre);
+        const abreviarPalabra=(palabra,indice)=>{
+            const limpia=String(palabra||'').trim();
+            if(!limpia) return '';
+            const lower=limpia.toLowerCase();
+            const mapa={
+                programable:'Prog.', programables:'Prog.',
+                instrumentacion:'Inst.', instrumentación:'Inst.',
+                electromecanica:'Electromec.', electromecánica:'Electromec.',
+                industrial:'Ind.', industriales:'Ind.',
+                administracion:'Admin.', administración:'Admin.',
+                electricidad:'Elect.', electrica:'Eléc.', eléctrica:'Eléc.', electricas:'Eléc.', eléctricas:'Eléc.',
+                electronica:'Electrónica', electrónica:'Electrónica',
+                conversion:'Conv.', conversión:'Conv.',
+                seguridad:'Seg.', mantenimiento:'Mant.', automatizados:'Autom.', complejos:'Compl.', computador:'Comp.'
+            };
+            if(mapa[lower]) return mapa[lower];
+            if(indice>0 && limpia.length>9) return limpia.slice(0,5)+'.';
+            return limpia;
+        };
+        const palabras=nombre.split(' ').filter(Boolean);
+        let salida=[];
+        for(let i=0;i<palabras.length;i++){
+            salida.push(abreviarPalabra(palabras[i],salida.length));
+            const relevantes=salida.filter(x=>!['de','del','la','las','el','los','en','a','para','y','e'].includes(String(x).toLowerCase())).length;
+            if(salida.join(' ').length>=maxNombre && relevantes>=2) break;
+        }
+        if(!salida.length) salida=palabras.slice(0,2).map((p,i)=>abreviarPalabra(p,i));
+        let corto=salida.join(' ').trim();
+        if(corto.length>maxNombre){
+            const partes=corto.split(' ');
+            while(partes.length>2 && partes.join(' ').length>maxNombre) partes.pop();
+            corto=partes.join(' ');
+            if(corto.length>maxNombre) corto=corto.slice(0,Math.max(8,maxNombre-1)).trim()+'.';
+        }
+        return codigo?`${codigo} - ${corto}`:corto;
+    }
     const CONFIG_DEFAULT = {
         bloquesDiariosMax:13, bloquesSemestralesMax:47, horasDescanso:12, sabadoHastaBloque:16,
         horasPorBloque:18, confirmarEliminacion:true, sensibilidadArrastre:5,
         umbralCargaDocente:80, porcentajesHomologo:[{desde:0,hasta:200,porcentaje:50},{desde:201,hasta:500,porcentaje:30},{desde:501,hasta:9999,porcentaje:20}],
-        exportacionExcel:'xlsx', vistaGeneralColumnas:2,
+        exportacionExcel:'xlsx', vistaGeneralColumnas:2, formatoTextoBloque:'codigo_nombre_resumido', formatoTextoBloqueVistaHorario:'codigo', formatoTextoBloqueFichaDocente:'codigo',
         vistaGeneralCampos:{asignatura:true,docente:false,sala:false,hora:false},
         fuenteApp:'segoe', temaVisualActivo:'planhor', temaUsuario:null,
         especialidades:[],
@@ -524,6 +572,7 @@ window._appRuntimeInicializada = true;
         resolverFallbackExcel,
         descargarTablaExcel,
         colorAsignaturaPlanhor,
+        formatearTextoBloqueAsignatura,
         asegurarXLSX,
         asegurarHtml2Canvas,
         asegurarJsPDF,
@@ -590,13 +639,16 @@ window._appRuntimeInicializada = true;
         getTemporadaLabel,
         optionHTML,
         escapeHTML,
+        escapeAttr,
         colorSeguro,
         colorAsignaturaPlanhor,
+        formatearTextoBloqueAsignatura,
         asegurarHtml2Canvas,
         asegurarJsPDF,
         mostrarErrorTecnico,
         sanitizarNodoExportacion,
         activarTab,
+        irASeccion,
         actualizarReporte,
         toast
     });
@@ -697,6 +749,8 @@ window._appRuntimeInicializada = true;
         cerrarModal,
         cerrarFlotante,
         irASeccion,
+        irAGestorId,
+        irASeccionesDesdeGestor,
         activarTab,
         calcularValidacionPrevia,
         confirmarAccionCritica,
@@ -709,6 +763,7 @@ window._appRuntimeInicializada = true;
         escapeHTML,
         escapeAttr,
         colorAsignaturaPlanhor,
+        formatearTextoBloqueAsignatura,
         toast
     });
     const construirGrilla = Planificacion.construirGrilla;
@@ -1162,6 +1217,9 @@ window._appRuntimeInicializada = true;
             data.configuracion.solverPesos[k]=normalizarNivelSolver(data.configuracion.solverPesos[k],CONFIG_DEFAULT.solverPesos[k]);
         });
         if(!['xlsx','html'].includes(data.configuracion.exportacionExcel)) data.configuracion.exportacionExcel='xlsx';
+        if(!['codigo','nombre','codigo_nombre','codigo_nombre_resumido'].includes(data.configuracion.formatoTextoBloque)) data.configuracion.formatoTextoBloque=CONFIG_DEFAULT.formatoTextoBloque;
+        if(!['codigo','nombre','codigo_nombre','codigo_nombre_resumido'].includes(data.configuracion.formatoTextoBloqueVistaHorario)) data.configuracion.formatoTextoBloqueVistaHorario=CONFIG_DEFAULT.formatoTextoBloqueVistaHorario;
+        if(!['codigo','nombre','codigo_nombre','codigo_nombre_resumido'].includes(data.configuracion.formatoTextoBloqueFichaDocente)) data.configuracion.formatoTextoBloqueFichaDocente=CONFIG_DEFAULT.formatoTextoBloqueFichaDocente;
         data.configuracion.vistaGeneralColumnas=Math.max(1,Math.min(4,parseInt(data.configuracion.vistaGeneralColumnas)||2));
         data.configuracion.vistaGeneralCampos=Object.assign({},CONFIG_DEFAULT.vistaGeneralCampos,data.configuracion.vistaGeneralCampos||{});
         if(!['planhor','institucional','sobrio','usuario'].includes(data.configuracion.temaVisualActivo)) data.configuracion.temaVisualActivo='planhor';
@@ -1619,6 +1677,15 @@ window._appRuntimeInicializada = true;
         }
     }
 
+    function limpiarControlesTrabajoPlanificacion(){
+        if(!data?.sel) return;
+        data.sel.asignaturaId=null;
+        data.sel.componenteId=null;
+        data.sel.docenteId=null;
+        data.sel.salaId=null;
+        data.sel.tipo='presencial';
+    }
+
     document.getElementById('btnModoPlanificar').onclick=()=>{
         if(!data.sel.seccionId) return toast('Seleccione una sección para entrar al modo planificación','error');
         data.modoPlan=true;
@@ -1630,7 +1697,9 @@ window._appRuntimeInicializada = true;
     document.getElementById('btnCancelarModo').onclick=()=>{
         if(hayMovimiento()){ cancelarMovimiento(); return; }
         data.modoPlan=false;
+        limpiarControlesTrabajoPlanificacion();
         actualizarModoPlanificacionUI();
+        actualizarSelectoresPlan();
         construirGrilla();
     };
 
@@ -1906,6 +1975,9 @@ window._appRuntimeInicializada = true;
             componenteId:limpiarTexto(p.componenteId,60),
             nota:limpiarTexto(p.nota,500),
             fijo:!!p.fijo,
+            revisionMarcada:!!p.revisionMarcada,
+            estadoGestionExterna:['gestion','acordada'].includes(p.estadoGestionExterna)?p.estadoGestionExterna:'',
+            seguimientoActualizadoEn:limpiarTexto(p.seguimientoActualizadoEn,80),
             explicacionAuto:(p.explicacionAuto&&typeof p.explicacionAuto==='object'&&!Array.isArray(p.explicacionAuto))?{
                 origen:limpiarTexto(p.explicacionAuto.origen,60),
                 estrategia:limpiarTexto(p.explicacionAuto.estrategia,60),
@@ -2810,7 +2882,20 @@ window._appRuntimeInicializada = true;
             const candidatos=candidatosPorContexto.get(contextoFusion(row))||[];
             const grupo=row.idGestor?gruposCandidatos.get(row.idGestor):null;
             const madre=grupo?.planificada?.seccion||'';
-            if(!madre) return;
+            if(!madre){
+                const destino=candidatos.find(s=>!ocupadas.has(normalizarEncabezadoGestor(s.nombre)))||candidatos[0]||null;
+                if(!destino) return;
+                seccionAsignaturas.set(`${codigo}|${destino.nombre}`,{
+                    codigoAsignatura:codigo,
+                    seccion:destino.nombre,
+                    tipo:'externa',
+                    idGestor:row.idGestor,
+                    origen:'gestor-heredada-externa'
+                });
+                ocupadas.add(normalizarEncabezadoGestor(destino.nombre));
+                asignadasPorCodigo.set(codigo,ocupadas);
+                return;
+            }
             const destino=candidatos.find(s=>
                 normalizarEncabezadoGestor(s.nombre)!==normalizarEncabezadoGestor(madre) &&
                 !ocupadas.has(normalizarEncabezadoGestor(s.nombre))
@@ -3941,6 +4026,7 @@ window._appRuntimeInicializada = true;
                 if(actual){
                     if(rel.idGestor&&!actual.idGestor) actual.idGestor=rel.idGestor;
                     if(rel.marcaGestor) actual.marcaGestor=rel.marcaGestor;
+                    if(rel.origen&&String(rel.origen).includes('externa')) actual.origen=rel.origen;
                 }
             }
         });
@@ -4734,9 +4820,11 @@ window._appRuntimeInicializada = true;
     function activarTab(tab){
         const btn=document.querySelector(`.tab-btn[data-tab="${tab}"]`);
         if(!btn) return false;
-        if(data.modoPlan){ data.modoPlan=false; actualizarModoPlanificacionUI(); }
-        if(document.querySelector('.tab-panel.active')?.id==='panelFichaDocente'){
-            document.getElementById('fichaDocente').value=''; document.getElementById('fichaContenido').style.display='none';
+        if(data.modoPlan){
+            data.modoPlan=false;
+            limpiarControlesTrabajoPlanificacion();
+            actualizarModoPlanificacionUI();
+            actualizarSelectoresPlan();
         }
         document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active');
         document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
@@ -4758,13 +4846,36 @@ window._appRuntimeInicializada = true;
         data.sel.jornada=sec.jornada||jornadaGestor('',sec.nombre);
         data.sel.seccionId=sec.id;
         data.sel.asignaturaId=opciones.asignaturaId||null;
-        data.sel.docenteId=null;
-        data.sel.salaId=null;
+        data.sel.docenteId=opciones.docenteId||null;
+        data.sel.salaId=opciones.salaId||null;
+        data.sel.componenteId=opciones.componenteId||null;
+        data.sel.tipo=opciones.tipo||data.sel.tipo||'presencial';
         actualizarSelectoresPlan();
         construirGrilla();
         actualizarProgresoPlan();
+        if(Number.isInteger(Number(opciones.dia))&&Number.isInteger(Number(opciones.bloque))){
+            setTimeout(()=>{
+                const celda=document.querySelector(`#scheduleGrid .grid-cell[data-dia="${Number(opciones.dia)}"][data-bloque="${Number(opciones.bloque)}"]`);
+                celda?.scrollIntoView({behavior:'smooth',block:'center',inline:'center'});
+                celda?.classList.add('compare-jump-focus');
+                setTimeout(()=>celda?.classList.remove('compare-jump-focus'),2600);
+            },120);
+        }
         document.getElementById('scheduleContainer')?.scrollIntoView({behavior:'smooth',block:'start'});
         toast(opciones.mensaje||`Revisando sección ${sec.nombre}`,'info');
+    }
+    function irAGestorId(idGestor){
+        const id=String(idGestor||'').trim();
+        if(!id) return toast('Este bloque no tiene ID del Gestor registrada','info');
+        if(activarTab('gestorSecciones')===false) return;
+        const input=document.getElementById('gestorIdBusqueda');
+        if(input){
+            input.value=id;
+            renderBuscadorIdGestor();
+            input.scrollIntoView({behavior:'smooth',block:'center'});
+            input.focus();
+        }
+        toast(`Buscando ID ${id}`,'info');
     }
     function resolverDestinoSeccionesGestor({seccionId='',asignaturaId='',idGestor='',codigo='',nombre='' }={}){
         let sec=data.secciones.find(s=>s.id===seccionId)||seccionPorNombreGestor(nombre);
@@ -5068,7 +5179,9 @@ window._appRuntimeInicializada = true;
         });
     }
 
+    window._planhorStartupSync?.set('Preparando datos de la app...');
     cargar().then(()=>pedirTemporadaInicialSiHaceFalta()).then(()=>{
+        window._planhorStartupSync?.set('Cargando módulos...');
         inicializarModuloSeguro('Reportes',()=>Reportes.init());
         inicializarModuloSeguro('Ficha Docente',()=>FichaDocente.init());
         inicializarModuloSeguro('Entidades',()=>Entidades.init());
@@ -5077,8 +5190,19 @@ window._appRuntimeInicializada = true;
         inicializarModuloSeguro('Configuración',()=>Configuracion.init());
         inicializarAnimacionesResultados();
         refrescarInicial();
+        window._planhorStartupSync?.hide();
         // Sin autoguardado por intervalo — cada acción llama a guardar() directamente
         // Esto evita que un usuario pise los cambios del otro en entorno multiusuario
+    }).catch(error=>{
+        console.error('No se pudo iniciar Planhor:', error);
+        window._planhorStartupSync?.hide();
+        mostrarErrorTecnico?.({
+            titulo:'No se pudo iniciar Planhor',
+            mensaje:'La app no terminó el arranque seguro. Recarga la página antes de editar datos.',
+            modulo:'Arranque',
+            accion:'Sincronizar e iniciar',
+            error
+        });
     });
 })();
 }; // fin window._iniciarApp

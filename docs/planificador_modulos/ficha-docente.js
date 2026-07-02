@@ -24,6 +24,23 @@
             return `${formatoNumero(h,0)} h (${formatoNumero(bloques,1)} bloque(s)${pct})`;
         }
 
+        function lecturaDiferenciaHomologo(resumen){
+            if(!resumen?.homologoHoras) return 'Sin homólogo';
+            const diffHoras=(Number(resumen.horasActuales)||0)-Number(resumen.homologoHoras);
+            const diffBloques=diffHoras/BLOQUE_HORAS_SEMESTRALES;
+            const pct=diffHoras/resumen.homologoHoras*100;
+            const signo=diffHoras>0?'+':'';
+            return `${signo}${formatoNumero(pct,1)}% (${signo}${formatoNumero(diffHoras,0)} h · ${signo}${formatoNumero(diffBloques,1)} bloque(s))`;
+        }
+
+        function lecturaSabadoResumen(disp){
+            const total=Number(disp?.total)||0;
+            const sabado=Number(disp?.sabado)||0;
+            const sinSabado=Number(disp?.sinSabado)||0;
+            const pctSabado=total?sabado/total*100:0;
+            return `${formatoNumero(sinSabado,1)} sin sábado / ${formatoNumero(sabado,1)} sábado (${formatoNumero(pctSabado,1)}%)`;
+        }
+
         function contarDisponibilidadDocente(doc){
             const disp=Array.isArray(doc?.disponibilidad)?doc.disponibilidad:[];
             const porDia=ctx.DIAS.map((_,dia)=>(Array.isArray(disp[dia])?disp[dia]:[]).filter(Boolean).length);
@@ -104,9 +121,9 @@
             if(seleccionado && docs.some(d=>d.id===seleccionado)) sel.value=seleccionado;
         }
 
-        function renderFichaDocente(){
+        function renderFichaDocente(docIdForzado=null){
             const data = getData();
-            const docId=document.getElementById('fichaDocente')?.value;
+            const docId=typeof docIdForzado==='string'&&docIdForzado?docIdForzado:document.getElementById('fichaDocente')?.value;
             const cont=document.getElementById('fichaContenido');
             if(!cont) return;
             if(!docId){ cont.style.display='none'; cont.innerHTML=''; return; }
@@ -126,8 +143,8 @@
             html+='<div class="teacher-defensible-state"><span>Estado</span><strong>'+ctx.escapeHTML(cargaDefendible.estado)+'</strong></div>';
             html+='</div>';
             html+='<div class="teacher-defensible-detail">';
-            html+='<span>Sin sábado <strong>'+ctx.escapeHTML(lecturaBloques(cargaDefendible.disp.sinSabado,cargaDefendible.disp.total||null))+'</strong></span>';
-            html+='<span>Sábado <strong>'+ctx.escapeHTML(lecturaBloques(cargaDefendible.disp.sabado,cargaDefendible.disp.total||null))+'</strong></span>';
+            html+='<span>Disponibilidad sábado <strong>'+ctx.escapeHTML(lecturaSabadoResumen(cargaDefendible.disp))+'</strong></span>';
+            html+='<span>Diferencia vs homólogo <strong>'+ctx.escapeHTML(lecturaDiferenciaHomologo(cargaDefendible))+'</strong></span>';
             html+='<span>Día <strong>'+ctx.escapeHTML(lecturaBloques(cargaDefendible.disp.diurno,cargaDefendible.disp.total||null))+'</strong></span>';
             html+='<span>Noche <strong>'+ctx.escapeHTML(lecturaBloques(cargaDefendible.disp.vespertino,cargaDefendible.disp.total||null))+'</strong></span>';
             html+='</div></div>';
@@ -148,7 +165,10 @@
                         const asig=data.asignaturas.find(a=>a.id===plan.asignaturaId);
                         const sec=data.secciones.find(s=>s.id===plan.seccionId);
                         const sala=data.salas.find(s=>s.id===plan.salaId);
-                        html+='<td style="padding:2px 1px;border:1px solid var(--border);text-align:center;vertical-align:middle;word-wrap:break-word;background:'+(ctx.colorAsignaturaPlanhor?.(asig)||ctx.colorSeguro(asig?.color,'var(--planhor-subject-neutral)'))+';font-size:0.6rem;line-height:1.3;">'+ctx.escapeHTML(asig?.codigo||'?')+'<br><span style="font-size:0.55rem;">'+ctx.escapeHTML(sala?sala.nombre:'')+'</span><br><span style="font-size:0.55rem;">'+ctx.escapeHTML(sec?sec.nombre:'')+'</span></td>';
+                        const textoAsig=ctx.formatearTextoBloqueAsignatura
+                            ? ctx.formatearTextoBloqueAsignatura(asig,{formato:data.configuracion?.formatoTextoBloqueFichaDocente||'codigo',maxNombre:24})
+                            : (asig?.codigo||'?');
+                        html+='<td class="ficha-plan-cell" data-seccion="'+ctx.escapeAttr(plan.seccionId||'')+'" data-asignatura="'+ctx.escapeAttr(plan.asignaturaId||'')+'" data-docente="'+ctx.escapeAttr(plan.docenteId||'')+'" data-sala="'+ctx.escapeAttr(plan.salaId||'')+'" data-tipo="'+(plan.tipoPresencial===false?'virtual':'presencial')+'" data-componente="'+ctx.escapeAttr(plan.componenteId||'')+'" data-dia="'+plan.dia+'" data-bloque="'+plan.bloque+'" style="padding:2px 1px;border:1px solid var(--border);text-align:center;vertical-align:middle;word-wrap:break-word;background:'+(ctx.colorAsignaturaPlanhor?.(asig)||ctx.colorSeguro(asig?.color,'var(--planhor-subject-neutral)'))+';font-size:0.6rem;line-height:1.3;">'+ctx.escapeHTML(textoAsig)+'<br><span style="font-size:0.55rem;">'+ctx.escapeHTML(sala?sala.nombre:'')+'</span><br><span style="font-size:0.55rem;">'+ctx.escapeHTML(sec?sec.nombre:'')+'</span></td>';
                     } else if(!disponible){
                         html+='<td style="padding:2px;border:1px solid var(--border);text-align:center;background:var(--planhor-unavailable-bg);color:var(--planhor-unavailable-text);font-size:0.6rem;height:48px;">x</td>';
                     } else {
@@ -284,17 +304,152 @@
             }
         }
 
+        function docentesFichaExportables(){
+            const data=getData();
+            const espFiltro=document.getElementById('fichaEspFiltro')?.value||'';
+            let docs=data.docentes.filter(d=>d.id!==ctx.DOCENTE_NN_ID);
+            if(espFiltro&&espFiltro!=='__todas__') docs=docs.filter(d=>d.especialidad===espFiltro);
+            return docs.sort((a,b)=>(a.apellido||'').localeCompare(b.apellido||'') || (a.nombre||'').localeCompare(b.nombre||''));
+        }
+
+        async function exportarTodasFichasPDF(){
+            const docs=docentesFichaExportables();
+            if(!docs.length) return ctx.toast('No hay docentes para exportar','warning');
+            const etiquetaFiltro=document.getElementById('fichaEspFiltro')?.value;
+            const alcance=etiquetaFiltro&&etiquetaFiltro!=='__todas__'?`la especialidad ${etiquetaFiltro}`:'todos los docentes';
+            if(!confirm(`Se generará un PDF con ${docs.length} ficha(s) de ${alcance}. ¿Continuar?`)) return;
+            if(ctx.asegurarHtml2Canvas && !(await ctx.asegurarHtml2Canvas())) return;
+            if(ctx.asegurarJsPDF && !(await ctx.asegurarJsPDF())) return;
+            const select=document.getElementById('fichaDocente');
+            const docOriginal=select?.value||'';
+            const cont=document.getElementById('fichaContenido');
+            if(!cont) return;
+            window.scrollTo(0,0);
+            try{
+                const {jsPDF}=window.jspdf;
+                const pdf=new jsPDF('landscape','mm','a4');
+                const pageW=297, pageH=210;
+                for(let i=0;i<docs.length;i++){
+                    const doc=docs[i];
+                    if(select) select.value=doc.id;
+                    renderFichaDocente(doc.id);
+                    await new Promise(resolve=>requestAnimationFrame(resolve));
+                    const canvas=await capturarFichaFija(cont);
+                    const imgData=canvas.toDataURL('image/jpeg',0.95);
+                    const imgH=Math.min(canvas.height*pageW/canvas.width,pageH);
+                    if(i>0) pdf.addPage('a4','landscape');
+                    pdf.addImage(imgData,'JPEG',0,0,pageW,imgH);
+                    ctx.toast(`Exportando ficha ${i+1}/${docs.length}`,'info');
+                }
+                if(select) select.value=docOriginal;
+                if(docOriginal) renderFichaDocente(docOriginal);
+                else { cont.style.display='none'; cont.innerHTML=''; }
+                pdf.save('Fichas_Docentes_'+ctx.getTemporadaLabel()+'.pdf');
+                ctx.toast('Fichas docentes exportadas','success');
+            }catch(error){
+                if(select) select.value=docOriginal;
+                if(docOriginal) renderFichaDocente(docOriginal);
+                if(ctx.mostrarErrorTecnico) ctx.mostrarErrorTecnico({titulo:'No se pudo exportar fichas docentes',mensaje:'La exportación masiva falló, pero la app principal sigue funcionando.',modulo:'Ficha Docente',accion:'Exportar todas las fichas a PDF',error});
+                else ctx.toast('Error al exportar fichas','error');
+            }
+        }
+
+        function cerrarMenuFicha(){
+            document.querySelectorAll('.ficha-context-popup').forEach(p=>p.remove());
+        }
+
+        function abrirMenuFicha(cell,e){
+            const data=getData();
+            cerrarMenuFicha();
+            const popup=document.createElement('div');
+            popup.className='action-popup ficha-context-popup';
+            popup.innerHTML=`
+                <button id="fichaCtxIrPlan">Ir a planificación</button>
+                <button id="fichaCtxSeleccionar">Seleccionar bloque</button>
+                <button id="fichaCtxDetalle">Ver detalle</button>
+            `;
+            document.body.appendChild(popup);
+            const scrollX=window.scrollX||document.documentElement.scrollLeft||0;
+            const scrollY=window.scrollY||document.documentElement.scrollTop||0;
+            const x=Number(e.pageX)||Number(e.clientX||0)+scrollX;
+            const y=Number(e.pageY)||Number(e.clientY||0)+scrollY;
+            const margen=8;
+            const ancho=popup.offsetWidth||220;
+            const alto=popup.offsetHeight||140;
+            let left=x+margen, top=y+margen;
+            if(left+ancho>scrollX+window.innerWidth-margen) left=x-ancho-margen;
+            if(top+alto>scrollY+window.innerHeight-margen) top=scrollY+window.innerHeight-alto-margen;
+            popup.style.left=`${Math.max(scrollX+margen,Math.round(left))}px`;
+            popup.style.top=`${Math.max(scrollY+margen,Math.round(top))}px`;
+            const plan={
+                seccionId:cell.dataset.seccion,
+                asignaturaId:cell.dataset.asignatura,
+                docenteId:cell.dataset.docente,
+                salaId:cell.dataset.sala,
+                componenteId:cell.dataset.componente||null,
+                tipo:cell.dataset.tipo||'presencial',
+                dia:Number(cell.dataset.dia),
+                bloque:Number(cell.dataset.bloque)
+            };
+            const abrir=(mensaje)=>{
+                cerrarMenuFicha();
+                ctx.irASeccion?.(plan.seccionId,{
+                    asignaturaId:plan.asignaturaId,
+                    docenteId:plan.docenteId,
+                    salaId:plan.salaId,
+                    componenteId:plan.componenteId,
+                    tipo:plan.tipo,
+                    dia:plan.dia,
+                    bloque:plan.bloque,
+                    mensaje
+                });
+            };
+            popup.querySelector('#fichaCtxIrPlan').onclick=()=>abrir('Bloque abierto desde Ficha Docente');
+            popup.querySelector('#fichaCtxSeleccionar').onclick=()=>abrir('Bloque seleccionado desde Ficha Docente');
+            popup.querySelector('#fichaCtxDetalle').onclick=()=>{
+                const asig=data.asignaturas.find(a=>a.id===plan.asignaturaId);
+                const sec=data.secciones.find(s=>s.id===plan.seccionId);
+                const sala=data.salas.find(s=>s.id===plan.salaId);
+                alert([
+                    `${asig?.codigo||''} ${asig?.nombre||''}`.trim(),
+                    `Sección: ${sec?.nombre||'Sin sección'}`,
+                    `Sala: ${sala?.nombre||'Sin sala'}`,
+                    `Bloque: ${(ctx.DIAS||[])[plan.dia]||'?'} B${plan.bloque}`
+                ].join('\n'));
+                cerrarMenuFicha();
+            };
+        }
+
         function init(){
-            document.getElementById('fichaDocente')?.addEventListener('change',renderFichaDocente);
+            document.getElementById('fichaDocente')?.addEventListener('change',()=>renderFichaDocente());
             document.getElementById('fichaDocente')?.addEventListener('focus',actualizarFichaDocentes);
             document.getElementById('fichaDocente')?.addEventListener('click',actualizarFichaDocentes);
             document.getElementById('fichaEspFiltro')?.addEventListener('change',()=>{
                 actualizarFichaDocentes();
-                document.getElementById('fichaDocente').value='';
                 renderFichaDocente();
+            });
+            document.getElementById('btnLimpiarFichaDocente')?.addEventListener('click',()=>{
+                const esp=document.getElementById('fichaEspFiltro');
+                const doc=document.getElementById('fichaDocente');
+                const cont=document.getElementById('fichaContenido');
+                if(esp) esp.value='';
+                actualizarFichaDocentes();
+                if(doc) doc.value='';
+                if(cont){ cont.style.display='none'; cont.innerHTML=''; }
             });
             document.getElementById('btnExportarFichaPDF')?.addEventListener('click',exportarFichaPDF);
             document.getElementById('btnExportarFichaJPG')?.addEventListener('click',exportarFichaJPG);
+            document.getElementById('btnExportarTodasFichasPDF')?.addEventListener('click',exportarTodasFichasPDF);
+            document.getElementById('fichaContenido')?.addEventListener('contextmenu',(e)=>{
+                const cell=e.target.closest?.('.ficha-plan-cell');
+                if(!cell) return;
+                e.preventDefault();
+                abrirMenuFicha(cell,e);
+            });
+            document.addEventListener('pointerdown',(e)=>{
+                if(e.target.closest?.('.ficha-context-popup')) return;
+                cerrarMenuFicha();
+            },true);
         }
 
         return { actualizarFichaDocentes, renderFichaDocente, init };

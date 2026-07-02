@@ -24,6 +24,8 @@
         const textoCelda=(cell)=>cell&&typeof cell==='object' ? (cell.text??cell.value??'') : cell;
         const htmlCelda=(cell)=>cell&&typeof cell==='object'&&cell.html ? cell.html : ctx.escapeHTML(textoCelda(cell));
         const detalleCelda=(cell)=>cell&&typeof cell==='object'&&cell.detalle ? cell.detalle : null;
+        const reparacionesReporte = new Map();
+        let reparacionSeq = 0;
         const accionSeccion=(secId, asignaturaId, etiqueta='Revisar')=>{
             if(!secId) return '';
             return {
@@ -40,7 +42,15 @@
         };
         const accionReparacion=(accion,payload={},etiqueta='Reparar')=>({
             text:etiqueta,
-            html:`<button type="button" class="btn btn-xs btn-warning report-repair-btn" data-repair-action="${ctx.escapeAttr(accion)}" data-repair-payload="${ctx.escapeAttr(JSON.stringify(payload))}">${ctx.escapeHTML(etiqueta)}</button>`
+            html:(()=>{
+                const id=`repair-${++reparacionSeq}`;
+                reparacionesReporte.set(id,Object.assign({},payload,{accion:payload.accion||accion}));
+                return `<button type="button" class="btn btn-xs btn-warning report-repair-btn" data-repair-id="${ctx.escapeAttr(id)}" data-repair-action="${ctx.escapeAttr(accion)}">${ctx.escapeHTML(etiqueta)}</button>`;
+            })()
+        });
+        const accionGestorPendientes=(etiqueta='Ver pendientes')=>({
+            text:etiqueta,
+            html:`<button type="button" class="btn btn-xs report-gestor-pendientes-btn" data-gestor-pendientes="true">${ctx.escapeHTML(etiqueta)}</button>`
         });
         const limpiarDatosExportacion=(datos)=>datos.map(row=>row.map(textoCelda));
         const nombreAsignatura=(data,id)=>{
@@ -212,9 +222,11 @@
             conflictos:'Conflictos de docente / sala',
             softwareSala:'Software por sala / laboratorio',
             softwareAsignatura:'Software por asignatura',
+            asignaturasPlanificadas:'Reporte de asignatura',
             validacionPrevia:'Validación previa',
             gruposDictacion:'Grupos de dictación / fusiones',
             horasNegociacion:'Horas negociables por asignatura',
+            seguimientoPlanificacion:'Seguimiento de planificación',
             incompletas:'Asignaturas incompletas',
             cargaDocente:'Carga docente',
             cargaDefendible:'Carga defendible docente',
@@ -222,6 +234,14 @@
             comparativaHomologo:'Comparativa homólogo'
         };
         etiquetaReporte.integridadDatos='Integridad de datos';
+        const categoriaReporte={
+            pendientes:['tro2','docenteNN','incompletas','observacionesPlanificacion','seguimientoPlanificacion'],
+            validacion:['validacionPrevia','integridadDatos','conflictos','calidadHorario'],
+            recursos:['softwareSala','softwareAsignatura'],
+            planificacion:['asignaturasPlanificadas','horasNegociacion','criticas','transversales','subseccionesAsignatura'],
+            docentes:['cargaDocente','cargaDefendible','excedidos','comparativaHomologo'],
+            gestor:['gruposDictacion']
+        };
         const ordenSeveridad={critico:0,advertencia:1,info:2};
         const etiquetaSeveridad={critico:'Crítico',advertencia:'Advertencia',info:'Revisión'};
         const tonoSeveridad={critico:'danger',advertencia:'warning',info:'info'};
@@ -534,7 +554,7 @@
             if(ultima){
                 const ids=Array.isArray(gestor.ids)?gestor.ids.filter(x=>x.cargaId===ultima.id):[];
                 const pendientes=ids.filter(x=>x.estado==='pendiente_externa');
-                if(pendientes.length) add('info','Gestor Secciones','IDs pendientes externos',`${pendientes.length} ID(s) con madre en carrera no cargada o pendiente de relación.`);
+                if(pendientes.length) add('info','Gestor Secciones','IDs pendientes externos',`${pendientes.length} ID(s) con madre en carrera no cargada o pendiente de relación.`,{accionTipo:'gestorPendientes',accionId:'pendiente_externa'});
             }
 
             return issues.sort((a,b)=>(ordenSeveridad[a.severidad]??9)-(ordenSeveridad[b.severidad]??9)||a.categoria.localeCompare(b.categoria)||a.elemento.localeCompare(b.elemento));
@@ -897,6 +917,41 @@
                         accionSeccion(g.sec?.id,g.asig?.id)
                     ]);
                 columnas = ['Sección','Código','Asignatura','Área','Modalidad','Tipo','NN/Planificados','Estado','Bloques NN','Acción'];
+            } else if (tipo === 'asignaturasPlanificadas') {
+                const grupos=new Map();
+                data.planificaciones.forEach(p=>{
+                    const asig=data.asignaturas.find(a=>a.id===p.asignaturaId);
+                    const sec=data.secciones.find(s=>s.id===p.seccionId);
+                    const nivel=sec?data.niveles.find(n=>n.id===sec.nivelId):null;
+                    const carrera=nivel?data.carreras.find(c=>c.id===nivel.carreraId):null;
+                    const doc=data.docentes.find(d=>d.id===p.docenteId);
+                    const sala=data.salas.find(s=>s.id===p.salaId);
+                    const key=[p.asignaturaId,p.seccionId,p.docenteId,p.salaId,p.tipoPresencial===false?'V':'P',p.componenteId||''].join('|');
+                    if(!grupos.has(key)) grupos.set(key,{asig,sec,nivel,carrera,doc,sala,tipo:p.tipoPresencial===false?'Virtual':'Presencial',componente:nombreComponentePlan(data,p),planes:[]});
+                    grupos.get(key).planes.push(p);
+                });
+                datos=Array.from(grupos.values())
+                    .sort((a,b)=>(a.asig?.codigo||'').localeCompare(b.asig?.codigo||'',undefined,{numeric:true,sensitivity:'base'})
+                        || (a.carrera?.nombre||'').localeCompare(b.carrera?.nombre||'',undefined,{numeric:true,sensitivity:'base'})
+                        || (a.nivel?.nombre||'').localeCompare(b.nivel?.nombre||'',undefined,{numeric:true,sensitivity:'base'})
+                        || (a.sec?.nombre||'').localeCompare(b.sec?.nombre||'',undefined,{numeric:true,sensitivity:'base'}))
+                    .map(g=>[
+                        g.asig?.codigo||'',
+                        g.asig?.nombre||'',
+                        criterio(g.asig,'area','especialidad'),
+                        criterio(g.asig,'modalidad','lectiva'),
+                        g.carrera?.codigo||g.carrera?.nombre||'',
+                        g.nivel?.nombre||'',
+                        g.sec?.nombre||'',
+                        g.tipo,
+                        g.componente||'',
+                        docentesTexto(g.planes,data)||'Sin docente',
+                        g.sala?.nombre||'Sin sala',
+                        g.planes.length,
+                        bloquesTexto(g.planes),
+                        accionSeccion(g.sec?.id,g.asig?.id)
+                    ]);
+                columnas=['Código','Asignatura','Área','Modalidad','Carrera','Nivel','Sección','Tipo','Componente','Docente','Sala','Bloques','Horario','Acción'];
             } else if (tipo === 'observacionesPlanificacion') {
                 const grupos = new Map();
                 data.planificaciones
@@ -928,6 +983,41 @@
                         accionSeccion(g.sec?.id,g.asig?.id)
                     ]);
                 columnas = ['Carrera','Nivel','Sección','Código','Asignatura','Área','Modalidad','Bloques','Observación','Acción'];
+            } else if (tipo === 'seguimientoPlanificacion') {
+                const grupos = new Map();
+                data.planificaciones
+                    .filter(p=>p.revisionMarcada||p.estadoGestionExterna)
+                    .forEach(p=>{
+                        const asig=data.asignaturas.find(a=>a.id===p.asignaturaId);
+                        const sec=data.secciones.find(s=>s.id===p.seccionId);
+                        const nivel=sec?data.niveles.find(n=>n.id===sec.nivelId):null;
+                        const carrera=nivel?data.carreras.find(c=>c.id===nivel.carreraId):null;
+                        const estado=p.estadoGestionExterna==='acordada'?'Acordada':p.estadoGestionExterna==='gestion'?'En gestión':'Marcada para revisión';
+                        const key=[p.seccionId,p.asignaturaId,p.componenteId||'',estado].join('|');
+                        if(!grupos.has(key)) grupos.set(key,{p,asig,sec,nivel,carrera,estado,bloques:[]});
+                        grupos.get(key).bloques.push(p);
+                    });
+                datos=Array.from(grupos.values())
+                    .sort((a,b)=>(a.estado||'').localeCompare(b.estado||'',undefined,{numeric:true,sensitivity:'base'})
+                        || (a.carrera?.nombre||'').localeCompare(b.carrera?.nombre||'',undefined,{numeric:true,sensitivity:'base'})
+                        || (a.nivel?.nombre||'').localeCompare(b.nivel?.nombre||'',undefined,{numeric:true,sensitivity:'base'})
+                        || (a.sec?.nombre||'').localeCompare(b.sec?.nombre||'',undefined,{numeric:true,sensitivity:'base'})
+                        || (a.asig?.codigo||'').localeCompare(b.asig?.codigo||'',undefined,{numeric:true,sensitivity:'base'}))
+                    .map(g=>[
+                        g.estado,
+                        g.carrera?.codigo||g.carrera?.nombre||'',
+                        g.nivel?.nombre||'',
+                        g.sec?.nombre||'',
+                        g.asig?.codigo||'',
+                        g.asig?.nombre||'',
+                        criterio(g.asig,'area','especialidad'),
+                        criterio(g.asig,'modalidad','lectiva'),
+                        nombreComponentePlan(data,g.p)||'',
+                        bloquesTexto(g.bloques),
+                        g.p.seguimientoActualizadoEn?new Date(g.p.seguimientoActualizadoEn).toLocaleString():'',
+                        accionSeccion(g.sec?.id,g.asig?.id)
+                    ]);
+                columnas = ['Estado','Carrera','Nivel','Sección','Código','Asignatura','Área','Modalidad','Componente','Bloques','Actualizado','Acción'];
             } else if (tipo === 'criticas') {
                 const criticas=data.asignaturas.filter(a=>['alta-reprobacion','requiere-ayudantia','alta-reprobacion-ayudantia'].includes(a.condicion));
                 const filas=[];
@@ -1118,6 +1208,7 @@
                 ]);
                 columnas=['Severidad','Categoría','Elemento','Detalle','Acción'];
             } else if (tipo === 'integridadDatos') {
+                reparacionesReporte.clear();
                 datos=calcularIntegridadDatos().map(x=>[
                     etiquetaSeveridad[x.severidad]||x.severidad,
                     x.categoria,
@@ -1125,7 +1216,8 @@
                     x.detalle,
                     [
                         x.reparacion?accionReparacion(x.reparacion.accion,x.reparacion,'Reparar'):'',
-                        x.seccionId?accionSeccion(x.seccionId,x.asignaturaId):(x.accionTipo?accionEntidad(x.accionTipo,x.accionId):'')
+                        x.accionTipo==='gestorPendientes'?accionGestorPendientes():
+                            x.seccionId?accionSeccion(x.seccionId,x.asignaturaId):(x.accionTipo?accionEntidad(x.accionTipo,x.accionId):'')
                     ].filter(Boolean).map(a=>a.html? a : {text:a,html:ctx.escapeHTML(a)}).reduce((acc,a,idx)=>({
                         text:[acc.text,a.text].filter(Boolean).join(' '),
                         html:[acc.html,a.html].filter(Boolean).join(' ')
@@ -1743,7 +1835,7 @@
                 if(total) datosExportar.push(total);
             }
             if (!datosExportar.length) return ctx.toast('No hay datos para exportar','info');
-            const etiquetas={tro2:'TRO2',docenteNN:'DocenteNN',observacionesPlanificacion:'ObservacionesPlanificacion',criticas:'Criticas',transversales:'Transversales',softwareSala:'SoftwarePorSala',softwareAsignatura:'SoftwarePorAsignatura',validacionPrevia:'ValidacionPrevia',integridadDatos:'IntegridadDatos',gruposDictacion:'GruposDictacion',subseccionesAsignatura:'SubseccionesAsignatura',horasNegociacion:'HorasNegociacionAsignatura',calidadHorario:'CalidadHorario',incompletas:'Incompletas',cargaDocente:'CargaDocente',cargaDefendible:'CargaDefendibleDocente',excedidos:'Excedidos',comparativaHomologo:'ComparativaHomologo',conflictos:'Conflictos'};
+            const etiquetas={tro2:'TRO2',docenteNN:'DocenteNN',asignaturasPlanificadas:'ReporteAsignatura',observacionesPlanificacion:'ObservacionesPlanificacion',seguimientoPlanificacion:'SeguimientoPlanificacion',criticas:'Criticas',transversales:'Transversales',softwareSala:'SoftwarePorSala',softwareAsignatura:'SoftwarePorAsignatura',validacionPrevia:'ValidacionPrevia',integridadDatos:'IntegridadDatos',gruposDictacion:'GruposDictacion',subseccionesAsignatura:'SubseccionesAsignatura',horasNegociacion:'HorasNegociacionAsignatura',calidadHorario:'CalidadHorario',incompletas:'Incompletas',cargaDocente:'CargaDocente',cargaDefendible:'CargaDefendibleDocente',excedidos:'Excedidos',comparativaHomologo:'ComparativaHomologo',conflictos:'Conflictos'};
             const nombre=(etiquetas[tipo]||'Reporte')+'_'+ctx.getTemporadaLabel();
             const data = getData();
             const usarCompatible=data.configuracion.exportacionExcel==='html';
@@ -1789,7 +1881,17 @@
             const data=getData();
             const accion=payload?.accion||payload?.action||'';
             const confirmar=ctx.confirmarAccionCritica || ((opts)=>Promise.resolve(confirm(opts?.mensaje||'¿Continuar?')));
+            const nombreAsigLocal=(id)=>{
+                const a=data.asignaturas.find(x=>x.id===id);
+                return [a?.codigo,a?.nombre].filter(Boolean).join(' - ') || id || 'Sin asignatura';
+            };
+            const nombreSecLocal=(id)=>data.secciones.find(s=>s.id===id)?.nombre || id || 'Sin sección';
             let titulo='Reparar integridad de datos';
+            let mensaje='Esta reparación modificará datos técnicos del modelo.';
+            let queHara='';
+            let afectara='';
+            let noTocara='No eliminará catálogos completos ni temporadas.';
+            let seguridad='Se creará un punto de recuperación antes de aplicar el cambio.';
             let detalles=[];
             let ejecutar=null;
             if(accion==='eliminar-planificacion'){
@@ -1797,18 +1899,27 @@
                 if(!ids.length) return ctx.toast('No hay bloques para reparar','info');
                 const encontrados=data.planificaciones.filter(p=>ids.includes(p.id));
                 titulo='Eliminar bloque huérfano';
+                mensaje='Hay bloques que apuntan a datos que ya no existen.';
+                queHara=`Eliminará ${encontrados.length} bloque(s) huérfano(s).`;
+                afectara='Solo registros de planificación inválidos.';
+                noTocara='No eliminará secciones, asignaturas, docentes ni salas.';
                 detalles=[
                     `${encontrados.length} bloque(s) serán eliminados porque apuntan a datos inexistentes.`,
-                    'No se eliminarán secciones, asignaturas, docentes ni salas.'
+                    'Causa raíz: la planificación conserva referencias a un elemento eliminado o no disponible.'
                 ];
                 ejecutar=()=>{ data.planificaciones=data.planificaciones.filter(p=>!ids.includes(p.id)); return encontrados.length; };
             }else if(accion==='limpiar-vinculo-grupo'){
                 const grupo=(data.gruposDictacion||[]).find(g=>g.id===payload.grupoId);
                 if(!grupo) return ctx.toast('El grupo ya no existe','info');
                 const seccionId=payload.seccionId;
+                const seccion=nombreSecLocal(seccionId);
                 titulo='Limpiar vínculo inválido';
+                mensaje='El grupo de dictación conserva una sección vinculada que no debería estar activa.';
+                queHara=`Quitará ${seccion} del grupo de ${nombreAsigLocal(grupo.asignaturaId)}.`;
+                afectara=`Grupo madre: ${nombreSecLocal(grupo.seccionMadreId)}.`;
+                noTocara='No eliminará bloques existentes ni la asignatura del catálogo.';
                 detalles=[
-                    'Se quitará una sección vinculada inválida u obsoleta del grupo de dictación.',
+                    'Causa raíz: una relación heredada/desvinculada quedó todavía dentro del grupo madre.',
                     'Si corresponde a una fusión desvinculada, se conservará la marca histórica en la sección hija.'
                 ];
                 ejecutar=()=>{
@@ -1824,10 +1935,15 @@
             }else if(accion==='limpiar-vinculos-grupo-desvinculado'){
                 const grupo=(data.gruposDictacion||[]).find(g=>g.id===payload.grupoId);
                 if(!grupo) return ctx.toast('El grupo ya no existe','info');
+                const vinculadas=(grupo.seccionesVinculadasIds||[]).map(nombreSecLocal).filter(Boolean);
                 titulo='Limpiar compartidas de grupo desvinculado';
+                mensaje='Un grupo que ya fue separado sigue mostrando secciones vinculadas.';
+                queHara=`Retirará ${vinculadas.length} vínculo(s) de ${nombreAsigLocal(grupo.asignaturaId)}.`;
+                afectara=`Grupo propio en ${nombreSecLocal(grupo.seccionMadreId)}${vinculadas.length?` y sus vínculos: ${vinculadas.slice(0,4).join(', ')}${vinculadas.length>4?'...':''}`:''}.`;
+                noTocara='No eliminará bloques ya planificados ni quitará la marca histórica de desvinculación.';
                 detalles=[
-                    `${(grupo.seccionesVinculadasIds||[]).length} vínculo(s) serán retirados.`,
-                    'El grupo seguirá marcado como fusión desvinculada.'
+                    'Causa raíz: al desvincular una fusión, el grupo propio debe quedar sin consumidoras heredadas.',
+                    'Acción: dejará el grupo como propio/desvinculado y recalculará alumnos vinculados si no hay ajuste manual.'
                 ];
                 ejecutar=()=>{
                     const n=(grupo.seccionesVinculadasIds||[]).length;
@@ -1844,6 +1960,10 @@
                 if(!grupo) return ctx.toast('El grupo ya no existe','info');
                 const total=(Number(grupo.alumnosBase)||0)+(Number(grupo.alumnosVinculados)||0);
                 titulo='Recalcular total de alumnos';
+                mensaje='El total del grupo no coincide con propios más vinculados.';
+                queHara=`Ajustará el total de ${nombreAsigLocal(grupo.asignaturaId)} a ${total} alumno(s).`;
+                afectara=`Grupo madre: ${nombreSecLocal(grupo.seccionMadreId)}.`;
+                noTocara='No modificará vínculos, bloques, docentes ni salas.';
                 detalles=[
                     `Total actual: ${Number(grupo.alumnosTotales)||0}.`,
                     `Nuevo total: ${total} = propios + vinculados.`
@@ -1854,20 +1974,80 @@
             }
             const ok=await confirmar({
                 titulo,
-                mensaje:'Esta reparación modificará datos técnicos del modelo.',
-                detalles:[...detalles,'Se creará un punto de recuperación antes de aplicar el cambio.'],
+                mensaje,
+                queHara,
+                afectara,
+                noTocara,
+                seguridad,
+                detalles,
                 confirmarTexto:'Reparar',
                 peligro:true
             });
             if(!ok) return;
             ctx.crearPuntoRecuperacion?.(`antes_reparacion_${accion}`);
             const afectados=ejecutar();
+            if(!afectados){
+                actualizarReporte();
+                return ctx.toast('No se aplicaron cambios: el dato ya estaba corregido o requiere revisión manual.','info');
+            }
             ctx.reconstruirIndices?.();
             ctx.auditoria?.('reparacion_integridad',{accion,afectados,payload});
             await ctx.guardar?.({forzar:true, motivo:`reparacion_${accion}`});
             actualizarReporte();
             ctx.refrescarTodo?.();
             ctx.toast(`Reparación aplicada (${afectados||0} cambio(s))`,'success');
+        }
+
+        function abrirPendientesGestor(){
+            ctx.activarTab?.('gestorSecciones');
+            setTimeout(()=>{
+                const estado=document.getElementById('gestorRelacionEstado');
+                const busqueda=document.getElementById('gestorRelacionBusqueda');
+                if(estado) estado.value='pendiente_externa';
+                if(busqueda) busqueda.value='';
+                estado?.dispatchEvent(new Event('change'));
+                document.getElementById('gestorPendientes')?.scrollIntoView({behavior:'smooth',block:'start'});
+            },0);
+        }
+
+        function ejecutarReparacionDesdeBoton(repair){
+            if(!repair) return false;
+            try{
+                const payload=reparacionesReporte.get(repair.dataset.repairId)
+                    || JSON.parse(repair.dataset.repairPayload||'{}');
+                if(!payload?.accion) throw new Error('Payload de reparación vacío');
+                repair.disabled=true;
+                Promise.resolve(ejecutarReparacionIntegridad(payload))
+                    .catch(err=>{
+                        console.error('Error al reparar integridad',err);
+                        ctx.toast(`No se pudo ejecutar la reparación: ${err?.message||err}`,'error');
+                    })
+                    .finally(()=>{ repair.disabled=false; });
+            }catch(err){
+                console.error('No se pudo leer la reparación',err);
+                ctx.toast(`No se pudo leer la reparación: ${err?.message||err}`,'error');
+            }
+            return true;
+        }
+
+        function tiposPermitidosPorCategoria(categoria){
+            if(!categoria||categoria==='todos') return null;
+            return new Set(categoriaReporte[categoria]||[]);
+        }
+
+        function actualizarFiltroCategoriasReportes(){
+            const categoria=document.getElementById('reporteCategoria')?.value||'todos';
+            const select=document.getElementById('reporteTipo');
+            if(!select) return;
+            const permitidos=tiposPermitidosPorCategoria(categoria);
+            let primeroVisible='';
+            [...select.options].forEach(opt=>{
+                const visible=!permitidos||permitidos.has(opt.value);
+                opt.hidden=!visible;
+                opt.disabled=!visible;
+                if(visible&&!primeroVisible) primeroVisible=opt.value;
+            });
+            if(permitidos&&!permitidos.has(select.value)&&primeroVisible) select.value=primeroVisible;
         }
 
         function obtenerProgresoSecciones(){
@@ -2454,6 +2634,12 @@
                 const gruposTro2=new Set(p.filter(x=>x.salaId===ctx.SALA_TRO2_ID).map(x=>`${x.asignaturaId}_${x.seccionId}`));
                 if(gruposTro2.size) cards.push({t:'📍 Asignaturas en TRO2',v:gruposTro2.size,c:'var(--warning)',report:'tro2'});
             }
+            const marcadasRevision=new Set(p.filter(x=>x.revisionMarcada).map(x=>`${x.asignaturaId}_${x.seccionId}_${x.componenteId||''}`));
+            const externasGestion=new Set(p.filter(x=>x.estadoGestionExterna==='gestion').map(x=>`${x.asignaturaId}_${x.seccionId}_${x.componenteId||''}`));
+            const externasAcordadas=new Set(p.filter(x=>x.estadoGestionExterna==='acordada').map(x=>`${x.asignaturaId}_${x.seccionId}_${x.componenteId||''}`));
+            if(marcadasRevision.size) cards.push({t:'🔎 Marcadas para revisión',v:marcadasRevision.size,c:'var(--warning)',report:'seguimientoPlanificacion'});
+            if(externasGestion.size) cards.push({t:'🤝 Externas en gestión',v:externasGestion.size,c:'var(--warning)',report:'seguimientoPlanificacion'});
+            if(externasAcordadas.size) cards.push({t:'✅ Externas acordadas',v:externasAcordadas.size,c:'var(--success)',report:'seguimientoPlanificacion'});
             if(cfg.criticas!==false){
                 const criticas=data.asignaturas.filter(a=>['alta-reprobacion','requiere-ayudantia','alta-reprobacion-ayudantia'].includes(a.condicion)).length;
                 if(criticas) cards.push({t:'🎯 Asignaturas críticas',v:criticas,c:'var(--warning)',report:'criticas'});
@@ -2776,6 +2962,12 @@
         }
 
         function init(){
+            actualizarFiltroCategoriasReportes();
+            document.getElementById('reporteCategoria')?.addEventListener('change',()=>{
+                reportePagina=1;
+                actualizarFiltroCategoriasReportes();
+                actualizarReporte();
+            });
             document.getElementById('reporteTipo')?.addEventListener('change',()=>{
                 reportePagina=1;
                 actualizarReporte();
@@ -2796,15 +2988,9 @@
             });
             document.getElementById('reporteContenido')?.addEventListener('click',(e)=>{
                 const repair=e.target.closest('.report-repair-btn');
-                if(repair){
-                    try{
-                        const payload=JSON.parse(repair.dataset.repairPayload||'{}');
-                        ejecutarReparacionIntegridad(payload);
-                    }catch(err){
-                        ctx.toast('No se pudo leer la reparación','error');
-                    }
-                    return;
-                }
+                if(repair) return ejecutarReparacionDesdeBoton(repair);
+                const gestorPendientes=e.target.closest('[data-gestor-pendientes]');
+                if(gestorPendientes) return abrirPendientesGestor();
                 const detail=e.target.closest('.report-detail-btn');
                 if(detail?.dataset.detailReport==='cargaDefendible'){
                     abrirDetalleCargaDefendible(detail.dataset.docente);
@@ -2827,18 +3013,7 @@
                 const ultimoAuto=e.target.closest('[data-auto-general="ultimo"]');
                 if(ultimoAuto) return abrirUltimoAutoGeneral();
                 const gestorPendientes=e.target.closest('[data-gestor-pendientes]');
-                if(gestorPendientes){
-                    ctx.activarTab?.('gestorSecciones');
-                    setTimeout(()=>{
-                        const estado=document.getElementById('gestorRelacionEstado');
-                        const busqueda=document.getElementById('gestorRelacionBusqueda');
-                        if(estado) estado.value='pendiente_externa';
-                        if(busqueda) busqueda.value='';
-                        estado?.dispatchEvent(new Event('change'));
-                        document.getElementById('gestorPendientes')?.scrollIntoView({behavior:'smooth',block:'start'});
-                    },0);
-                    return;
-                }
+                if(gestorPendientes) return abrirPendientesGestor();
                 const card=e.target.closest('[data-report]');
                 if(card) return abrirDetalleDashboard(card.dataset.report);
                 const carrera=e.target.closest('[data-carrera]');
@@ -2858,6 +3033,13 @@
                 if(row && ctx.irASeccion) ctx.irASeccion(row.dataset.seccion,{mensaje:'Sección abierta desde el dashboard'});
             });
             document.getElementById('modalContainer')?.addEventListener('click',(e)=>{
+                const repair=e.target.closest('.report-repair-btn');
+                if(repair) return ejecutarReparacionDesdeBoton(repair);
+                const gestorPendientes=e.target.closest('[data-gestor-pendientes]');
+                if(gestorPendientes){
+                    ctx.cerrarModal();
+                    return abrirPendientesGestor();
+                }
                 const revisar=e.target.closest('.report-action-btn');
                 if(revisar && ctx.irASeccion){
                     ctx.cerrarModal();

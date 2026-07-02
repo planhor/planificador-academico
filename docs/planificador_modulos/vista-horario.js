@@ -241,11 +241,21 @@
 
         function llenarCeldaPlanificada(cell, plan, tipo, data){
             cell.classList.add('planned');
+            cell.dataset.planSeccion=plan.seccionId||'';
+            cell.dataset.planAsignatura=plan.asignaturaId||'';
+            cell.dataset.planDocente=plan.docenteId||'';
+            cell.dataset.planSala=plan.salaId||'';
+            cell.dataset.planTipo=plan.tipoPresencial===false?'virtual':'presencial';
+            cell.dataset.planComponente=plan.componenteId||'';
+            cell.dataset.planDia=String(plan.dia);
+            cell.dataset.planBloque=String(plan.bloque);
             const asig=data.asignaturas.find(a=>a.id===plan.asignaturaId);
             cell.style.backgroundColor=ctx.colorAsignaturaPlanhor?.(asig)||asig?.color||'var(--planhor-subject-neutral)';
             cell.innerHTML='';
             const linea1=document.createElement('span');
-            linea1.textContent=asig?.codigo||'';
+            linea1.textContent=ctx.formatearTextoBloqueAsignatura
+                ? ctx.formatearTextoBloqueAsignatura(asig,{formato:data.configuracion?.formatoTextoBloqueVistaHorario||'codigo',maxNombre:30})
+                : (asig?.codigo||'');
             const compTexto=nombreComponente(plan,data);
             const compEl=document.createElement('small');
             compEl.className='plan-component-label';
@@ -270,6 +280,74 @@
             }
             if(compTexto) cell.append(linea1,compEl,linea2,linea3);
             else cell.append(linea1,linea2,linea3);
+        }
+
+        function cerrarMenuVista(){
+            document.querySelectorAll('.vista-context-popup').forEach(p=>p.remove());
+        }
+
+        function abrirMenuVista(cell,e){
+            const data=getData();
+            const plan=data.planificaciones.find(p=>
+                p.seccionId===cell.dataset.planSeccion &&
+                p.asignaturaId===cell.dataset.planAsignatura &&
+                p.docenteId===cell.dataset.planDocente &&
+                p.salaId===cell.dataset.planSala &&
+                String(p.dia)===cell.dataset.planDia &&
+                String(p.bloque)===cell.dataset.planBloque &&
+                String(p.componenteId||'')===String(cell.dataset.planComponente||'')
+            );
+            if(!plan) return;
+            cerrarMenuVista();
+            const popup=document.createElement('div');
+            popup.className='action-popup vista-context-popup';
+            popup.innerHTML=`
+                <button id="vistaCtxIrPlan">Ir a planificación</button>
+                <button id="vistaCtxSeleccionar">Seleccionar bloque</button>
+                <button id="vistaCtxDetalle">Ver detalle</button>
+            `;
+            document.body.appendChild(popup);
+            const scrollX=window.scrollX||document.documentElement.scrollLeft||0;
+            const scrollY=window.scrollY||document.documentElement.scrollTop||0;
+            const x=Number(e.pageX)||Number(e.clientX||0)+scrollX;
+            const y=Number(e.pageY)||Number(e.clientY||0)+scrollY;
+            const margen=8;
+            const ancho=popup.offsetWidth||220;
+            const alto=popup.offsetHeight||140;
+            let left=x+margen, top=y+margen;
+            if(left+ancho>scrollX+window.innerWidth-margen) left=x-ancho-margen;
+            if(top+alto>scrollY+window.innerHeight-margen) top=scrollY+window.innerHeight-alto-margen;
+            popup.style.left=`${Math.max(scrollX+margen,Math.round(left))}px`;
+            popup.style.top=`${Math.max(scrollY+margen,Math.round(top))}px`;
+            const abrir=(mensaje)=>{
+                cerrarMenuVista();
+                ctx.irASeccion?.(plan.seccionId,{
+                    asignaturaId:plan.asignaturaId,
+                    docenteId:plan.docenteId,
+                    salaId:plan.salaId,
+                    componenteId:plan.componenteId||null,
+                    tipo:plan.tipoPresencial===false?'virtual':'presencial',
+                    dia:plan.dia,
+                    bloque:plan.bloque,
+                    mensaje
+                });
+            };
+            popup.querySelector('#vistaCtxIrPlan').onclick=()=>abrir('Bloque abierto desde Vista Horarios');
+            popup.querySelector('#vistaCtxSeleccionar').onclick=()=>abrir('Bloque seleccionado desde Vista Horarios');
+            popup.querySelector('#vistaCtxDetalle').onclick=()=>{
+                const asig=data.asignaturas.find(a=>a.id===plan.asignaturaId);
+                const sec=data.secciones.find(s=>s.id===plan.seccionId);
+                const doc=data.docentes.find(d=>d.id===plan.docenteId);
+                const sala=data.salas.find(s=>s.id===plan.salaId);
+                alert([
+                    `${asig?.codigo||''} ${asig?.nombre||''}`.trim(),
+                    `Sección: ${sec?.nombre||'Sin sección'}`,
+                    `Docente: ${doc?(doc.id===ctx.DOCENTE_NN_ID?'Docente NN':`${doc.nombre||''} ${doc.apellido||''}`.trim()):'Sin docente'}`,
+                    `Sala: ${sala?.nombre||'Sin sala'}`,
+                    `Bloque: ${(ctx.DIAS||[])[plan.dia]||'?'} B${plan.bloque}`
+                ].join('\n'));
+                cerrarMenuVista();
+            };
         }
 
         function crearGridExportacion(vista){
@@ -432,7 +510,9 @@
                     const sala=data.salas.find(x=>x.id===plan.salaId);
                     const color=ctx.colorAsignaturaPlanhor?.(asig)||asig?.color||'var(--planhor-subject-neutral)';
                     const partes=[
-                        campos.asignatura ? (asig?.codigo||'?') : '',
+                        campos.asignatura ? (ctx.formatearTextoBloqueAsignatura
+                            ? ctx.formatearTextoBloqueAsignatura(asig,{formato:data.configuracion?.formatoTextoBloqueVistaHorario||'codigo',maxNombre:18})
+                            : (asig?.codigo||'?')) : '',
                         campos.docente && doc ? (doc.id===ctx.DOCENTE_NN_ID?'Docente NN':`${(doc.nombre||'').charAt(0)}. ${doc.apellido||''}`.trim()) : '',
                         campos.sala && sala ? (sala.nombre||'') : ''
                     ].filter(Boolean);
@@ -1015,6 +1095,16 @@
                 document.getElementById('vistaExportDropdown')?.classList.remove('show');
             });
             document.addEventListener('click',(e)=>{if(!e.target.closest('#btnExportarVista')) document.getElementById('vistaExportDropdown')?.classList.remove('show');});
+            document.getElementById('vistaGrid')?.addEventListener('contextmenu',(e)=>{
+                const cell=e.target.closest?.('.grid-cell.planned');
+                if(!cell) return;
+                e.preventDefault();
+                abrirMenuVista(cell,e);
+            });
+            document.addEventListener('pointerdown',(e)=>{
+                if(e.target.closest?.('.vista-context-popup')) return;
+                cerrarMenuVista();
+            },true);
             sincronizarModoVista();
         }
 
