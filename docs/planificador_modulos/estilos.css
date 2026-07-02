@@ -42,12 +42,12 @@
     --app-content-max-width: 1920px;
 }
 * { margin:0; padding:0; box-sizing:border-box; }
-html { min-width:var(--app-page-min-width); overflow-x:auto; scroll-behavior:smooth; }
-body { font-family:var(--font); background:var(--bg); color:var(--text); min-height:100vh; width:100%; min-width:var(--app-page-min-width); line-height:1.5; overflow-x:auto; }
+html { min-width:var(--app-page-min-width); overflow-x:auto; scroll-behavior:smooth; text-rendering:optimizeLegibility; }
+body { font-family:var(--font); background:var(--bg); color:var(--text); min-height:100vh; width:100%; min-width:var(--app-page-min-width); line-height:1.5; overflow-x:auto; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; }
 #appRoot { width:100%; min-width:var(--app-page-min-width); }
 .app-header { background:var(--surface); border-bottom:1px solid var(--border-light); padding:0 24px; width:100%; min-width:var(--app-page-min-width); height:56px; display:flex; align-items:center; justify-content:space-between; box-shadow:var(--shadow-sm); position:sticky; top:0; left:0; z-index:100; }
 .app-logo { font-weight:600; font-size:1.15rem; white-space:nowrap; flex:0 0 auto; display:flex; align-items:center; gap:10px; min-width:0; }
-.app-logo-img { display:block; width:auto; height:34px; max-width:168px; object-fit:contain; }
+.app-logo-img { display:block; width:134px; height:40px; object-fit:contain; image-rendering:auto; flex:0 0 auto; }
 .header-actions { display:flex; gap:10px; align-items:center; flex:0 0 auto; }
 .history-controls { display:inline-flex; align-items:center; gap:0; height:32px; padding:2px; border:1px solid color-mix(in srgb, var(--border) 84%, transparent); border-radius:999px; background:color-mix(in srgb, var(--surface) 88%, var(--surface-alt)); box-shadow:inset 0 1px 0 rgba(255,255,255,0.72), var(--shadow-sm); overflow:hidden; }
 .icon-btn { width:30px; height:26px; border:0; border-radius:999px; background:transparent; color:var(--text-secondary); cursor:pointer; display:inline-flex; align-items:center; justify-content:center; font-family:var(--font); line-height:1; transition:background 180ms ease,color 180ms ease,transform 180ms ease,opacity 180ms ease; }
@@ -91,12 +91,12 @@ body { font-family:var(--font); background:var(--bg); color:var(--text); min-hei
 .dropdown-item:disabled { opacity:0.45; cursor:not-allowed; }
 .dropdown-item:disabled:hover { background:transparent; }
 .login-brand { display:flex; flex-direction:column; align-items:center; gap:8px; margin-bottom:18px; }
-.login-brand-logo { display:block; width:min(260px,100%); height:auto; max-height:82px; object-fit:contain; }
+.login-brand-logo { display:block; width:min(268px,100%); height:auto; object-fit:contain; image-rendering:auto; }
 .login-brand h2 { margin:0; font-size:1.05rem; color:var(--planhor-ink); font-weight:700; letter-spacing:0; }
 .startup-sync-overlay { position:fixed; inset:0; z-index:180; display:flex; align-items:center; justify-content:center; background:linear-gradient(180deg,color-mix(in srgb,var(--surface) 92%,var(--planhor-blue)),color-mix(in srgb,var(--bg) 94%,var(--planhor-teal))); backdrop-filter:blur(8px); animation:planhorOverlayIn 240ms ease-out both; }
 .startup-sync-overlay.closing { pointer-events:none; animation:planhorOverlayOut 180ms ease-in both; }
 .startup-sync-card { width:min(420px,calc(100vw - 40px)); border:1px solid color-mix(in srgb,var(--accent) 16%,var(--border)); border-radius:18px; background:color-mix(in srgb,var(--surface) 96%,transparent); box-shadow:var(--shadow-lg); padding:30px 28px; text-align:center; color:var(--text); animation:planhorModalIn 240ms cubic-bezier(.2,.78,.28,1) both; }
-.startup-sync-card img { width:min(250px,100%); height:auto; max-height:74px; object-fit:contain; margin-bottom:18px; }
+.startup-sync-card img { width:min(248px,100%); height:auto; object-fit:contain; image-rendering:auto; margin-bottom:18px; }
 .startup-sync-card h2 { margin:10px 0 6px; color:var(--planhor-ink); font-size:1.08rem; line-height:1.2; }
 .startup-sync-card p { margin:0 auto 12px; max-width:330px; color:var(--text-secondary); font-size:0.82rem; line-height:1.45; }
 .startup-sync-card span { display:inline-flex; min-height:25px; align-items:center; justify-content:center; padding:4px 10px; border:1px solid var(--border-light); border-radius:999px; background:var(--surface-alt); color:var(--text-secondary); font-size:0.72rem; font-weight:700; }
@@ -831,14 +831,13 @@ body { font-family:var(--font); background:var(--bg); color:var(--text); min-hei
 .career-header:hover { background:var(--surface); }
 .career-header .arrow { transition:transform 0.2s; display:inline-block; }
 .career-header.open .arrow { transform:rotate(90deg); }
-.nested { margin-left:20px; display:block; max-height:0; opacity:0; overflow:hidden; visibility:hidden; transform:translateY(-3px); transition:max-height 240ms cubic-bezier(.22,.8,.3,1),opacity 180ms ease,transform 240ms cubic-bezier(.22,.8,.3,1),visibility 240ms; }
-.nested.open { opacity:1; visibility:visible; transform:translateY(0); }
+.nested { margin-left:20px; display:block; max-height:0; opacity:0; overflow:hidden; visibility:hidden; transition:max-height 240ms cubic-bezier(.22,.8,.3,1),opacity 180ms ease,visibility 240ms; }
+.nested.open { opacity:1; visibility:visible; }
 .area-section-group { border:1px solid var(--border-light, var(--border)); border-radius:var(--radius-sm); margin:10px 0; background:var(--surface-alt); overflow:hidden; }
 
 /* Virtualizacion nativa: conserva eventos y contenido, pero evita calcular y
    pintar grupos extensos hasta que se acercan al area visible. */
 @supports (content-visibility:auto) {
-    .area-section-group,
     .subject-specialty-group,
     .docentes-specialty-group,
     .rooms-type-group,
@@ -846,7 +845,6 @@ body { font-family:var(--font); background:var(--bg); color:var(--text); min-hei
         content-visibility:auto;
         contain-intrinsic-size:auto 120px;
     }
-    .area-section-group { contain-intrinsic-size:auto 260px; }
 }
 .area-section-header { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:9px 12px; background:var(--surface); border-bottom:1px solid var(--border-light, var(--border)); }
 .area-section-header strong { font-size:0.9rem; color:var(--text); }
@@ -1141,8 +1139,8 @@ body { font-family:var(--font); background:var(--bg); color:var(--text); min-hei
     to { opacity:1; transform:translateY(0) scale(1); }
 }
 @keyframes planhorPanelIn {
-    from { opacity:.6; transform:translateY(3px); }
-    to { opacity:1; transform:translateY(0); }
+    from { opacity:.82; }
+    to { opacity:1; }
 }
 @keyframes planhorOverlayIn {
     from { opacity:0; }

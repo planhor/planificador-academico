@@ -966,11 +966,26 @@
         function ofertasElectivas(){
             const data=getData();
             const ofertas=[];
+            const agregarOferta=(asignatura,seccionOrigenId,origenes)=>{
+                if(!seccionOrigenId || !data.secciones.some(s=>s.id===seccionOrigenId) || origenes.has(seccionOrigenId)) return;
+                origenes.add(seccionOrigenId);
+                ofertas.push({
+                    asignaturaId:asignatura.id,
+                    seccionOrigenId,
+                    texto:`${nombreAsignatura(asignatura.id)} · Sección origen: ${nombreSeccion(seccionOrigenId)}`
+                });
+            };
             data.asignaturas.filter(a=>a.area==='electiva').forEach(asignatura=>{
-                const origenes=new Set(data.planificaciones.filter(p=>p.asignaturaId===asignatura.id).map(p=>p.seccionId));
-                (data.asignaturaSeccion||[]).filter(r=>r.asignaturaId===asignatura.id).forEach(r=>origenes.add(r.seccionId));
-                (data.asignaturaCarreraNivel||[]).filter(r=>r.asignaturaId===asignatura.id).forEach(r=>data.secciones.filter(s=>s.nivelId===r.nivelId).forEach(s=>origenes.add(s.id)));
-                [...origenes].filter(id=>data.secciones.some(s=>s.id===id)).forEach(seccionOrigenId=>ofertas.push({asignaturaId:asignatura.id,seccionOrigenId,texto:`${nombreAsignatura(asignatura.id)} · Sección origen: ${nombreSeccion(seccionOrigenId)}`}));
+                const origenes=new Set();
+                (ctx.getGruposDictacion?.()||[])
+                    .filter(g=>grupoCoincideAsignatura(g,asignatura.id))
+                    .forEach(g=>agregarOferta(asignatura,g.seccionMadreId,origenes));
+                (data.asignaturaSeccion||[])
+                    .filter(r=>r.asignaturaId===asignatura.id)
+                    .forEach(r=>agregarOferta(asignatura,r.seccionId,origenes));
+                data.planificaciones
+                    .filter(p=>p.asignaturaId===asignatura.id)
+                    .forEach(p=>agregarOferta(asignatura,p.seccionId,origenes));
             });
             return ofertas.sort((a,b)=>a.texto.localeCompare(b.texto,'es',{numeric:true}));
         }
