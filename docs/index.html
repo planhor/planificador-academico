@@ -10,7 +10,7 @@
     <link rel="apple-touch-icon" sizes="180x180" href="planificador_modulos/icono-planhor-180.png?v=5">
     <link rel="manifest" href="planificador_modulos/site.webmanifest?v=2">
     <meta name="theme-color" content="#245f67">
-<link rel="stylesheet" href="planificador_modulos/estilos.css?v=20260702-logo-electivos">
+<link rel="stylesheet" href="planificador_modulos/estilos.css?v=20260720-carga-externa-mini-grid-3">
 </head>
 <body>
 <div id="appRoot" style="display:none;">
@@ -108,6 +108,7 @@
                         <button class="btn" id="btnAutoSeccion">🤖 Auto-sección</button>
                         <button class="btn" id="btnAutoGeneral">🤖 Auto-general</button>
                         <button class="btn" id="btnOptimizarHorario">✨ Optimizar</button>
+                        <button class="btn" id="btnCargaExterna">➕ Carga externa</button>
                         <button class="btn btn-danger" id="btnRevertirAutoRapido">↩ Revertir auto</button>
                         <button class="btn" id="btnCancelarModo">✖ Cancelar</button>
                     </div>
@@ -134,6 +135,7 @@
             <span><i class="legend-swatch room"></i>Sala ocupada</span>
             <span><i class="legend-swatch both"></i>Docente y sala ocupados</span>
             <span><i class="legend-swatch linked"></i>Heredada o electiva vinculada</span>
+            <span><i class="legend-swatch external"></i>Carga externa</span>
             <span><i class="legend-swatch fixed"></i>Bloque fijo</span>
         </div>
     </div>
@@ -321,6 +323,7 @@
             <div class="form-group"><label class="form-label">Especialidad</label><select class="form-select" id="fichaEspFiltro"><option value="">-- Especialidad --</option></select></div>
             <div class="form-group" style="flex:1;min-width:200px;"><label class="form-label">Docente</label><select class="form-select" id="fichaDocente"></select></div>
             <button class="btn btn-sm" id="btnLimpiarFichaDocente">Limpiar vista</button>
+            <button class="btn btn-sm" id="btnCargaExternaDocente">➕ Carga externa</button>
             <button class="btn btn-sm" id="btnExportarFichaPDF">📄 Exportar PDF</button>
             <button class="btn btn-sm" id="btnExportarFichaJPG">🖼️ Exportar JPG</button>
             <button class="btn btn-sm" id="btnExportarTodasFichasPDF">📚 Exportar todas PDF</button>
@@ -525,14 +528,14 @@ onAuthStateChanged(auth, async (user) => {
 </script>
 
 <script src="planificador_modulos/utils.js"></script>
-<script src="planificador_modulos/sync.js?v=20260626-startup-sync"></script>
+<script src="planificador_modulos/sync.js?v=20260720-carga-externa-docente"></script>
 <script src="planificador_modulos/exportaciones.js?v=20260608-subsecciones-reportes"></script>
 <script src="planificador_modulos/vista-horario.js?v=20260701-texto-bloques-vistas"></script>
 <script src="planificador_modulos/reportes.js?v=20260702-integridad-dashboard-reparar"></script>
-<script src="planificador_modulos/ficha-docente.js?v=20260701-texto-bloques-vistas"></script>
+<script src="planificador_modulos/ficha-docente.js?v=20260720-ficha-carga-contextual-8"></script>
 <script src="planificador_modulos/entidades.js?v=20260702-electivos-dictados"></script>
-<script src="planificador_modulos/planificacion.js?v=20260701-texto-bloques"></script>
+<script src="planificador_modulos/planificacion.js?v=20260720-carga-externa"></script>
 <script src="planificador_modulos/configuracion.js?v=20260702-config-ordenada"></script>
-<script src="planificador_modulos/app.js?v=20260701-texto-bloques-vistas"></script>
+<script src="planificador_modulos/app.js?v=20260720-carga-externa-legada-ficha"></script>
 </body>
 </html>

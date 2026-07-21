@@ -557,6 +557,7 @@
                 asignaturaCarreraNivel:data.asignaturaCarreraNivel || [],
                 asignaturaSeccion:data.asignaturaSeccion || [],
                 planificaciones:data.planificaciones || [],
+                cargasExternasDocente:data.cargasExternasDocente || [],
                 gruposDictacion:data.gruposDictacion || [],
                 vinculosElectivos:data.vinculosElectivos || [],
                 gestorSecciones:data.gestorSecciones || {cargas:[],ids:[],ultimaCargaId:null}
@@ -581,6 +582,7 @@
             data.asignaturaCarreraNivel = temp.asignaturaCarreraNivel || [];
             data.asignaturaSeccion = temp.asignaturaSeccion || [];
             data.planificaciones = temp.planificaciones || [];
+            data.cargasExternasDocente = temp.cargasExternasDocente || [];
             data.gruposDictacion = temp.gruposDictacion || [];
             data.vinculosElectivos = temp.vinculosElectivos || [];
             data.gruposElectivos = temp.gruposElectivos || [];
@@ -592,6 +594,7 @@
             snapshot.sel = snapshot.sel || {};
             snapshot.configuracion = snapshot.configuracion || {};
             snapshot.sel.temporadaId = null;
+            delete snapshot.sel.cargaExterna;
             delete snapshot.configuracion.temporadaActualId;
             return limpiarMetadatosTransporte(snapshot);
         }

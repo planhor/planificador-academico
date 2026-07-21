@@ -282,6 +282,46 @@
             ).map(plan=>({plan,vinculos:vinculos.filter(v=>mismoId(v.asignaturaId,plan.asignaturaId)&&mismoId(v.seccionOrigenId,plan.seccionId))}));
         }
 
+        function vinculoElectivoActivo(){
+            const data=getData();
+            const id=data.sel?.vinculoElectivoId;
+            if(!id) return null;
+            const v=(data.vinculosElectivos||[]).find(x=>mismoId(x.id,id));
+            if(!v) return null;
+            if(!mismoId(v.seccionDestinoId,data.sel?.seccionId)) return null;
+            if(data.sel?.asignaturaId && !mismoId(v.asignaturaId,data.sel.asignaturaId)) return null;
+            return v;
+        }
+
+        function contextoPlanificacionSeleccionada(){
+            const data=getData();
+            const vinculo=vinculoElectivoActivo();
+            return {
+                vinculo,
+                seccionVistaId:data.sel?.seccionId||'',
+                seccionPlanId:vinculo?.seccionOrigenId||data.sel?.seccionId||''
+            };
+        }
+
+        function vinculosElectivosDestino(seccionId){
+            const data=getData();
+            const etiquetaAsignatura=(asigId)=>{
+                const a=data.asignaturas.find(x=>mismoId(x.id,asigId));
+                return [a?.codigo,a?.nombre].filter(Boolean).join(' - ')||'';
+            };
+            return (data.vinculosElectivos||[])
+                .filter(v=>mismoId(v.seccionDestinoId,seccionId) && data.asignaturas.some(a=>mismoId(a.id,v.asignaturaId)&&a.area==='electiva') && data.secciones.some(s=>mismoId(s.id,v.seccionOrigenId)))
+                .sort((a,b)=>etiquetaAsignatura(a.asignaturaId).localeCompare(etiquetaAsignatura(b.asignaturaId),'es',{numeric:true})||nombreSeccion(a.seccionOrigenId).localeCompare(nombreSeccion(b.seccionOrigenId),'es',{numeric:true}));
+        }
+
+        function valorSelectorElectiva(vinculoId){
+            return `__electiva_${vinculoId}`;
+        }
+
+        function optionElectivaVinculadaHTML(vinculo, texto, selected=false){
+            return `<option value="${ctx.escapeAttr(valorSelectorElectiva(vinculo.id))}" data-asignatura-electiva="${ctx.escapeAttr(vinculo.asignaturaId)}" data-vinculo-electivo="${ctx.escapeAttr(vinculo.id)}"${selected?' selected':''}>${ctx.escapeHTML(texto)}</option>`;
+        }
+
         function planElectivoObjetivoEn(seccionId,dia,bloque,planes=null){
             const coincidencias=planesElectivosObjetivoEn(seccionId,dia,bloque,planes);
             if(!coincidencias.length) return null;
@@ -338,7 +378,7 @@
         function seccionOcupadaVisible(seccionId,dia,bloque,opciones={}){
             const ignorar=new Set(opciones.ignorarIds||[]);
             const visible=planVisibleEnFuente(seccionId,dia,bloque,opciones.planes||null);
-            return !!(visible?.plan && !ignorar.has(visible.plan.id));
+            return !!(visible?.plan && !visible.plan.esCargaExterna && !ignorar.has(visible.plan.id));
         }
 
         function estadoDictacionAsignatura(asigId,seccionId){
@@ -466,7 +506,8 @@
 
         function componenteSeleccionado(){
             const data=getData();
-            const comps=componentesAsignaturaSeccion(data.sel.asignaturaId,data.sel.seccionId);
+            const ctxSel=contextoPlanificacionSeleccionada();
+            const comps=componentesAsignaturaSeccion(data.sel.asignaturaId,ctxSel.seccionPlanId);
             if(!comps.length) return null;
             const actual=data.sel.componenteId&&comps.find(c=>c.id===data.sel.componenteId);
             return actual||comps[0]||null;
@@ -522,8 +563,12 @@
             }
             const estado=estadoDictacionAsignatura(asig.id,data.sel.seccionId);
             const mensajes=[];
+            const vinculoActivo=vinculoElectivoActivo();
             const vinculosElectivos=(data.vinculosElectivos||[]).filter(v=>mismoId(v.asignaturaId,asig.id)&&mismoId(v.seccionOrigenId,data.sel.seccionId));
-            if(asig.area==='electiva'&&vinculosElectivos.length){
+            if(vinculoActivo){
+                mensajes.push(`<strong>Electiva vinculada desde ${ctx.escapeHTML(nombreSeccion(vinculoActivo.seccionOrigenId))}</strong>`);
+                mensajes.push(`Estás planificando mirando el horario de ${ctx.escapeHTML(nombreSeccion(vinculoActivo.seccionDestinoId))}. El bloque se guardará en la sección de origen y quedará visible aquí.`);
+            }else if(asig.area==='electiva'&&vinculosElectivos.length){
                 const destinos=[...new Set(vinculosElectivos.map(v=>v.seccionDestinoId))].map(nombreSeccion).filter(Boolean);
                 mensajes.push(`<strong>Electiva vinculada a ${destinos.length} sección(es)</strong>`);
                 mensajes.push(`Protege el horario de: ${ctx.escapeHTML(destinos.join(', '))}.`);
@@ -582,7 +627,10 @@
                 const ids=[g.asignaturaId,...(g.asignaturasEquivalentesIds||[])].filter(Boolean);
                 return fuente.filter(p=>mismoId(p.seccionId,g.seccionMadreId)&&ids.some(id=>mismoId(id,p.asignaturaId)));
             });
-            return [...propios,...heredados];
+            const electivas=vinculosElectivosDestino(seccionId)
+                .filter(v=>mismoId(v.asignaturaId,asigId))
+                .flatMap(v=>fuente.filter(p=>mismoId(p.seccionId,v.seccionOrigenId)&&mismoId(p.asignaturaId,v.asignaturaId)));
+            return [...propios,...heredados,...electivas];
         }
 
         function planesVisiblesSeccionDia(seccionId,dia,planes=null){
@@ -1036,6 +1084,7 @@
         function aplicarEstadoCelda(cell,plan,meta={}){
             const data = getData();
             cell.classList.add('planned');
+            if(plan.esCargaExterna) cell.classList.add('plan-carga-externa');
             if(meta.vinculado) cell.classList.add('linked-plan');
             if(plan.fijo) cell.classList.add('fixed-plan');
             if(plan.revisionMarcada) cell.classList.add('plan-review-marked');
@@ -1043,10 +1092,10 @@
             const asig=data.asignaturas.find(a=>a.id===plan.asignaturaId);
             const sala=data.salas.find(s=>s.id===plan.salaId);
             const doc=data.docentes.find(d=>d.id===plan.docenteId);
-            cell.style.backgroundColor=ctx.colorAsignaturaPlanhor?.(asig)||asig?.color||'var(--planhor-subject-neutral)';
+            cell.style.backgroundColor=plan.esCargaExterna?'':(ctx.colorAsignaturaPlanhor?.(asig)||asig?.color||'var(--planhor-subject-neutral)');
             cell.innerHTML='';
             const codigo=document.createElement('span');
-            codigo.textContent=(meta.electivaObjetivo?'◇ ':meta.vinculado?'🔗 ':plan.fijo?'🔒 ':'')+nombreCortoAsignatura(asig);
+            codigo.textContent=(plan.esCargaExterna?'EXT · ':meta.electivaObjetivo?'◇ ':meta.vinculado?'🔗 ':plan.fijo?'🔒 ':'')+(plan.esCargaExterna?nombreCargaExterna(plan):nombreCortoAsignatura(asig));
             const salaEl=document.createElement('small');
             salaEl.textContent=sala?.nombre||'?';
             const docenteEl=document.createElement('small');
@@ -1066,6 +1115,11 @@
                 origen.className='linked-plan-source';
                 origen.textContent=meta.alternativas>1?`Ventana electiva · ${meta.alternativas} opciones`:'Electiva vinculada';
                 cell.appendChild(origen);
+            }else if(plan.esCargaExterna){
+                const origen=document.createElement('small');
+                origen.className='external-plan-source';
+                origen.textContent=plan.estadoCargaExterna==='acordada'?'Carga externa acordada':'Carga externa';
+                cell.appendChild(origen);
             }else if(meta.vinculado){
                 const origen=document.createElement('small');
                 origen.className='linked-plan-source';
@@ -1080,7 +1134,7 @@
             }
             const explicacion=textoExplicacionAuto(plan.explicacionAuto);
             const aria=[
-                [asig?.codigo,asig?.nombre].filter(Boolean).join(' - '),
+                plan.esCargaExterna?`Carga externa ${nombreCargaExterna(plan)}`:[asig?.codigo,asig?.nombre].filter(Boolean).join(' - '),
                 sala?.nombre?`Sala ${sala.nombre}`:'',
                 doc?(doc.id===ctx.DOCENTE_NN_ID?'Docente NN':`${doc.nombre||''} ${doc.apellido||''}`.trim()):'',
                 meta.electivaObjetivo?`Electiva vinculada desde ${nombreSeccion(plan.seccionId)}`:meta.vinculado?`Heredada desde ${nombreSeccion(plan.seccionId)}`:'',
@@ -1107,18 +1161,19 @@
                 const idGestor=idGestorBloqueVisible(plan,meta);
                 const item=document.createElement('div');
                 item.className='multi-plan-item'+(meta.vinculado?' linked':'');
+                if(plan.esCargaExterna) item.classList.add('external');
                 if(plan.revisionMarcada) item.classList.add('plan-review-marked');
                 if(plan.estadoGestionExterna) item.classList.add(`plan-external-${plan.estadoGestionExterna}`);
-                item.style.backgroundColor=ctx.colorAsignaturaPlanhor?.(asig)||asig?.color||'var(--planhor-subject-neutral)';
+                item.style.backgroundColor=plan.esCargaExterna?'':(ctx.colorAsignaturaPlanhor?.(asig)||asig?.color||'var(--planhor-subject-neutral)');
                 item.title=[
-                    [asig?.codigo,asig?.nombre].filter(Boolean).join(' - '),
+                    plan.esCargaExterna?`Carga externa ${nombreCargaExterna(plan)}`:[asig?.codigo,asig?.nombre].filter(Boolean).join(' - '),
                     idGestor?`ID ${idGestor}`:'',
                     meta.vinculado?`Heredada desde ${nombreSeccion(plan.seccionId)}`:'',
                     sala?.nombre||'Sin sala',
                     docenteNombre(doc)
                 ].filter(Boolean).join(' · ');
                 item.innerHTML=`
-                    <span>${ctx.escapeHTML((meta.electivaObjetivo?'◇ ':meta.vinculado?'🔗 ':plan.fijo?'🔒 ':'')+nombreCortoAsignatura(asig,24))}</span>
+                    <span>${ctx.escapeHTML((plan.esCargaExterna?'EXT · ':meta.electivaObjetivo?'◇ ':meta.vinculado?'🔗 ':plan.fijo?'🔒 ':'')+(plan.esCargaExterna?nombreCargaExterna(plan,18):nombreCortoAsignatura(asig,24)))}</span>
                     <small>${ctx.escapeHTML(sala?.nombre||'?')}</small>
                     <small>${ctx.escapeHTML(doc?(mismoId(doc.id,ctx.DOCENTE_NN_ID)?'Docente NN':`${String(doc.nombre||'').charAt(0)}. ${doc.apellido||''}`.trim()):'?')}</small>
                 `;
@@ -1204,6 +1259,14 @@
                 if(corto.length>maxNombre) corto=corto.slice(0,Math.max(8,maxNombre-1)).trim()+'.';
             }
             return codigo?`${codigo} - ${corto}`:corto;
+        }
+
+        function nombreCargaExterna(plan,maxNombre=30){
+            const codigo=String(plan?.codigoExterno||'EXT').trim()||'EXT';
+            const nombre=String(plan?.nombreExterno||'Carga externa').replace(/\s+/g,' ').trim()||'Carga externa';
+            const texto=`${codigo} - ${nombre}`;
+            if(texto.length<=maxNombre) return texto;
+            return texto.slice(0,Math.max(1,maxNombre-3)).trimEnd()+'...';
         }
 
         function seleccionarContextoBloque(plan,{mensaje=null}={}){
@@ -1407,7 +1470,8 @@
             const docenteOcupado=aplicarOcupacionDocenteCelda(cell,dia,bloque);
             const salaOcupada=aplicarOcupacionSalaCelda(cell,dia,bloque);
             if(docenteOcupado||salaOcupada) return;
-            const disp=checkDisponibilidad(data.sel.docenteId,dia,bloque,data.sel.seccionId);
+            const contextoSel=contextoPlanificacionSeleccionada();
+            const disp=checkDisponibilidad(data.sel.docenteId,dia,bloque,contextoSel.seccionPlanId,{asignaturaId:data.sel.asignaturaId});
             if(!disp.ok) cell.classList.add('unavailable-docente');
             else if(disp.sug) cell.classList.add('available');
         }
@@ -1444,11 +1508,17 @@
                 return false;
             };
             if(opciones.requiereModo && !data.modoPlan) return avisar('Active Modo Planificación para modificar bloques','info');
+            if(s.cargaExterna?.activa){
+                if(!s.seccionId||!s.docenteId) return avisar('Seleccione sección de referencia y docente para la carga externa','error');
+                if((s.tipo||'presencial')==='presencial' && !s.salaId) return avisar('Seleccione una sala para la carga externa presencial','error');
+                return true;
+            }
             if(!s.seccionId||!s.asignaturaId||!s.docenteId) return avisar('Seleccione sección, asignatura y docente','error');
             if(esAsignaturaVinculada(s.asignaturaId,s.seccionId)){
                 return avisar(`Esta asignatura está vinculada desde ${nombreMadreAsignatura(s.asignaturaId,s.seccionId)}. Planifícala en la sección madre.`,'info');
             }
-            const comps=componentesAsignaturaSeccion(s.asignaturaId,s.seccionId);
+            const contextoSel=contextoPlanificacionSeleccionada();
+            const comps=componentesAsignaturaSeccion(s.asignaturaId,contextoSel.seccionPlanId);
             if(comps.length && (s.tipo||'presencial')==='presencial' && !componenteSeleccionado()){
                 return avisar('Seleccione el componente de la asignatura','error');
             }
@@ -1482,7 +1552,9 @@
             const data = getData();
             const planes=ctx.getPlanificacionesFiltradas(opciones.ignorarIds||[]);
             const asigId=opciones.asignaturaId||data.sel?.asignaturaId||'';
-            const ocupacionSec=asigId
+            const ocupacionSec=opciones.omitirTopeSeccion
+                ? {ocupada:false,seccionId:secId}
+                : asigId
                 ? ocupacionSeccionesImpactadas(asigId,secId,dia,bloque,Object.assign({},opciones,{planes}))
                 : {ocupada:secId&&seccionOcupadaVisible(secId,dia,bloque,Object.assign({},opciones,{planes})),seccionId:secId};
             const doc=data.docentes.find(d=>d.id===docId); if(!doc) return {ok:false};
@@ -1636,6 +1708,59 @@
             return true;
         }
 
+        function abrirCargaExterna(){
+            const data=getData();
+            if(!data.sel.seccionId) return ctx.toast('Seleccione una sección de referencia antes de crear una carga externa','info');
+            const docentes=data.docentes||[];
+            const salas=data.salas||[];
+            const docOptions=docentes.map(d=>ctx.optionHTML(d.id,d.id===ctx.DOCENTE_NN_ID?'Docente NN (pendiente)':`${d.nombre||''} ${d.apellido||''}${d.especialidad?` [${d.especialidad}]`:''}`.trim(),d.id===data.sel.docenteId)).join('');
+            const salaOptions=salas.filter(s=>s.id!==ctx.SALA_VIRTUAL_ID).map(s=>ctx.optionHTML(s.id,etiquetaSalaConCapacidad(s),s.id===data.sel.salaId)).join('');
+            document.getElementById('modalContainer').innerHTML=`
+                <div class="modal-overlay" id="modalOverlay"><div class="modal">
+                    <div class="modal-header"><h3>Carga externa</h3><p>Registra bloques negociados con otra área sin convertirlos en asignatura propia.</p></div>
+                    <div class="form-grid">
+                        <div class="form-group"><label class="form-label">Código o referencia</label><input class="form-input" id="extCodigo" maxlength="24" placeholder="EXT"></div>
+                        <div class="form-group"><label class="form-label">Nombre breve</label><input class="form-input" id="extNombre" maxlength="80" placeholder="Asignatura externa"></div>
+                        <div class="form-group"><label class="form-label">Coordinación / área origen</label><input class="form-input" id="extOrigen" maxlength="80" placeholder="Otra coordinación"></div>
+                        <div class="form-group"><label class="form-label">Estado</label><select class="form-select" id="extEstado"><option value="gestion">En gestión</option><option value="acordada">Acordada</option></select></div>
+                        <div class="form-group"><label class="form-label">Docente</label><select class="form-select" id="extDocente"><option value="">-- Docente --</option>${docOptions}</select></div>
+                        <div class="form-group"><label class="form-label">Tipo</label><select class="form-select" id="extTipo"><option value="presencial">Presencial</option><option value="virtual">Virtual</option></select></div>
+                        <div class="form-group"><label class="form-label">Sala</label><select class="form-select" id="extSala"><option value="">-- Sala --</option>${salaOptions}</select></div>
+                    </div>
+                    <p class="criteria-note">Estos bloques suman a carga docente y ocupación de sala, pero no completan horas requeridas de una asignatura oficial.</p>
+                    <div class="modal-actions"><button class="btn" id="btnCancelarCargaExterna">Cancelar</button><button class="btn btn-primary" id="btnActivarCargaExterna">Activar carga externa</button></div>
+                </div></div>`;
+            const tipo=document.getElementById('extTipo');
+            const sala=document.getElementById('extSala');
+            tipo.value=data.sel.tipo||'presencial';
+            const syncSala=()=>{ sala.disabled=tipo.value==='virtual'; if(tipo.value==='virtual') sala.value=''; };
+            tipo.onchange=syncSala; syncSala();
+            document.getElementById('btnCancelarCargaExterna').onclick=()=>ctx.cerrarModal();
+            document.getElementById('modalOverlay').onclick=e=>{ if(e.target===e.currentTarget) ctx.cerrarModal(); };
+            document.getElementById('btnActivarCargaExterna').onclick=()=>{
+                const codigo=(document.getElementById('extCodigo').value||'EXT').trim().toUpperCase();
+                const nombre=(document.getElementById('extNombre').value||'Carga externa').trim();
+                const docenteId=document.getElementById('extDocente').value;
+                const tipoValor=tipo.value==='virtual'?'virtual':'presencial';
+                const salaId=tipoValor==='virtual'?ctx.SALA_VIRTUAL_ID:document.getElementById('extSala').value;
+                if(!docenteId) return ctx.toast('Seleccione docente para la carga externa','error');
+                if(tipoValor==='presencial'&&!salaId) return ctx.toast('Seleccione sala para la carga externa presencial','error');
+                data.sel.cargaExterna={activa:true,id:`__externa_${ctx.genId()}`,codigo,nombre,origen:(document.getElementById('extOrigen').value||'').trim(),estado:document.getElementById('extEstado').value||'gestion'};
+                data.sel.asignaturaId=null;
+                data.sel.componenteId=null;
+                data.sel.docenteId=docenteId;
+                data.sel.tipo=tipoValor;
+                data.sel.salaId=salaId;
+                data.modoPlan=true;
+                ctx.cerrarModal();
+                actualizarSelectoresPlan();
+                actualizarProgresoPlan();
+                construirGrilla();
+                ctx.actualizarModoPlanificacionUI?.();
+                ctx.toast('Carga externa activa. Marca los bloques en la grilla.','info');
+            };
+        }
+
         function etiquetaSalaConCapacidad(sala){
             if(!sala) return '';
             if(sala.id===ctx.SALA_TRO2_ID || sala.id===ctx.SALA_VIRTUAL_ID || sala.esVirtual || sala.ilimitada) return sala.nombre;
@@ -1659,17 +1784,21 @@
             const data = getData();
             const s=data.sel;
             if(!validarSeleccionManual({requiereModo:true})) return false;
-            const disp=checkDisponibilidad(s.docenteId,dia,bloque,s.seccionId); if(!disp.ok) return false;
+            const esCargaExterna=!!s.cargaExterna?.activa;
+            const contextoSel=contextoPlanificacionSeleccionada();
+            const seccionPlanId=esCargaExterna?s.seccionId:contextoSel.seccionPlanId;
+            const seccionVistaId=s.seccionId;
+            const disp=checkDisponibilidad(s.docenteId,dia,bloque,seccionPlanId,{asignaturaId:esCargaExterna?'':s.asignaturaId,omitirTopeSeccion:esCargaExterna}); if(!disp.ok) return false;
             const asig=data.asignaturas.find(a=>a.id===s.asignaturaId);
-            if(asig){
+            if(asig&&!esCargaExterna){
                 const tipo=s.tipo==='virtual'?'virtual':'presencial';
                 const comp=componenteSeleccionado();
                 const componenteId=tipo==='presencial'?comp?.id||'': '';
-                const planesTipo=planesVisiblesAsignaturaSeccion(asig.id,s.seccionId).filter(p=>
+                const planesTipo=planesVisiblesAsignaturaSeccion(asig.id,seccionVistaId).filter(p=>
                     ((tipo==='presencial'&&p.tipoPresencial!==false)||(tipo==='virtual'&&p.tipoPresencial===false)) &&
-                    (!componentesAsignaturaSeccion(asig.id,s.seccionId).length || tipo==='virtual' || String(p.componenteId||'')===String(componenteId||''))
+                    (!componentesAsignaturaSeccion(asig.id,seccionPlanId).length || tipo==='virtual' || String(p.componenteId||'')===String(componenteId||''))
                 );
-                const maxPermitido=horasComponentePlanificacion(asig.id,s.seccionId,componenteId,tipo);
+                const maxPermitido=horasComponentePlanificacion(asig.id,seccionPlanId,componenteId,tipo);
                 if(maxPermitido<=0){
                     ctx.toast(tipo==='virtual'?'Esta asignatura no tiene bloques virtuales pendientes':'Este componente no tiene bloques pendientes','info');
                     return false;
@@ -1680,10 +1809,12 @@
                 }
             }
             const salaPlan=s.tipo==='virtual'?ctx.SALA_VIRTUAL_ID:s.salaId;
-            if(!opciones.omitirCapacidad && s.tipo==='presencial' && !confirmarCapacidadSala(s.asignaturaId,s.seccionId,salaPlan)) return false;
+            if(!esCargaExterna && !opciones.omitirCapacidad && s.tipo==='presencial' && !confirmarCapacidadSala(s.asignaturaId,seccionVistaId,salaPlan)) return false;
             if(!opciones.omitirUndo) ctx.pushUndo();
             const compPlan=s.tipo==='presencial'?componenteSeleccionado():null;
-            const plan={id:ctx.genId(),seccionId:s.seccionId,asignaturaId:s.asignaturaId,docenteId:s.docenteId,salaId:salaPlan,dia,bloque,tipoPresencial:s.tipo==='presencial',componenteId:compPlan?.id||''};
+            const plan=esCargaExterna
+                ? {id:ctx.genId(),seccionId:s.seccionId,asignaturaId:s.cargaExterna.id,docenteId:s.docenteId,salaId:salaPlan,dia,bloque,tipoPresencial:s.tipo==='presencial',componenteId:'',esCargaExterna:true,codigoExterno:s.cargaExterna.codigo,nombreExterno:s.cargaExterna.nombre,origenCargaExterna:s.cargaExterna.origen,estadoCargaExterna:s.cargaExterna.estado||'gestion',estadoGestionExterna:s.cargaExterna.estado||'gestion'}
+                : {id:ctx.genId(),seccionId:seccionPlanId,asignaturaId:s.asignaturaId,docenteId:s.docenteId,salaId:salaPlan,dia,bloque,tipoPresencial:s.tipo==='presencial',componenteId:compPlan?.id||''};
             data.planificaciones.push(plan);
             ctx.auditoria?.('bloque_creado',{plan});
             if(!opciones.omitirGuardar){
@@ -2388,16 +2519,27 @@
             const seccionesFiltradas=seccionesNivel.filter(s=>!data.sel.jornada||jornadaSeccion(s)===data.sel.jornada).sort(ordenarSeccionesNombre);
             if(data.sel.seccionId&&!seccionesFiltradas.some(s=>mismoId(s.id,data.sel.seccionId))) data.sel.seccionId=null;
             sec.innerHTML='<option value="">-- Sección --</option>'+(data.sel.jornada?seccionesFiltradas.map(s=>ctx.optionHTML(s.id,s.nombre)).join(''):''); sec.value=data.sel.seccionId||''; sec.disabled=!data.sel.nivelId||!data.sel.jornada;
+            const cargaExternaActiva=!!data.sel.cargaExterna?.activa;
+            if(data.sel.vinculoElectivoId&&!vinculoElectivoActivo()) data.sel.vinculoElectivoId=null;
             const asignaturasSelector=data.sel.seccionId?asignaturasDeSeccion(data.sel.seccionId):(data.sel.carreraId&&data.sel.nivelId?data.asignaturaCarreraNivel.filter(r=>r.carreraId===data.sel.carreraId&&r.nivelId===data.sel.nivelId).map(r=>r.asignaturaId):[]);
-            asig.innerHTML='<option value="">-- Asignatura --</option>'+(asignaturasSelector.length?asignaturasSelector.map(asignaturaId=>{
+            const opcionesElectivas=data.sel.seccionId?vinculosElectivosDestino(data.sel.seccionId).map(v=>{
+                const a=data.asignaturas.find(x=>mismoId(x.id,v.asignaturaId));
+                if(!a) return '';
+                const partes=[]; if(a.horasPresenciales>0) partes.push(a.horasPresenciales+'hP'); if(a.horasVirtuales>0) partes.push(a.horasVirtuales+'hV');
+                return optionElectivaVinculadaHTML(v, `${a.codigo} - ${a.nombre} (${partes.join(' + ')}) · Electiva desde ${nombreSeccion(v.seccionOrigenId)}`, mismoId(data.sel.vinculoElectivoId,v.id));
+            }).join(''):'';
+            const valorAsignaturaActual=data.sel.vinculoElectivoId?valorSelectorElectiva(data.sel.vinculoElectivoId):(data.sel.asignaturaId||'');
+            asig.innerHTML='<option value="">-- Asignatura --</option>'+(cargaExternaActiva?ctx.optionHTML(data.sel.cargaExterna.id,`EXT - ${data.sel.cargaExterna.nombre}`,true):'')+(asignaturasSelector.length?asignaturasSelector.map(asignaturaId=>{
                 const r={asignaturaId};
                 const a=data.asignaturas.find(x=>x.id===r.asignaturaId); if(!a) return '';
                 const partes=[]; if(a.horasPresenciales>0) partes.push(a.horasPresenciales+'hP'); if(a.horasVirtuales>0) partes.push(a.horasVirtuales+'hV');
                 const resumen=data.sel.seccionId?resumenDictacionCorto(a.id,data.sel.seccionId):'';
                 const vinculo=resumen?` · ${resumen}`:'';
                 return ctx.optionHTML(a.id, `${a.codigo} - ${a.nombre} (${partes.join(' + ')})${vinculo}`);
-            }).join(''):''); asig.value=data.sel.asignaturaId||''; asig.disabled=!data.sel.seccionId;
-            const componentes=data.sel.seccionId&&data.sel.asignaturaId&&data.sel.tipo!=='virtual'?componentesAsignaturaSeccion(data.sel.asignaturaId,data.sel.seccionId):[];
+            }).join(''):'')+opcionesElectivas; asig.value=valorAsignaturaActual; asig.disabled=!data.sel.seccionId;
+            if(cargaExternaActiva){ asig.value=data.sel.cargaExterna.id; asig.disabled=true; }
+            const contextoSel=contextoPlanificacionSeleccionada();
+            const componentes=data.sel.seccionId&&data.sel.asignaturaId&&data.sel.tipo!=='virtual'?componentesAsignaturaSeccion(data.sel.asignaturaId,contextoSel.seccionPlanId):[];
             if(compGroup&&compSel){
                 if(componentes.length){
                     if(data.sel.componenteId&&!componentes.some(c=>c.id===data.sel.componenteId)) data.sel.componenteId=componentes[0].id;
@@ -2419,7 +2561,9 @@
                 }
             }
             actualizarMensajesPlanificador();
-            doc.innerHTML='<option value="">-- Docente --</option>'+(data.sel.asignaturaId?(()=>{
+            doc.innerHTML='<option value="">-- Docente --</option>'+(cargaExternaActiva
+                ? data.docentes.map(d=>ctx.optionHTML(d.id,d.id===ctx.DOCENTE_NN_ID?'Docente NN (pendiente)':`${d.nombre||''} ${d.apellido||''}${d.especialidad?` [${d.especialidad}]`:''}`.trim())).join('')
+                : data.sel.asignaturaId?(()=>{
                 const carreraEsp=data.sel.carreraId?data.carreras.find(c=>c.id===data.sel.carreraId)?.especialidad:null;
                 return data.docentes.filter(d=>d.id===ctx.DOCENTE_NN_ID||d.asignaturasQueDicta?.includes(data.sel.asignaturaId)).map(d=>{
                     if(d.id===ctx.DOCENTE_NN_ID) return ctx.optionHTML(d.id,'Docente NN (pendiente)');
@@ -2427,7 +2571,7 @@
                     const matchEsp=carreraEsp&&d.especialidad===carreraEsp;
                     return ctx.optionHTML(d.id, `${d.nombre} ${d.apellido}${d.especialidad?` [${d.especialidad}]`:''} (${usados}/${data.configuracion.bloquesSemestralesMax} · ${usados*18}h)${matchEsp?' ★':''}`, false, !d.autorizadoExceder&&usados>=data.configuracion.bloquesSemestralesMax);
                 }).join('');
-            })():''); doc.value=data.sel.docenteId||''; doc.disabled=!data.sel.asignaturaId;
+            })():''); doc.value=data.sel.docenteId||''; doc.disabled=!data.sel.asignaturaId&&!cargaExternaActiva;
             if(data.sel.tipo==='virtual'){
                 data.sel.salaId=ctx.SALA_VIRTUAL_ID;
                 const virtual=data.salas.find(s=>s.id===ctx.SALA_VIRTUAL_ID);
@@ -2439,23 +2583,31 @@
                 const salasPresenciales=data.salas.filter(s=>s.id!==ctx.SALA_VIRTUAL_ID);
                 sala.innerHTML='<option value="">-- Sala --</option>'+salasPresenciales.map(s=>ctx.optionHTML(s.id,etiquetaSalaConCapacidad(s))).join('');
                 sala.value=data.sel.salaId||'';
-                sala.disabled=!data.sel.docenteId;
+                sala.disabled=!data.sel.docenteId&&!cargaExternaActiva;
             }
         }
 
         function actualizarProgresoPlan(){
             const data = getData();
             const el=document.getElementById('planProgreso');
+            if(data.sel.cargaExterna?.activa){
+                const c=data.sel.cargaExterna;
+                const actuales=data.planificaciones.filter(p=>p.esCargaExterna&&p.asignaturaId===c.id).length;
+                el.innerHTML=`Carga externa: <span style="color:var(--accent);font-weight:700;">${ctx.escapeHTML(c.codigo)} - ${ctx.escapeHTML(c.nombre)}</span> · ${actuales} bloque(s) · No suma al avance de sección/asignatura`;
+                el.style.display='block';
+                return;
+            }
             if(!data.sel.seccionId||!data.sel.asignaturaId||!data.sel.docenteId){
                 if(!data.sel.seccionId||!data.sel.asignaturaId){ el.style.display='none'; return; }
             }
             const asig=data.asignaturas.find(a=>a.id===data.sel.asignaturaId);
             if(!asig){ el.style.display='none'; return; }
+            const contextoSel=contextoPlanificacionSeleccionada();
             const visibles=planesVisiblesAsignaturaSeccion(asig.id,data.sel.seccionId);
             const planesP=visibles.filter(p=>p.tipoPresencial!==false);
             const planesV=visibles.filter(p=>p.tipoPresencial===false);
             const reqP=bloquesRequeridosAsignatura(asig,'presencial'), reqV=bloquesRequeridosAsignatura(asig,'virtual');
-            const componentes=componentesAsignaturaSeccion(asig.id,data.sel.seccionId);
+            const componentes=componentesAsignaturaSeccion(asig.id,contextoSel.seccionPlanId);
             const compActual=componentes.length?componenteSeleccionado():null;
             const planesComp=compActual?planesP.filter(p=>String(p.componenteId||'')===String(compActual.id)):planesP;
             const reqComp=compActual?bloquesDesdeHoras(Number(compActual.horas)||0):reqP;
@@ -2465,7 +2617,9 @@
             const colorP=pctP>=100?'var(--success)':pctP>0?'var(--warning)':'var(--text-secondary)';
             const colorV=pctV>=100?'var(--success)':pctV>0?'var(--warning)':'var(--text-secondary)';
             const resumen=resumenDictacionAsignatura(asig.id,data.sel.seccionId);
-            const nota=resumen?` · ${ctx.escapeHTML(resumen)}`:'';
+            const nota=contextoSel.vinculo
+                ? ` · <span style="color:var(--accent);font-weight:700;">Electiva desde ${ctx.escapeHTML(nombreSeccion(contextoSel.seccionPlanId))}</span>`
+                : (resumen?` · ${ctx.escapeHTML(resumen)}`:'');
             const alumnos=alumnosGrupoAsignatura(asig.id,data.sel.seccionId,compActual?.id||'');
             const alumnosTexto=alumnos.tieneDatos
                 ? ` · <span style="color:var(--text-secondary);font-weight:600;">Alumnos: ${alumnos.total}${alumnos.base&&alumnos.vinculados?` (${alumnos.base} propios + ${alumnos.vinculados} vinculados)`:''}</span>`
@@ -7047,17 +7201,26 @@
                     modoMovimiento=null;
                     ctx.toast('Movimiento cancelado por cambio de selección','info');
                 }
-                if(map[id]) data.sel[map[id]]=this.value||null;
+                if(id==='planAsignatura'){
+                    const opt=this.selectedOptions?.[0];
+                    const vinculoId=opt?.dataset?.vinculoElectivo||'';
+                    const vinculo=vinculoId?(data.vinculosElectivos||[]).find(v=>mismoId(v.id,vinculoId)):null;
+                    data.sel.vinculoElectivoId=vinculo?.id||null;
+                    data.sel.asignaturaId=vinculo?.asignaturaId||this.value||null;
+                }else{
+                    if(map[id]) data.sel[map[id]]=this.value||null;
+                }
                 if(id==='planTipo'){
-                    if(data.sel.tipo==='virtual') data.sel.salaId=ctx.SALA_VIRTUAL_ID;
-                    else if(data.sel.salaId===ctx.SALA_VIRTUAL_ID) data.sel.salaId=null;
+            if(data.sel.tipo==='virtual') data.sel.salaId=ctx.SALA_VIRTUAL_ID;
+            else if(data.sel.salaId===ctx.SALA_VIRTUAL_ID) data.sel.salaId=null;
                 }
                 if(['planArea','planCarrera','planNivel','planJornada','planSeccion','planAsignatura','planDocente'].includes(id)){
-                    if(id==='planArea'){data.sel.carreraId=null;data.sel.nivelId=null;data.sel.jornada=null;data.sel.seccionId=null;data.sel.asignaturaId=null;data.sel.docenteId=null;}
-                    if(id==='planCarrera'){data.sel.nivelId=null;data.sel.jornada=null;data.sel.seccionId=null;data.sel.asignaturaId=null;data.sel.docenteId=null;}
-                    if(id==='planNivel'){data.sel.jornada=null;data.sel.seccionId=null;data.sel.asignaturaId=null;data.sel.docenteId=null;}
-                    if(id==='planJornada'){data.sel.seccionId=null;data.sel.asignaturaId=null;data.sel.docenteId=null;}
-                    if(id==='planSeccion'){data.sel.asignaturaId=null;data.sel.componenteId=null;data.sel.docenteId=null;}
+                    if(id!=='planDocente') data.sel.cargaExterna=null;
+                    if(id==='planArea'){data.sel.carreraId=null;data.sel.nivelId=null;data.sel.jornada=null;data.sel.seccionId=null;data.sel.asignaturaId=null;data.sel.vinculoElectivoId=null;data.sel.docenteId=null;}
+                    if(id==='planCarrera'){data.sel.nivelId=null;data.sel.jornada=null;data.sel.seccionId=null;data.sel.asignaturaId=null;data.sel.vinculoElectivoId=null;data.sel.docenteId=null;}
+                    if(id==='planNivel'){data.sel.jornada=null;data.sel.seccionId=null;data.sel.asignaturaId=null;data.sel.vinculoElectivoId=null;data.sel.docenteId=null;}
+                    if(id==='planJornada'){data.sel.seccionId=null;data.sel.asignaturaId=null;data.sel.vinculoElectivoId=null;data.sel.docenteId=null;}
+                    if(id==='planSeccion'){data.sel.asignaturaId=null;data.sel.vinculoElectivoId=null;data.sel.componenteId=null;data.sel.docenteId=null;}
                     if(id==='planAsignatura'){data.sel.componenteId=null;data.sel.docenteId=null;}
                     if(id==='planDocente'&&data.sel.tipo!=='virtual'){data.sel.salaId=null;}
                 }
@@ -7073,6 +7236,7 @@
             document.getElementById('btnAutoSeccion').onclick=autoAsignarSeccionActual;
             document.getElementById('btnAutoGeneral').onclick=autoAsignarGeneral;
             document.getElementById('btnOptimizarHorario').onclick=abrirOptimizacionHorario;
+            document.getElementById('btnCargaExterna').onclick=abrirCargaExterna;
             document.getElementById('btnRevertirAutoRapido').onclick=deshacerUltimaAuto;
             document.getElementById('btnCompararSeccion').onclick=alternarComparadorPlanificacion;
             actualizarBotonComparador();

@@ -356,7 +356,7 @@ window._appRuntimeInicializada = true;
 
     let data = {
         carreras:[], niveles:[], secciones:[], asignaturas:[], docentes:[], salas:[],
-        asignaturaCarreraNivel:[], asignaturaSeccion:[], planificaciones:[], gruposDictacion:[], vinculosElectivos:[], configuracion:JSON.parse(JSON.stringify(CONFIG_DEFAULT)),
+        asignaturaCarreraNivel:[], asignaturaSeccion:[], planificaciones:[], cargasExternasDocente:[], gruposDictacion:[], vinculosElectivos:[], configuracion:JSON.parse(JSON.stringify(CONFIG_DEFAULT)),
         gestorSecciones:{cargas:[],ids:[],ultimaCargaId:null},
         modoPlan:false, temporadas:[], auditoria:[], ultimoAutoGeneral:null, ultimaAutoEjecucion:null, autoEjecuciones:[], temporadaData:{}, sel:{temporadaId:null,area:null,carreraId:null,nivelId:null,seccionId:null,asignaturaId:null,docenteId:null,salaId:null,tipo:'presencial'}
     };
@@ -386,7 +386,7 @@ window._appRuntimeInicializada = true;
         );
     }
     function datosTemporadaVacios(){
-        return { carreras:[], niveles:[], secciones:[], asignaturas:[], docentes:[], salas:[], asignaturaCarreraNivel:[], asignaturaSeccion:[], planificaciones:[], gruposDictacion:[], vinculosElectivos:[], gestorSecciones:{cargas:[],ids:[],filas:[],enlacesManuales:[],ultimaCargaId:null,tablaLimite:250} };
+        return { carreras:[], niveles:[], secciones:[], asignaturas:[], docentes:[], salas:[], asignaturaCarreraNivel:[], asignaturaSeccion:[], planificaciones:[], cargasExternasDocente:[], gruposDictacion:[], vinculosElectivos:[], gestorSecciones:{cargas:[],ids:[],filas:[],enlacesManuales:[],ultimaCargaId:null,tablaLimite:250} };
     }
 
     function guardarTemporadaPreferida(id) {
@@ -562,6 +562,7 @@ window._appRuntimeInicializada = true;
         getData: () => data,
         DIAS,
         BLOQUES,
+        SALA_VIRTUAL_ID,
         DOCENTE_NN_ID,
         getPlanificaciones,
         getTemporadaLabel,
@@ -634,9 +635,14 @@ window._appRuntimeInicializada = true;
         getData: () => data,
         DIAS,
         BLOQUES,
+        SALA_VIRTUAL_ID,
+        SALA_TRO2_ID,
         DOCENTE_NN_ID,
         getPlanificaciones,
         getTemporadaLabel,
+        genId,
+        guardar,
+        reconstruirIndices,
         optionHTML,
         escapeHTML,
         escapeAttr,
@@ -649,7 +655,9 @@ window._appRuntimeInicializada = true;
         sanitizarNodoExportacion,
         activarTab,
         irASeccion,
+        abrirCargaExternaPlanificada,
         actualizarReporte,
+        cerrarModal,
         toast
     });
     const actualizarFichaDocentes = FichaDocente.actualizarFichaDocentes;
@@ -813,7 +821,7 @@ window._appRuntimeInicializada = true;
         if (!id || id === data.sel.temporadaId) return;
         limpiarHistorialCambios();
         const tempData = data.temporadaData;
-        tempData[data.sel.temporadaId] = { carreras:data.carreras, niveles:data.niveles, secciones:data.secciones, asignaturas:data.asignaturas, docentes:data.docentes, salas:data.salas, asignaturaCarreraNivel:data.asignaturaCarreraNivel, asignaturaSeccion:data.asignaturaSeccion||[], planificaciones:data.planificaciones, gruposDictacion:data.gruposDictacion, vinculosElectivos:data.vinculosElectivos||[], gestorSecciones:data.gestorSecciones };
+        tempData[data.sel.temporadaId] = { carreras:data.carreras, niveles:data.niveles, secciones:data.secciones, asignaturas:data.asignaturas, docentes:data.docentes, salas:data.salas, asignaturaCarreraNivel:data.asignaturaCarreraNivel, asignaturaSeccion:data.asignaturaSeccion||[], planificaciones:data.planificaciones, cargasExternasDocente:data.cargasExternasDocente||[], gruposDictacion:data.gruposDictacion, vinculosElectivos:data.vinculosElectivos||[], gestorSecciones:data.gestorSecciones };
         cargarTemporadaSinPersistirActual(id);
     }
     function cargarTemporadaSinPersistirActual(id) {
@@ -823,7 +831,7 @@ window._appRuntimeInicializada = true;
         if (!tempData[id]) tempData[id] = nueva;
         data.carreras = nueva.carreras; data.niveles = nueva.niveles; data.secciones = nueva.secciones;
         data.asignaturas = nueva.asignaturas; data.docentes = nueva.docentes; data.salas = nueva.salas;
-        data.asignaturaCarreraNivel = nueva.asignaturaCarreraNivel; data.asignaturaSeccion = nueva.asignaturaSeccion || []; data.planificaciones = nueva.planificaciones; data.gruposDictacion = nueva.gruposDictacion || []; data.vinculosElectivos=nueva.vinculosElectivos||[]; data.gruposElectivos=nueva.gruposElectivos||[]; data.gestorSecciones = nueva.gestorSecciones || {cargas:[],ids:[],ultimaCargaId:null};
+        data.asignaturaCarreraNivel = nueva.asignaturaCarreraNivel; data.asignaturaSeccion = nueva.asignaturaSeccion || []; data.planificaciones = nueva.planificaciones; data.cargasExternasDocente = nueva.cargasExternasDocente || []; data.gruposDictacion = nueva.gruposDictacion || []; data.vinculosElectivos=nueva.vinculosElectivos||[]; data.gruposElectivos=nueva.gruposElectivos||[]; data.gestorSecciones = nueva.gestorSecciones || {cargas:[],ids:[],ultimaCargaId:null};
         data.sel.temporadaId = id;
         data.configuracion.temporadaActualId = id;
         guardarTemporadaPreferida(id);
@@ -1238,6 +1246,7 @@ window._appRuntimeInicializada = true;
         if(!Array.isArray(data.gruposDictacion)) data.gruposDictacion=[];
         if(!Array.isArray(data.asignaturaSeccion)) data.asignaturaSeccion=[];
         data.sel=Object.assign({temporadaId:null,area:null,carreraId:null,nivelId:null,seccionId:null,asignaturaId:null,docenteId:null,salaId:null,tipo:'presencial'},data.sel||{});
+        delete data.sel.cargaExterna;
         const defaultsArea=new Set(['electricidad','automatización','automatizacion','electrónicos','electronicos','transversales']);
         const areasEnUso=new Set(data.carreras.map(c=>limpiarTexto(c.area||c.especialidad).toLowerCase()).filter(Boolean));
         data.configuracion.especialidades=(data.configuracion.especialidades||[]).filter(e=>!defaultsArea.has(limpiarTexto(e).toLowerCase())||areasEnUso.has(limpiarTexto(e).toLowerCase()));
@@ -1858,6 +1867,7 @@ window._appRuntimeInicializada = true;
         if(d.gruposDictacion!==undefined && (!Array.isArray(d.gruposDictacion) || d.gruposDictacion.length>5000)) return false;
         if(d.gruposElectivos!==undefined && (!Array.isArray(d.gruposElectivos) || d.gruposElectivos.length>5000)) return false;
         if(d.vinculosElectivos!==undefined && (!Array.isArray(d.vinculosElectivos) || d.vinculosElectivos.length>10000)) return false;
+        if(d.cargasExternasDocente!==undefined && (!Array.isArray(d.cargasExternasDocente) || d.cargasExternasDocente.length>5000)) return false;
         // Verificar que configuracion es un objeto (no null ni array)
         if (!d.configuracion || typeof d.configuracion !== 'object' || Array.isArray(d.configuracion)) return false;
         return true;
@@ -1916,6 +1926,27 @@ window._appRuntimeInicializada = true;
             seccionDestinoId:limpiarTexto(v.seccionDestinoId),
             origen:limpiarTexto(v.origen,40)||'manual'
         })):[];
+        limpio.cargasExternasDocente=Array.isArray(limpio.cargasExternasDocente)?limpio.cargasExternasDocente.map(c=>({
+            id:limpiarTexto(c.id)||genId(),
+            docenteId:limpiarTexto(c.docenteId),
+            codigo:(limpiarTexto(c.codigo,40)||'EXT').toUpperCase(),
+            nombre:limpiarTexto(c.nombre,120)||'Carga externa',
+            origen:limpiarTexto(c.origen,100),
+            estado:['gestion','acordada','confirmada'].includes(c.estado)?c.estado:'gestion',
+            observacion:limpiarTexto(c.observacion,300),
+            horasPresenciales:Number(c.horasPresenciales)||((Number(c.bloquesPresenciales)||0)*18),
+            horasVirtuales:Number(c.horasVirtuales)||((Number(c.bloquesVirtuales)||0)*18),
+            bloquesPresenciales:Number(c.bloquesPresenciales)||0,
+            bloquesVirtuales:Number(c.bloquesVirtuales)||0,
+            bloques:Array.isArray(c.bloques)?c.bloques.map(b=>({
+                dia:Number(b.dia),
+                bloque:Number(b.bloque),
+                tipoPresencial:b.tipoPresencial!==false,
+                salaId:b.tipoPresencial===false?SALA_VIRTUAL_ID:(limpiarTexto(b.salaId)||SALA_TRO2_ID)
+            })).filter(b=>Number.isInteger(b.dia)&&b.dia>=0&&b.dia<DIAS.length&&Number.isInteger(b.bloque)&&b.bloque>=1&&b.bloque<=BLOQUES.length):[],
+            creadoEn:limpiarTexto(c.creadoEn,80),
+            actualizadoEn:limpiarTexto(c.actualizadoEn,80)
+        })).filter(c=>c.docenteId&&c.codigo&&c.nombre):[];
         limpio.docentes = limpio.docentes.map(d=>({
             ...d,
             id:limpiarTexto(d.id)||genId(), nombre:limpiarTexto(d.nombre), apellido:limpiarTexto(d.apellido),
@@ -1976,6 +2007,11 @@ window._appRuntimeInicializada = true;
             nota:limpiarTexto(p.nota,500),
             fijo:!!p.fijo,
             revisionMarcada:!!p.revisionMarcada,
+            esCargaExterna:!!p.esCargaExterna,
+            codigoExterno:(limpiarTexto(p.codigoExterno,24)||'EXT').toUpperCase(),
+            nombreExterno:limpiarTexto(p.nombreExterno,80)||'Carga externa',
+            origenCargaExterna:limpiarTexto(p.origenCargaExterna,80),
+            estadoCargaExterna:['gestion','acordada'].includes(p.estadoCargaExterna)?p.estadoCargaExterna:'',
             estadoGestionExterna:['gestion','acordada'].includes(p.estadoGestionExterna)?p.estadoGestionExterna:'',
             seguimientoActualizadoEn:limpiarTexto(p.seguimientoActualizadoEn,80),
             explicacionAuto:(p.explicacionAuto&&typeof p.explicacionAuto==='object'&&!Array.isArray(p.explicacionAuto))?{
@@ -1993,7 +2029,7 @@ window._appRuntimeInicializada = true;
     function aplicarDatosImportados(imported){
         const base={
             carreras:[], niveles:[], secciones:[], asignaturas:[], docentes:[], salas:[],
-            asignaturaCarreraNivel:[], asignaturaSeccion:[], planificaciones:[], gruposDictacion:[], vinculosElectivos:[], configuracion:JSON.parse(JSON.stringify(CONFIG_DEFAULT)),
+            asignaturaCarreraNivel:[], asignaturaSeccion:[], planificaciones:[], cargasExternasDocente:[], gruposDictacion:[], vinculosElectivos:[], configuracion:JSON.parse(JSON.stringify(CONFIG_DEFAULT)),
             gestorSecciones:{cargas:[],ids:[],ultimaCargaId:null},
             modoPlan:false, temporadas:[], auditoria:[], temporadaData:{},
             sel:{temporadaId:null,area:null,carreraId:null,nivelId:null,seccionId:null,asignaturaId:null,docenteId:null,salaId:null,tipo:'presencial'}
@@ -2017,7 +2053,7 @@ window._appRuntimeInicializada = true;
             data.temporadaData[data.sel.temporadaId]={
                 carreras:data.carreras, niveles:data.niveles, secciones:data.secciones, asignaturas:data.asignaturas,
                 docentes:data.docentes, salas:data.salas, asignaturaCarreraNivel:data.asignaturaCarreraNivel, asignaturaSeccion:data.asignaturaSeccion||[],
-                planificaciones:data.planificaciones, gruposDictacion:data.gruposDictacion || [], vinculosElectivos:data.vinculosElectivos||[], gestorSecciones:data.gestorSecciones || {cargas:[],ids:[],ultimaCargaId:null}
+                planificaciones:data.planificaciones, cargasExternasDocente:data.cargasExternasDocente||[], gruposDictacion:data.gruposDictacion || [], vinculosElectivos:data.vinculosElectivos||[], gestorSecciones:data.gestorSecciones || {cargas:[],ids:[],ultimaCargaId:null}
             };
         }
         data.gestorSecciones=normalizarGestorSeccionesData(data.gestorSecciones);
@@ -4436,7 +4472,7 @@ window._appRuntimeInicializada = true;
         return {cargas:[],ids:[],filas:[],enlacesManuales:[],ultimaCargaId:null,tablaLimite:20,tablaPagina:1,tablaTamano:20};
     }
     function temporadaDataVacia(){
-        return {carreras:[],niveles:[],secciones:[],asignaturas:[],docentes:[],salas:[],asignaturaCarreraNivel:[],asignaturaSeccion:[],planificaciones:[],gruposDictacion:[],vinculosElectivos:[],gestorSecciones:gestorSeccionesVacio()};
+        return {carreras:[],niveles:[],secciones:[],asignaturas:[],docentes:[],salas:[],asignaturaCarreraNivel:[],asignaturaSeccion:[],planificaciones:[],cargasExternasDocente:[],gruposDictacion:[],vinculosElectivos:[],gestorSecciones:gestorSeccionesVacio()};
     }
     function limpiarTodo(){
         return limpiarTodoApp();
@@ -4863,6 +4899,44 @@ window._appRuntimeInicializada = true;
         }
         document.getElementById('scheduleContainer')?.scrollIntoView({behavior:'smooth',block:'start'});
         toast(opciones.mensaje||`Revisando sección ${sec.nombre}`,'info');
+    }
+    function abrirCargaExternaPlanificada(plan={}){
+        const sec=data.secciones.find(s=>s.id===plan.seccionId);
+        if(!sec) return toast('No se encontró la sección de la carga externa','error');
+        const nivel=data.niveles.find(n=>n.id===sec.nivelId);
+        const carrera=nivel?data.carreras.find(c=>c.id===nivel.carreraId):null;
+        if(!nivel||!carrera) return toast('No se encontró el contexto de la carga externa','error');
+        if(activarTab('planificacion')===false) return;
+        data.sel.area=carrera.area||carrera.especialidad||null;
+        data.sel.carreraId=carrera.id;
+        data.sel.nivelId=nivel.id;
+        data.sel.jornada=sec.jornada||jornadaGestor('',sec.nombre);
+        data.sel.seccionId=sec.id;
+        data.sel.asignaturaId=null;
+        data.sel.componenteId=null;
+        data.sel.docenteId=plan.docenteId||null;
+        data.sel.salaId=plan.salaId||null;
+        data.sel.tipo=plan.tipoPresencial===false?'virtual':'presencial';
+        data.sel.cargaExterna={
+            activa:true,
+            id:plan.asignaturaId,
+            codigo:plan.codigoExterno||'EXT',
+            nombre:plan.nombreExterno||'Carga externa',
+            origen:plan.origenCargaExterna||'',
+            estado:plan.estadoCargaExterna||plan.estadoGestionExterna||'gestion'
+        };
+        data.modoPlan=true;
+        actualizarModoPlanificacionUI();
+        actualizarSelectoresPlan();
+        construirGrilla();
+        actualizarProgresoPlan();
+        setTimeout(()=>{
+            const celda=document.querySelector(`#scheduleGrid .grid-cell[data-dia="${Number(plan.dia)}"][data-bloque="${Number(plan.bloque)}"]`);
+            celda?.scrollIntoView({behavior:'smooth',block:'center',inline:'center'});
+            celda?.classList.add('compare-jump-focus');
+            setTimeout(()=>celda?.classList.remove('compare-jump-focus'),2600);
+        },120);
+        toast('Carga externa lista para editar en planificación','info');
     }
     function irAGestorId(idGestor){
         const id=String(idGestor||'').trim();
