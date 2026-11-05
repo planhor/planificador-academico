@@ -504,8 +504,8 @@
             const p=[...ctx.getPlanificaciones().filter(pl=>pl.docenteId===docId),...planesFichaCargasExternas(cargasExternas)];
             const diasDisponibles=doc.disponibilidad||ctx.DIAS.map(()=>Array(18).fill(false));
             const cargaDefendible=calcularResumenDefendible(doc,data);
-            let html='<div style="display:flex;gap:16px;flex-wrap:wrap;">';
-            html+='<div style="flex:2;min-width:650px;"><div style="font-size:1.1rem;font-weight:600;margin-bottom:8px;">'+ctx.escapeHTML(doc.nombre)+' '+ctx.escapeHTML(doc.apellido)+(doc.especialidad?' <small style="font-size:0.8rem;color:var(--text-secondary)">['+ctx.escapeHTML(doc.especialidad)+']</small>':'')+'</div>';
+            let html='<div class="teacher-sheet-layout">';
+            html+='<div class="teacher-sheet-main"><div style="font-size:1.1rem;font-weight:600;margin-bottom:8px;">'+ctx.escapeHTML(doc.nombre)+' '+ctx.escapeHTML(doc.apellido)+(doc.especialidad?' <small style="font-size:0.8rem;color:var(--text-secondary)">['+ctx.escapeHTML(doc.especialidad)+']</small>':'')+'</div>';
             html+='<div class="teacher-defensible-panel">';
             html+='<div class="teacher-defensible-header"><div><strong>Carga defendible</strong><span>Resumen ejecutivo para comparar disponibilidad, homólogo y carga actual.</span></div><div style="display:flex;gap:8px;flex-wrap:wrap;"><button type="button" class="btn btn-sm" id="btnFichaCargaExterna">+ Carga externa</button><button type="button" class="btn btn-sm" id="btnFichaCargaDefendible">Ver detalle</button></div></div>';
             html+='<div class="teacher-defensible-metrics">';
@@ -556,7 +556,7 @@
                 html+='</tr>';
             });
             html+='</table></div></div>';
-            html+='<div style="flex:1;min-width:280px;"><div style="font-size:1rem;font-weight:600;margin-bottom:8px;">📋 Resumen carga académica</div>';
+            html+='<div class="teacher-sheet-summary"><div style="font-size:1rem;font-weight:600;margin-bottom:8px;">📋 Resumen carga académica</div>';
             html+='<table style="border-collapse:collapse;font-size:0.78rem;width:100%;">';
             html+='<tr style="background:var(--surface-alt);"><th style="padding:6px 8px;border:1px solid var(--border);text-align:left;">Asignatura</th><th style="padding:6px 4px;border:1px solid var(--border);text-align:center;width:42px;">Cant.</th><th style="padding:6px 8px;border:1px solid var(--border);text-align:center;width:64px;">Horas</th></tr>';
             const agrupado={};
@@ -628,6 +628,13 @@
         async function capturarFichaFija(elemento){
             const wrapper=document.createElement('div');
             const clon=elemento.cloneNode(true);
+            // La exportación conserva su composición fija, independiente del viewport.
+            const layout=clon.querySelector('.teacher-sheet-layout');
+            const principal=clon.querySelector('.teacher-sheet-main');
+            const resumen=clon.querySelector('.teacher-sheet-summary');
+            if(layout) layout.style.cssText='display:flex;gap:16px;flex-wrap:wrap;';
+            if(principal) principal.style.cssText='flex:2;min-width:650px;';
+            if(resumen) resumen.style.cssText='flex:1;min-width:280px;';
             const exportId='planhorFichaExportRoot';
             wrapper.id=exportId;
             wrapper.style.position='absolute';

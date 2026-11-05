@@ -83,14 +83,15 @@ test('el Worker del solver conserva contrato y fallback en Planificación', () =
 });
 
 test('las colecciones grandes mantienen paginacion o virtualizacion nativa', () => {
-    const app = fs.readFileSync(path.join(DOCS, 'planificador_modulos/app.js'), 'utf8');
+    const app = fs.readFileSync(path.join(DOCS, 'planificador_modulos/app.js'), 'utf8') + fs.readFileSync(path.join(DOCS, 'aplicaciones/gestor-secciones.js'), 'utf8');
     const reportes = fs.readFileSync(path.join(DOCS, 'planificador_modulos/reportes.js'), 'utf8');
     const estilos = fs.readFileSync(path.join(DOCS, 'planificador_modulos/estilos.css'), 'utf8');
 
     assert.match(app, /\[20,50,100\]/);
     assert.match(app, /filtradas\.slice\(inicio,inicio\+tamano\)/);
     assert.match(reportes, /filtrados\.slice\(inicio,inicio\+reporteTamano\)/);
-    assert.match(reportes, /gruposTodos\.slice\(inicio,inicio\+historialTamano\)/);
+    const historial=fs.readFileSync(path.join(DOCS,'aplicaciones/historial.js'),'utf8');
+    assert.match(historial, /gruposTodos\.slice\(inicio,inicio\+shared\.historialTamano\)/);
     assert.match(estilos, /@supports \(content-visibility:auto\)/);
     for (const clase of ['area-section-group', 'subject-specialty-group', 'docentes-specialty-group', 'rooms-type-group']) {
         assert.match(estilos, new RegExp(`\\.${clase}`));
@@ -98,7 +99,7 @@ test('las colecciones grandes mantienen paginacion o virtualizacion nativa', () 
 });
 
 test('el historial agrupa por operación o revisión sin mezclar momentos distintos', () => {
-    const reportes = fs.readFileSync(path.join(DOCS, 'planificador_modulos/reportes.js'), 'utf8');
+    const reportes = fs.readFileSync(path.join(DOCS, 'aplicaciones/historial.js'), 'utf8');
     assert.match(reportes, /ev\.operacionId\|\|ev\.revisionId/);
     assert.match(reportes, /\[operacion,ev\.accion,ev\.usuario,p\.seccionId,p\.asignaturaId\]/);
 });

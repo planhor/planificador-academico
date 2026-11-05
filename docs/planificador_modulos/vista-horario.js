@@ -102,7 +102,7 @@
         }
 
         function camposVistaGeneral(){
-            const base={asignatura:true,docente:false,sala:false,hora:false};
+            const base={asignatura:true,docente:false,sala:false,seccion:false,hora:false};
             return Object.assign(base,getData()?.configuracion?.vistaGeneralCampos||{});
         }
 
@@ -508,13 +508,15 @@
                     const asig=data.asignaturas.find(a=>a.id===plan.asignaturaId);
                     const doc=data.docentes.find(x=>x.id===plan.docenteId);
                     const sala=data.salas.find(x=>x.id===plan.salaId);
+                    const seccionPlan=data.secciones.find(s=>s.id===plan.seccionId)||data.secciones.find(s=>s.id===seccionId);
                     const color=ctx.colorAsignaturaPlanhor?.(asig)||asig?.color||'var(--planhor-subject-neutral)';
                     const partes=[
                         campos.asignatura ? (ctx.formatearTextoBloqueAsignatura
                             ? ctx.formatearTextoBloqueAsignatura(asig,{formato:data.configuracion?.formatoTextoBloqueVistaHorario||'codigo',maxNombre:18})
                             : (asig?.codigo||'?')) : '',
                         campos.docente && doc ? (doc.id===ctx.DOCENTE_NN_ID?'Docente NN':`${(doc.nombre||'').charAt(0)}. ${doc.apellido||''}`.trim()) : '',
-                        campos.sala && sala ? (sala.nombre||'') : ''
+                        campos.sala && sala ? (sala.nombre||'') : '',
+                        campos.seccion && seccionPlan ? (seccionPlan.nombre||'') : ''
                     ].filter(Boolean);
                     const title=[
                         `${d} B${b.n}`,
@@ -523,7 +525,7 @@
                         sala ? `Sala: ${sala.nombre||''}` : '',
                         plan.vinculado?`Heredada desde ${data.secciones.find(s=>s.id===plan.seccionOrigenId)?.nombre||plan.seccionId}`:''
                     ].filter(Boolean).join(' · ');
-                    return `<div class="vista-general-cell filled ${plan.vinculado?'linked':''}" style="background:${ctx.escapeAttr(color)}" title="${ctx.escapeAttr(title)}">${partes.length?partes.map(p=>`<span>${ctx.escapeHTML(p)}</span>`).join(''):'<span>&nbsp;</span>'}</div>`;
+                    return `<div class="vista-general-cell filled fields-${Math.max(1,Math.min(4,partes.length))} ${plan.vinculado?'linked':''}" style="background:${ctx.escapeAttr(color)}" title="${ctx.escapeAttr(title)}">${partes.length?partes.map(p=>`<span>${ctx.escapeHTML(p)}</span>`).join(''):'<span>&nbsp;</span>'}</div>`;
                 }).join('');
                 return `<div class="vista-general-time">${campos.hora?`B${b.n}<small>${ctx.escapeHTML(b.inicio)}-${ctx.escapeHTML(b.fin)}</small>`:`B${b.n}`}</div>${celdas}`;
             }).join('');
@@ -600,6 +602,7 @@
                         <label><input type="checkbox" data-vista-campo="asignatura" ${campos.asignatura?'checked':''}> Asignatura</label>
                         <label><input type="checkbox" data-vista-campo="docente" ${campos.docente?'checked':''}> Docente</label>
                         <label><input type="checkbox" data-vista-campo="sala" ${campos.sala?'checked':''}> Sala</label>
+                        <label><input type="checkbox" data-vista-campo="seccion" ${campos.seccion?'checked':''}> Sección</label>
                         <label><input type="checkbox" data-vista-campo="hora" ${campos.hora?'checked':''}> Hora en primera columna</label>
                     </div>
                     <div class="vista-general-passive-note">
@@ -640,7 +643,7 @@
                     input.onchange=()=>{
                         const data=getData();
                         data.configuracion=data.configuracion||{};
-                        data.configuracion.vistaGeneralCampos=Object.assign({asignatura:true,docente:false,sala:false,hora:false},data.configuracion.vistaGeneralCampos||{});
+                        data.configuracion.vistaGeneralCampos=Object.assign({asignatura:true,docente:false,sala:false,seccion:false,hora:false},data.configuracion.vistaGeneralCampos||{});
                         data.configuracion.vistaGeneralCampos[input.dataset.vistaCampo]=!!input.checked;
                         if(!Object.values(data.configuracion.vistaGeneralCampos).some(Boolean)) data.configuracion.vistaGeneralCampos.asignatura=true;
                         construirVistaGeneral();

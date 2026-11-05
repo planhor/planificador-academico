@@ -1,0 +1,54 @@
+/* Ajustes del tema Usuario petróleo; los temas originales no se alteran. */
+html[data-professional-theme=true]{--professional-grid:#c5cfd9;--professional-block:#dfedf3;--professional-season:#a66b43;}
+html[data-professional-theme=true][data-professional-season=Invierno]{--professional-season:#3974a5;}
+html[data-professional-theme=true][data-professional-season=Primavera]{--professional-season:#3c8065;}
+html[data-professional-theme=true][data-professional-season=Verano]{--professional-season:#a97822;}
+html[data-professional-theme=true] #indicadorPaleta{border-left:3px solid var(--professional-season)!important;background:color-mix(in srgb,var(--professional-season) 7%,white);color:var(--text);}
+html[data-professional-theme=true] #selectorTemporada{border-left:3px solid var(--professional-season)!important;}
+html[data-professional-theme=true] #contenidoPrincipal .dashboard-card>div:first-child[style*="var(--accent)"]{color:var(--text)!important;}
+html[data-professional-theme=true] .dashboard-validation-item.warning{background:#fff9ed;border-color:#d8bd86;}
+html[data-professional-theme=true] .dashboard-validation-item.warning>span{color:#82570b;}
+html[data-professional-theme=true] .dashboard-validation-item.danger{background:#fff2f3;border-color:#dda4ae;}
+html[data-professional-theme=true] .dashboard-validation-item.danger>span{color:#a12c40;}
+html[data-professional-theme=true] .dashboard-validation-item.info{background:#eef5fa;border-color:#aac3d5;}
+html[data-professional-theme=true] .dashboard-validation-item.info>span{color:#265d7a;}
+html[data-professional-theme=true] #panelPlanificacion #scheduleGrid :is(.grid-cell,.grid-time,.grid-header),html[data-professional-theme=true] #panelOrganizarSalas :is(.slot,.time,.grid-heading){border-color:var(--professional-grid)!important;}
+html[data-professional-theme=true] #panelPlanificacion #scheduleGrid :is(.grid-time,.grid-header),html[data-professional-theme=true] #panelOrganizarSalas :is(.time,.grid-heading){background:#e9eef3;color:var(--text);}
+html[data-professional-theme=true] #panelPlanificacion #scheduleGrid .grid-cell.planned{background-color:var(--professional-block);color:var(--text);}
+html[data-professional-theme=true] #panelOrganizarSalas .lesson:not([aria-pressed=true]),html[data-professional-theme=true] #panelOrganizarSalas .sample.occupied{background:var(--professional-block);border-color:#91b3c5;color:var(--text);}
+html[data-professional-theme=true] #panelOrganizarSalas tbody tr:has(input:checked){background:#eaf3f7;}
+/* Capas: la profundidad pertenece a las superficies, nunca a cada celda. */
+html[data-professional-theme=true]{--bg:#f3f2ef!important;--surface-alt:#f0f0ed!important;--border:#d8d8d3!important;--border-light:#e8e7e2!important;--ui-radius:6px;--professional-shadow:0 2px 8px rgba(47,43,35,.06);}
+html[data-professional-theme=true] .application-sidebar::before{background:#faf9f6;box-shadow:2px 0 8px rgba(47,43,35,.04);}
+html[data-professional-theme=true] .app-header{box-shadow:0 2px 8px rgba(24,43,58,.08);}
+html[data-professional-theme=true] .application-sidebar .tab-btn.active{background:#dcecf3;border-color:#8cb3c5;color:#14546e;}
+html[data-professional-theme=true] #contenidoPrincipal :is(.dashboard-card,.card,.gestor-hero,.dashboard-progress-panel,.dashboard-criteria-panel,.dashboard-quality-panel,.dashboard-validation-panel,.dashboard-preparation-panel,.global-score-panel){box-shadow:var(--professional-shadow);}
+html[data-professional-theme=true] #contenidoPrincipal .global-score-panel{border-color:#c7cfce;background:#fffefa;}
+html[data-professional-theme=true] #contenidoPrincipal .global-score-panel .dashboard-progress-title{color:#14546e;}
+html[data-professional-theme=true] #contenidoPrincipal :is(.global-score-grid,.dashboard-validation-grid)>div{background:#f2f2ee;}
+html[data-professional-theme=true] #contenidoPrincipal .global-score-grid>div:first-child{background:#dcecf3;border:1px solid #adcbd9;}
+html[data-professional-theme=true] .modal-overlay .modal{box-shadow:0 12px 32px rgba(24,43,58,.18);border-radius:8px!important;}
+html[data-professional-theme=true] #panelPlanificacion .selection-panel,html[data-professional-theme=true] #panelOrganizarSalas .room-catalog{background:#faf9f6;}
+html[data-professional-theme=true] :is(.btn-primary,#btnModoPlanificar){box-shadow:0 2px 4px rgba(23,107,135,.2);}
+html[data-professional-theme=true] #contenidoPrincipal .dashboard-card-action{transition:background-color 180ms ease,border-color 180ms ease,box-shadow 180ms ease,transform 180ms ease!important;}
+@media(hover:hover){
+ html[data-professional-theme=true] #contenidoPrincipal .dashboard-card-action:hover{background:#f1f8fb;border-color:#83adbf;box-shadow:0 4px 12px rgba(24,43,58,.12);}
+ html[data-professional-theme=true][data-planhor-motion=full] #contenidoPrincipal .dashboard-card-action:hover{transform:translateY(-1px);}
+}
+html[data-professional-theme=true] #contenidoPrincipal .dashboard-card-action:focus-visible{outline:2px solid var(--accent);outline-offset:2px;box-shadow:0 4px 12px rgba(24,43,58,.12);}
+@media(prefers-reduced-motion:reduce){html[data-professional-theme=true] #contenidoPrincipal .dashboard-card-action{transition:none!important;transform:none!important;}}
+/* Superficies elevadas: misma familia neutra; distinta profundidad por nivel. */
+html[data-professional-theme=true]{--professional-floating-surface:#fffefd;--professional-floating-shadow:0 8px 24px rgba(47,43,35,.14);--professional-dialog-shadow:0 12px 32px rgba(47,43,35,.18);--professional-floating-hover:#eaf1f3;}
+html[data-professional-theme=true] :is(.modal-overlay .modal,.dropdown-menu,.account-menu,.action-popup,.action-popup-submenu-panel,.sidebar-pin-menu,.search-results,.planning-automation-options,.plan-block-tooltip){background:var(--professional-floating-surface)!important;border-color:var(--border);color:var(--text);box-shadow:var(--professional-floating-shadow)!important;border-radius:6px;}
+html[data-professional-theme=true] .modal-overlay .modal{box-shadow:var(--professional-dialog-shadow)!important;border-radius:8px!important;}
+html[data-professional-theme=true] .modal-overlay{background:rgba(40,39,35,.4);}
+html[data-professional-theme=true] :is(.account-menu .account-menu-action,.modal-overlay .modal>.floating-close,.modal-overlay .modal .modal-actions){background:var(--professional-floating-surface)!important;}
+html[data-professional-theme=true] .modal-overlay .modal .modal-actions{box-shadow:0 -4px 8px var(--professional-floating-surface)!important;}
+html[data-professional-theme=true] .modal-overlay .config-help-entry{background:#f5f5f0;border-color:var(--border);}
+html[data-professional-theme=true] :is(.dropdown-item,.account-menu-action,.action-popup button,.action-popup-submenu-panel button,.sidebar-pin-menu .btn):not(:disabled):hover{background:var(--professional-floating-hover);color:var(--accent);}
+html[data-professional-theme=true] :is(.dropdown-item,.account-menu-action,.action-popup button,.sidebar-pin-menu .btn):focus-visible{outline:2px solid var(--accent);outline-offset:-2px;}
+html[data-professional-theme=true] :is(.account-menu-action.danger,.dropdown-item.danger):hover{color:var(--danger);background:#fff2f3;}
+/* Las tablas de trabajo no deben transparentar el fondo de la página. */
+html[data-professional-theme=true] #contenidoPrincipal table{background:var(--surface);}
+html[data-professional-theme=true] #panelFichaDocente .teacher-defensible-panel{background:var(--surface);}
+html[data-professional-theme=true] #panelFichaDocente :is(.teacher-defensible-metrics>div,.teacher-defensible-detail>span){background:var(--surface-alt);}

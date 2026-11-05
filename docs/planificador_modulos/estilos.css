@@ -477,6 +477,9 @@ body { font-family:var(--font); background:var(--bg); color:var(--text); min-hei
 .vista-general-cell.filled { color:var(--planhor-ink); font-weight:500; border-color:color-mix(in srgb,var(--planhor-subject-border) 42%,transparent); box-shadow:inset 0 1px 0 rgba(255,255,255,0.34); }
 .vista-general-cell.filled { flex-direction:column; gap:1px; }
 .vista-general-cell.filled span { display:block; max-width:100%; padding:0 2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; line-height:1.05; }
+.vista-general-cell.fields-2 { min-height:calc(2.25em + 10px); }
+.vista-general-cell.fields-3 { min-height:calc(3.25em + 12px); }
+.vista-general-cell.fields-4 { min-height:calc(4.25em + 14px); }
 .vista-general-time small { display:block; max-width:100%; margin-top:1px; font-size:0.74em; font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .vista-general-cell.linked { outline:2px dashed color-mix(in srgb,var(--accent) 50%,transparent); outline-offset:-3px; }
 .vista-general-passive-grid { grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); }
@@ -558,7 +561,7 @@ body { font-family:var(--font); background:var(--bg); color:var(--text); min-hei
 .plan-compare-body .vista-general-cell { min-height:27px; font-size:0.58rem; font-weight:400; }
 .plan-compare-body .vista-general-cell.filled span { font-size:0.56rem; font-weight:400; }
 .plan-compare-empty { min-height:92px; display:flex; align-items:center; justify-content:center; padding:16px; color:var(--text-secondary); font-size:0.7rem; text-align:center; }
-.toast-container { position:fixed; top:14px; right:14px; z-index:9999; display:flex; flex-direction:column; gap:6px; pointer-events:none; }
+.toast-container { position:fixed; top:auto; bottom:14px; right:14px; z-index:9999; display:flex; flex-direction:column; align-items:flex-end; gap:6px; pointer-events:none; }
 .toast { min-height:34px; padding:7px 8px 7px 12px; border-radius:var(--radius-sm); color:#fff; font-weight:500; font-size:0.78rem; line-height:1.25; box-shadow:var(--shadow); width:max-content; max-width:320px; animation:slideIn 240ms ease; transition:opacity 240ms ease, transform 240ms ease; display:flex; align-items:flex-start; gap:8px; pointer-events:auto; }
 .toast-text { min-width:0; overflow-wrap:anywhere; }
 .toast-close { flex:0 0 auto; width:20px; height:20px; border:0; border-radius:50%; background:rgba(255,255,255,0.18); color:#fff; cursor:pointer; font-size:1rem; line-height:18px; display:flex; align-items:center; justify-content:center; opacity:0.9; }

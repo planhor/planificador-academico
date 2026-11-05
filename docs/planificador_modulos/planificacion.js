@@ -714,7 +714,7 @@
             });
             actualizarEstadoVacioPlanificador(secId,totalVisible);
             pintarSeleccionBloques();
-            if(cambioSeccion&&!window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches){
+            if(cambioSeccion&&!(document.documentElement.dataset.planhorMotion!=='full' && window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches)){
                 const superficies=['planProgreso','planMensajes','planComparador','scheduleContainer','planGridLegend']
                     .map(id=>document.getElementById(id)).filter(Boolean);
                 window.clearTimeout(animacionCambioSeccionTimer);
@@ -874,7 +874,7 @@
             const panel=document.getElementById('planComparador');
             if(!panel) return;
             actualizarBotonComparador();
-            const reducirMovimiento=window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+            const reducirMovimiento=(document.documentElement.dataset.planhorMotion!=='full' && window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches);
             if(!comparadorActivo){
                 window.clearTimeout(comparadorAnimacionTimer);
                 panel.classList.remove('opening');
@@ -1153,7 +1153,7 @@
             cell.innerHTML='';
             const wrap=document.createElement('div');
             wrap.className='multi-plan-stack';
-            visibles.slice(0,4).forEach(meta=>{
+            visibles.slice(0,4).forEach((meta,idx)=>{
                 const plan=meta.plan;
                 const asig=data.asignaturas.find(a=>mismoId(a.id,plan.asignaturaId));
                 const sala=data.salas.find(s=>mismoId(s.id,plan.salaId));
@@ -1161,17 +1161,18 @@
                 const idGestor=idGestorBloqueVisible(plan,meta);
                 const item=document.createElement('div');
                 item.className='multi-plan-item'+(meta.vinculado?' linked':'');
+                item.dataset.visibleIndex=String(idx);
                 if(plan.esCargaExterna) item.classList.add('external');
                 if(plan.revisionMarcada) item.classList.add('plan-review-marked');
                 if(plan.estadoGestionExterna) item.classList.add(`plan-external-${plan.estadoGestionExterna}`);
                 item.style.backgroundColor=plan.esCargaExterna?'':(ctx.colorAsignaturaPlanhor?.(asig)||asig?.color||'var(--planhor-subject-neutral)');
-                item.title=[
+                item.setAttribute('aria-label', [
                     plan.esCargaExterna?`Carga externa ${nombreCargaExterna(plan)}`:[asig?.codigo,asig?.nombre].filter(Boolean).join(' - '),
                     idGestor?`ID ${idGestor}`:'',
                     meta.vinculado?`Heredada desde ${nombreSeccion(plan.seccionId)}`:'',
                     sala?.nombre||'Sin sala',
                     docenteNombre(doc)
-                ].filter(Boolean).join(' · ');
+                ].filter(Boolean).join(' · '));
                 item.innerHTML=`
                     <span>${ctx.escapeHTML((plan.esCargaExterna?'EXT · ':meta.electivaObjetivo?'◇ ':meta.vinculado?'🔗 ':plan.fijo?'🔒 ':'')+(plan.esCargaExterna?nombreCargaExterna(plan,18):nombreCortoAsignatura(asig,24)))}</span>
                     <small>${ctx.escapeHTML(sala?.nombre||'?')}</small>
@@ -1330,9 +1331,23 @@
             if(!secId || !cell?.classList?.contains('grid-cell')) return ocultarTooltipPlan();
             const dia=Number(cell.dataset.dia);
             const bloque=Number(cell.dataset.bloque);
-            const visible=planVisibleEn(secId,dia,bloque);
+            const visibles=planesVisiblesEnFuente(secId,dia,bloque);
+            const item=e?.target?.closest?.('.multi-plan-item');
+            const idx=item&&cell.contains(item)?Number(item.dataset.visibleIndex):NaN;
+            const visible=Number.isFinite(idx)&&visibles[idx]?visibles[idx]:(visibles[0]||null);
             const plan=visible?.plan;
             if(!plan) return ocultarTooltipPlan();
+            mostrarDetalleBloque(plan,visible,secId,e);
+        }
+
+        function mostrarTooltipOrganizarSalas(planId,e){
+            const plan=getData().planificaciones.find(p=>String(p.id)===String(planId));
+            if(!plan || ctx.popupState?._popupAbierto) return ocultarTooltipPlan();
+            mostrarDetalleBloque(plan,{},plan.seccionId,e);
+        }
+
+        function mostrarDetalleBloque(plan,visible,secId,e){
+            const data=getData();
             const asig=data.asignaturas.find(a=>a.id===plan.asignaturaId);
             const sala=data.salas.find(s=>s.id===plan.salaId);
             const doc=data.docentes.find(d=>d.id===plan.docenteId);
@@ -1934,11 +1949,46 @@
             popup.style.top=`${Math.round(top)}px`;
         }
 
-        function mostrarPopupAccion(cell, plan, evento=null){
+        function mostrarPopupAlternativasCelda(cell, visibles, evento=null){
+            const data=getData();
+            const popupState=ctx.popupState;
+            if (popupState._popupAbierto && popupState._popupCell === cell) { cerrarPopupAccion(); return; }
+            cerrarPopupAccion();
+            const popup=document.createElement('div');
+            popup.className='action-popup';
+            popup.innerHTML=`
+                <div class="action-popup-note">
+                    <strong>Elegir bloque</strong>
+                    <span>Esta celda contiene ${visibles.length} alternativa(s) visibles.</span>
+                </div>
+                <div class="action-popup-list">
+                    ${visibles.map((meta,idx)=>{
+                        const plan=meta.plan;
+                        const asig=data.asignaturas.find(a=>mismoId(a.id,plan.asignaturaId));
+                        const prefijo=plan.esCargaExterna?'EXT':meta.electivaObjetivo?'Electiva':meta.vinculado?'Heredada':'Bloque';
+                        const origen=meta.electivaObjetivo?` · desde ${nombreSeccion(plan.seccionId)}`:meta.vinculado?` · madre ${nombreSeccion(plan.seccionId)}`:'';
+                        return `<button type="button" data-opcion-bloque="${idx}">${ctx.escapeHTML(prefijo)} · ${ctx.escapeHTML(asig?.codigo||'Asignatura')}${origen}</button>`;
+                    }).join('')}
+                </div>`;
+            document.body.appendChild(popup);
+            posicionarPopupEnPuntero(popup,cell,evento);
+            popupState._popupAbierto=popup; popupState._popupCell=cell;
+            requestAnimationFrame(()=>{ if(window._kbInitPopup) window._kbInitPopup(); });
+            popup.querySelectorAll('[data-opcion-bloque]').forEach(btn=>{
+                btn.addEventListener('click',()=>{
+                    const meta=visibles[Number(btn.dataset.opcionBloque)];
+                    if(!meta?.plan) return;
+                    cerrarPopupAccion();
+                    mostrarPopupAccion(cell,meta.plan,evento,meta);
+                });
+            });
+        }
+
+        function mostrarPopupAccion(cell, plan, evento=null, metaOverride=null){
             const data = getData();
             const popupState = ctx.popupState;
             const secVistaId=data.sel.seccionId;
-            const meta=secVistaId?planVisibleEn(secVistaId,Number(cell.dataset.dia),Number(cell.dataset.bloque)):null;
+            const meta=metaOverride||(secVistaId?planVisibleEn(secVistaId,Number(cell.dataset.dia),Number(cell.dataset.bloque)):null);
             if(meta?.vinculado) return mostrarPopupVinculado(cell,meta,evento);
             if(data.modoPlan && seleccionBloques.size && plan && seleccionBloques.has(plan.id)) return mostrarPopupSeleccion(cell,evento);
             if (popupState._popupAbierto && popupState._popupCell === cell) { cerrarPopupAccion(); return; }
@@ -2438,6 +2488,60 @@
                 ctx.guardar(); ctx.reconstruirIndices(); construirGrilla(); actualizarSelectoresPlan(); refrescarDespuesCambioPlanificacion(); ctx.cerrarModal(); ctx.toast(porComponente?'Docente cambiado en el componente':'Docente cambiado en toda la asignatura','success');
             };
             document.getElementById('modalOverlay').onclick=(e)=>{if(e.target===e.currentTarget)ctx.cerrarModal();};
+        }
+
+        // Servicio compartido por Organizar salas. Solo cambia salaId; conserva horario y relaciones.
+        function grupoOrganizarSalas(planId){
+            const data=getData();
+            const origen=data.planificaciones.find(p=>mismoId(p.id,planId));
+            if(!origen||origen.esCargaExterna||origen.tipoPresencial===false) return [];
+            return data.planificaciones.filter(p=>!p.esCargaExterna&&p.tipoPresencial!==false&&
+                mismoId(p.asignaturaId,origen.asignaturaId)&&mismoId(p.seccionId,origen.seccionId)&&
+                String(p.componenteId||'')===String(origen.componenteId||'')&&
+                p.dia===origen.dia&&mismoId(p.salaId,origen.salaId));
+        }
+        function validarOrganizarSalas(planId,salaId,esperado={}){
+            const data=getData();
+            const falla=msg=>({ok:false,msg,planes:[]});
+            if(esperado.temporadaId!==undefined&&!mismoId(esperado.temporadaId,data.sel?.temporadaId)) return falla('La temporada cambió. Vuelve a tomar el bloque.');
+            const planes=grupoOrganizarSalas(planId);
+            if(!planes.length) return falla('Este bloque se modifica desde Planificación.');
+            const sala=data.salas.find(s=>mismoId(s.id,salaId));
+            if(!sala||sala.esVirtual||mismoId(salaId,ctx.SALA_VIRTUAL_ID)) return falla('Selecciona una sala presencial.');
+            if(planes.some(p=>p.fijo)) return falla('Hay bloques fijos en este grupo. Desbloquéalos desde Planificación.');
+            if(planes.some(p=>esAsignaturaVinculada(p.asignaturaId,p.seccionId))) return falla('Esta asignatura se modifica desde su sección madre.');
+            if(planes.some(p=>!data.asignaturas.some(a=>mismoId(a.id,p.asignaturaId)))) return falla('La asignatura no está disponible. Revisa el bloque en Planificación.');
+            if(esperado.bloques){
+                const campos=['id','salaId','dia','bloque','asignaturaId','seccionId','componenteId','docenteId','fijo'];
+                if(planes.length!==esperado.bloques.length||planes.some(p=>!esperado.bloques.some(v=>campos.every(k=>(p[k]??null)===(v[k]??null))))) return falla('La planificación cambió durante el arrastre. Vuelve a tomar el bloque.');
+            }
+            if(planes.every(p=>mismoId(p.salaId,salaId))) return falla('Esta es la sala de origen.');
+            const ids=planes.map(p=>p.id);
+            for(const p of planes){
+                const ocupados=planesSalaEn(sala.id,p.dia,p.bloque,{ignorarIds:ids});
+                if(ocupados.length) return falla(`La sala está ocupada en ${ctx.DIAS[p.dia]} B${p.bloque}.`);
+            }
+            const capacidad=evaluarCapacidadSala(planes[0].asignaturaId,planes[0].seccionId,sala.id,planes[0].componenteId||'');
+            return {ok:true,planes,sala,advertencia:capacidad.excede?`Capacidad ${capacidad.capacidad} para ${capacidad.alumnos} alumnos. Se solicitará confirmación.`:''};
+        }
+        async function aplicarOrganizarSalas(planId,salaId,esperado={}){
+            let resultado=validarOrganizarSalas(planId,salaId,esperado);
+            if(!resultado.ok) return resultado;
+            const primero=resultado.planes[0];
+            if(!confirmarCapacidadSala(primero.asignaturaId,primero.seccionId,salaId,primero.componenteId||'')) return {ok:false,msg:'Traslado cancelado.',planes:[]};
+            resultado=validarOrganizarSalas(planId,salaId,esperado);
+            if(!resultado.ok) return resultado;
+            const cambios=resultado.planes.map(p=>({id:p.id,salaAnteriorId:p.salaId,salaNuevaId:salaId,dia:p.dia,bloque:p.bloque}));
+            ctx.pushUndo({tipo:'organizar_salas',resumen:'Trasladar bloques entre salas',afecta:`${cambios.length} bloque(s)`,temporadaId:getData().sel?.temporadaId});
+            resultado.planes.forEach(p=>{
+                registrarMemoriaPlanificacion('sala_corregida',Object.assign(contextoMemoriaDesdePlan(p),{salaAnteriorId:p.salaId,salaNuevaId:salaId,desdeTRO2:p.salaId===ctx.SALA_TRO2_ID}));
+                p.salaId=salaId;
+            });
+            ctx.auditoria?.('salas_reorganizadas',{cantidad:cambios.length,cambios});
+            ctx.reconstruirIndices();
+            const guardado=await ctx.guardar();
+            ctx.refrescarTodo?.();
+            return {ok:true,cantidad:cambios.length,guardado,msg:guardado===false?'Traslado guardado localmente; sincronización pendiente.':'Sala actualizada. Puedes deshacer desde la barra superior.'};
         }
 
         function cambiarSalaAsignatura(plan){
@@ -5505,7 +5609,7 @@
         function ejecutarSolverEnWorker(opciones,objetivos=[]){
             if(typeof Worker==='undefined') return Promise.reject(new Error('solver-worker-no-disponible'));
             cancelarWorkerOptimizacion();
-            const worker=new Worker('planificador_modulos/solver-worker.js?v=20260622-glpk5');
+            const worker=new Worker('planificador_modulos/solver-worker.js?v=20261026-restauracion-segura');
             const id=`solver-${Date.now()}-${Math.random().toString(36).slice(2)}`;
             return new Promise((resolve,reject)=>{
                 const limpiar=()=>{
@@ -7157,7 +7261,10 @@
                 ocultarTooltipPlan();
                 const cell=celdaDesdeEvento(e);
                 if(!cell||cell.dataset.dia===undefined) return;
-                const visible=data.sel.seccionId?planVisibleEn(data.sel.seccionId,Number(cell.dataset.dia),Number(cell.dataset.bloque)):null;
+                const visibles=data.sel.seccionId?planesVisiblesEnFuente(data.sel.seccionId,Number(cell.dataset.dia),Number(cell.dataset.bloque)):[];
+                const item=e.target?.closest?.('.multi-plan-item');
+                const idx=item&&cell.contains(item)?Number(item.dataset.visibleIndex):NaN;
+                const visible=Number.isFinite(idx)&&visibles[idx]?visibles[idx]:(visibles[0]||null);
                 const plan=visible?.plan||null;
                 if(!plan) return;
                 e.preventDefault();
@@ -7170,7 +7277,8 @@
                 arrastre.appendSeleccion=false;
                 arrastre.celdas=[];
                 quitarFantasmaArrastre();
-                mostrarPopupAccion(cell,plan,e);
+                if(visibles.length>1 && !(Number.isFinite(idx)&&visibles[idx])) mostrarPopupAlternativasCelda(cell,visibles,e);
+                else mostrarPopupAccion(cell,plan,e,visible);
             });
             window.addEventListener('blur',cancelarArrastreFueraGrilla);
             document.addEventListener('pointerdown',(e)=>{
@@ -7262,6 +7370,11 @@
             actualizarSelectoresPlan,
             actualizarProgresoPlan,
             validarSeleccionManual,
+            grupoOrganizarSalas,
+            mostrarTooltipOrganizarSalas,
+            ocultarTooltipPlan,
+            validarOrganizarSalas,
+            aplicarOrganizarSalas,
             scoreGlobalPlanificaciones,
             simularOptimizacionHorario,
             simularOptimizacionIterativa,

@@ -108,3 +108,22 @@ test('electivas vinculadas al mismo destino pueden compartir horario', () => {
 
     assert.equal(api.checkDisponibilidad('doc-1', 3, 5, 'sec-e1').ok, true);
 });
+
+test('electivas vinculadas no pueden topar con asignaturas base del destino', () => {
+    const data = crearDatosBase();
+    data.asignaturas.push({ id: 'elec-1', codigo: 'EARS41', nombre: 'Electivo de especialidad I', area: 'electiva' });
+    data.secciones.push({ id: 'sec-e1', nivelId: 'niv-1', nombre: 'ELEC-N4-C1', jornada: 'diurna' });
+    data.vinculosElectivos = [
+        { id: 've-1', asignaturaId: 'elec-1', seccionOrigenId: 'sec-e1', seccionDestinoId: 'sec-1' }
+    ];
+    data.planificaciones.push({
+        id: 'p-base', seccionId: 'sec-1', asignaturaId: 'asi-1', docenteId: 'doc-otro', salaId: 'sala-otra', dia: 3, bloque: 5
+    });
+    data.sel.asignaturaId = 'elec-1';
+    data.sel.seccionId = 'sec-e1';
+    const { api } = crearPlanificacionPrueba(data);
+
+    const resultado = api.checkDisponibilidad('doc-1', 3, 5, 'sec-e1');
+    assert.equal(resultado.ok, false);
+    assert.match(resultado.msg, /C1/);
+});

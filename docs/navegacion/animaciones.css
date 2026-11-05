@@ -1,0 +1,53 @@
+/* Movimiento de la capa visual local de Planhor.
+ * Duraciones, curvas, transiciones y keyframes. Ver MANTENIMIENTO.md.
+ * Mantener el orden de las reglas: conserva los efectos actuales. */
+.application-settings .dropdown-menu{transition:opacity 140ms ease,visibility 140ms!important;}
+.planning-automation[open] .planning-automation-options{animation:planhorFloatingIn 140ms ease-out both;}
+@media (prefers-reduced-motion:reduce){.application-settings .dropdown-menu{transition:none!important;}
+.planning-automation[open] .planning-automation-options{animation:none;}
+}
+html[data-planhor-motion=full] .modal-overlay{animation:planhorOverlayIn 220ms ease-out both!important;}
+html[data-planhor-motion=full] .modal{animation:planhorModalIn 220ms ease-out both!important;}
+html[data-planhor-motion=full] :is(.action-popup,.action-popup-submenu-panel,.planning-automation[open]>.planning-automation-options,.sidebar-pin-menu:not([hidden])){animation:planhorFloatingIn 180ms ease-out both!important;}
+html[data-planhor-motion=full] :is(.dropdown-menu,.search-results){transition:opacity 180ms ease,transform 180ms ease,visibility 180ms!important;}
+html[data-planhor-motion=full] :is(.btn,.tab-btn,.account-avatar){transition:background-color 160ms ease,border-color 160ms ease,box-shadow 160ms ease,transform 160ms ease!important;}
+html[data-planhor-motion=full] .nested{transition:max-height 240ms ease,opacity 180ms ease,visibility 240ms!important;}
+@keyframes planhorWorkspaceIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+html[data-planhor-motion=full] .plan-compare-panel{transition:max-height 240ms cubic-bezier(.22,.8,.3,1),padding 240ms ease,margin-bottom 240ms ease,border-width 240ms ease,opacity 180ms ease,transform 210ms ease!important;}
+html[data-planhor-motion=full] .navigation-canvas .plan-mode-tools{transition:max-height 240ms ease,opacity 180ms ease,transform 240ms ease,visibility 240ms!important;}
+html[data-planhor-motion=full] .selection-panel.plan-mode-active .plan-work-control{animation:planhorWorkspaceIn 240ms ease-out both!important;}
+.selection-panel .planning-work-fields .plan-work-control{animation:none!important;}
+html[data-planhor-motion=full] .planning-work-fields{transition:grid-template-rows 280ms cubic-bezier(.22,.8,.3,1),opacity 220ms ease,visibility 280ms!important;}
+.application-sidebar .tab-btn .navigation-icon{transition:transform 160ms ease;}
+html[data-planhor-motion=full] .application-sidebar .tab-btn{transition:background-color 120ms ease,border-color 120ms ease,color 120ms ease!important;}
+html[data-planhor-motion=full] .application-sidebar .tab-btn .navigation-icon{transition:transform 120ms ease!important;}
+:root{--motion-response:140ms;--motion-surface:180ms;--motion-expand:220ms;--motion-ease:cubic-bezier(.22,.8,.3,1);}
+html[data-planhor-motion=full] :is(.btn,.tab-btn,.account-avatar,.navigation-icon){transition-duration:var(--motion-response)!important;transition-timing-function:var(--motion-ease)!important;}
+html[data-planhor-motion=full] :is(.dropdown-menu,.search-results,.plan-block-tooltip){transition-duration:var(--motion-surface)!important;transition-timing-function:var(--motion-ease)!important;}
+html[data-planhor-motion=full] :is(.tab-panel.active,.modal-overlay,.modal,.action-popup,.action-popup-submenu-panel,.planning-automation[open]>.planning-automation-options,.sidebar-pin-menu:not([hidden])){animation-duration:var(--motion-surface)!important;animation-timing-function:var(--motion-ease)!important;}
+html[data-planhor-motion=full] :is(.planning-work-fields,.plan-mode-group,.plan-compare-panel,.nested){transition-duration:var(--motion-expand)!important;transition-timing-function:var(--motion-ease)!important;}
+html[data-planhor-motion=full] .application-sidebar :is(.tab-btn,.navigation-icon){transition-timing-function:var(--motion-ease)!important;}
+html[data-planhor-motion=full] .account-control[open]>.account-menu{animation:planhorFloatingIn var(--motion-surface) var(--motion-ease) both!important;}
+html[data-planhor-motion=full] .account-menu-action{transition:background-color var(--motion-response) var(--motion-ease),color var(--motion-response) var(--motion-ease)!important;}
+html[data-planhor-motion=full] :is(.form-input,.form-select,.icon-btn,.dropdown-item,.career-header,.career-header .arrow,.dashboard-card-action,.dashboard-section-link,.dashboard-career-link,.dashboard-preparation-link,.dashboard-quality-card,.global-score-loss,.cleanup-option,.recovery-option,.auto-general-strategy,.predictive-scenario,.external-load-slot){transition-duration:var(--motion-response)!important;transition-timing-function:var(--motion-ease)!important;}
+html[data-planhor-motion=full] :is(.result-content-refresh,.plan-section-surface-change){animation-duration:var(--motion-expand)!important;animation-timing-function:var(--motion-ease)!important;}
+html[data-planhor-motion=full] .dashboard-progress-fill{transition-duration:var(--motion-expand)!important;transition-timing-function:var(--motion-ease)!important;}
+html[data-planhor-motion=full] .grid-cell{transition:background-color var(--motion-response) var(--motion-ease),border-color var(--motion-response) var(--motion-ease)!important;}
+html[data-planhor-motion=full] .modal-overlay.closing{animation:planhorOverlayOut var(--motion-surface) var(--motion-ease) both!important;}
+html[data-planhor-motion=full] .modal-overlay.closing .modal{animation:planhorModalOut var(--motion-surface) var(--motion-ease) both!important;}
+html[data-planhor-motion=full] .action-popup.closing{animation:planhorFloatingOut 100ms var(--motion-ease) both!important;}
+html[data-planhor-motion=full] .startup-sync-overlay.closing{animation:planhorOverlayOut var(--motion-surface) var(--motion-ease) both!important;}
+html[data-planhor-motion=full] #contenidoPrincipal table tbody tr{transition:background-color var(--motion-response) var(--motion-ease)!important;}
+html[data-planhor-motion=full] :is(#contenidoPrincipal,.application-sidebar,#modalContainer,#motorOverlay,#themeOverlay) :is(input,select,textarea){transition:border-color var(--motion-response) var(--motion-ease),background-color var(--motion-response) var(--motion-ease),box-shadow var(--motion-response) var(--motion-ease)!important;}
+html[data-planhor-motion=full] :where(#appRoot,#modalContainer,#motorOverlay,#themeOverlay) :is(summary,.clear-btn,.theme-swatch,.mini-cell,.external-load-slot,input[type=checkbox],input[type=radio],label:has(input:is([type=checkbox],[type=radio]))){transition:outline-color var(--motion-response) var(--motion-ease),color var(--motion-response) var(--motion-ease),border-color var(--motion-response) var(--motion-ease)!important;}
+.navigation-canvas{transition:none!important;}
+:root{--sidebar-motion:180ms;--sidebar-ease:cubic-bezier(.25,.1,.25,1);}
+html[data-planhor-motion=full] .application-sidebar::before{transition:transform var(--sidebar-motion) var(--sidebar-ease)!important;}
+html[data-planhor-motion=full] .application-sidebar :is(.navigation-label,.application-sidebar-heading>span,.application-season-content,.application-search-content,.application-season-compact,.application-search-compact){transition:opacity var(--sidebar-motion) var(--sidebar-ease),visibility 0s linear!important;}
+html[data-planhor-motion=full].application-menu-collapsed .application-sidebar :is(.navigation-label,.application-sidebar-heading>span,.application-season-content,.application-search-content){transition:opacity var(--sidebar-motion) var(--sidebar-ease),visibility 0s linear var(--sidebar-motion)!important;}
+html[data-planhor-motion=full] .application-sidebar :is(.tab-btn,.application-settings-button){transition:width var(--sidebar-motion) var(--sidebar-ease),background-color var(--sidebar-motion) var(--sidebar-ease),border-color var(--sidebar-motion) var(--sidebar-ease),color var(--sidebar-motion) var(--sidebar-ease)!important;}
+html[data-planhor-motion=full] .navigation-canvas{transition:none!important;}
+@keyframes planhorContentFade{from{opacity:.55}to{opacity:1}}
+html[data-planhor-motion=full] .result-content-refresh{animation:planhorContentFade var(--motion-expand) var(--motion-ease) both!important;}
+@keyframes planhorContentWindowIn{from{opacity:.45;transform:scale(.99)}to{opacity:1;transform:scale(1)}}
+html[data-planhor-motion=full] .tab-panel.active{animation:planhorContentWindowIn 180ms var(--motion-ease) both!important;}

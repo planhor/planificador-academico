@@ -16,11 +16,12 @@
         const RECOVERY_MIN_INTERVAL = 2 * 60 * 1000;
         const LOCAL_DB_NAME = 'planhor_local_v1';
         const LOCAL_DB_STORE = 'sync';
-        const LOCAL_KEYS = { estado:'estado', base:'base', pendiente:'pendiente', recuperaciones:'recuperaciones' };
+        const LOCAL_KEYS = { estado:'estado', base:'base', pendiente:'pendiente', recuperaciones:'recuperaciones', restauracion:'restauracion' };
+        const RESTAURACION_KEY = 'planificador_v5_8_restauracion_retenida';
         let localDbPromise = null;
         let localDbDisponible = false;
         let almacenLocalInicializado = false;
-        const cacheLocal = { estado:null, base:null, pendiente:null, snapshots:[] };
+        const cacheLocal = { estado:null, base:null, pendiente:null, snapshots:[], restauracion:null };
         let estadoFormalSync='reconectando';
         let reintentoNumero=0;
         let reintentoTimer=null;
@@ -28,6 +29,7 @@
         let reconexionActiva=null;
         let colaSnapshotRemoto=Promise.resolve();
         let comparacionAutomaticaActiva=false;
+        let generacionRestauracion=0;
         const RETRY_DELAYS=[800,2000,5000,10000,30000];
 
         const getData = ctx.getData;
@@ -193,20 +195,26 @@
         }
         async function inicializarAlmacenLocal() {
             if (almacenLocalInicializado) return;
+            try {
+                const retenida=localStorage.getItem(RESTAURACION_KEY);
+                if(retenida) cacheLocal.restauracion=JSON.parse(retenida);
+            } catch(e) { /* IndexedDB todavía puede recuperar la retención. */ }
             const legado = leerLocalStorageLegado();
             try {
                 await abrirAlmacenLocal();
                 localDbDisponible = true;
-                const [estado,base,pendiente,snapshots] = await Promise.all([
+                const [estado,base,pendiente,snapshots,restauracion] = await Promise.all([
                     leerRegistroLocal(LOCAL_KEYS.estado),
                     leerRegistroLocal(LOCAL_KEYS.base),
                     leerRegistroLocal(LOCAL_KEYS.pendiente),
-                    leerRegistroLocal(LOCAL_KEYS.recuperaciones)
+                    leerRegistroLocal(LOCAL_KEYS.recuperaciones),
+                    leerRegistroLocal(LOCAL_KEYS.restauracion)
                 ]);
                 cacheLocal.estado = registroMasReciente(estado, legado.estado);
                 cacheLocal.base = registroMasReciente(base, legado.base);
                 cacheLocal.pendiente = registroMasReciente(pendiente, legado.pendiente);
                 cacheLocal.snapshots = combinarSnapshots(snapshots, legado.snapshots);
+                cacheLocal.restauracion = restauracion || cacheLocal.restauracion;
                 let migracionCompleta=true;
                 try { if (cacheLocal.estado && cacheLocal.estado!==estado) await escribirRegistroLocal(LOCAL_KEYS.estado, cacheLocal.estado); } catch(e) { migracionCompleta=false; }
                 try { if (cacheLocal.base && cacheLocal.base!==base) await escribirRegistroLocal(LOCAL_KEYS.base, cacheLocal.base); } catch(e) { migracionCompleta=false; }
@@ -223,13 +231,15 @@
             }
             almacenLocalInicializado = true;
         }
-        async function guardarEstadoLocal(json) {
+        async function guardarEstadoLocal(json, generacion=generacionRestauracion) {
+            if(generacion!==generacionRestauracion) return false;
             const registro={json:String(json||''),fecha:new Date().toISOString()};
             cacheLocal.estado=registro;
             if (localDbDisponible) {
                 try { await escribirRegistroLocal(LOCAL_KEYS.estado, registro); return true; } catch(e) { localDbDisponible=false; }
             }
-            try { localStorage.setItem('planificador_v5_8', registro.json); localStorage.setItem('planificador_v5_8_ts',registro.fecha); return true; } catch(e) { return false; }
+            if(generacion!==generacionRestauracion) return false;
+            try { copiarRetencionAlFallback(); localStorage.setItem('planificador_v5_8', registro.json); localStorage.setItem('planificador_v5_8_ts',registro.fecha); return true; } catch(e) { return false; }
         }
         async function guardarBaseComun(json) {
             const registro={json:String(json||''),fecha:new Date().toISOString()};
@@ -245,16 +255,18 @@
             if(!cacheLocal.base?.json) return null;
             try { return JSON.parse(cacheLocal.base.json); } catch(e) { return null; }
         }
-        async function guardarPendienteLocal(json) {
+        async function guardarPendienteLocal(json, generacion=generacionRestauracion) {
+            if(generacion!==generacionRestauracion) return false;
             const registro={json:String(json||''),fecha:new Date().toISOString()};
             cacheLocal.pendiente=registro;
-            if (localDbDisponible) {
-                try { await escribirRegistroLocal(LOCAL_KEYS.pendiente, registro); }
-                catch(e) { localDbDisponible=false; try { localStorage.setItem('planificador_v5_8_pendiente',registro.json); localStorage.setItem('planificador_v5_8_pendiente_ts',registro.fecha); } catch(e2) {} }
-            } else {
-                try { localStorage.setItem('planificador_v5_8_pendiente',registro.json); localStorage.setItem('planificador_v5_8_pendiente_ts',registro.fecha); } catch(e) {}
-            }
             cambioLocal = true;
+            if (localDbDisponible) {
+                try { await escribirRegistroLocal(LOCAL_KEYS.pendiente, registro); return true; }
+                catch(e) { localDbDisponible=false; }
+            }
+            if(generacion!==generacionRestauracion) return false;
+            try { copiarRetencionAlFallback(); localStorage.setItem('planificador_v5_8_pendiente',registro.json); localStorage.setItem('planificador_v5_8_pendiente_ts',registro.fecha); return true; }
+            catch(e) { return false; }
         }
         function leerPendienteLocal() {
             return cacheLocal.pendiente?.json ? cacheLocal.pendiente : null;
@@ -276,22 +288,20 @@
             if(!snapshot.checksum) return 'historico';
             return checksumRapido(snapshot.json)===snapshot.checksum ? 'valido' : 'invalido';
         }
-        function guardarListaSnapshotsRecuperacion(lista) {
+        async function guardarListaSnapshotsRecuperacion(lista) {
             cacheLocal.snapshots=lista.slice(0, RECOVERY_MAX);
             if (localDbDisponible) {
-                escribirRegistroLocal(LOCAL_KEYS.recuperaciones, cacheLocal.snapshots).catch(()=>{
-                    try { localStorage.setItem(RECOVERY_KEY, JSON.stringify(cacheLocal.snapshots)); } catch(e) {}
-                });
-                return true;
+                try { await escribirRegistroLocal(LOCAL_KEYS.recuperaciones, cacheLocal.snapshots); return true; }
+                catch(e) { localDbDisponible=false; }
             }
             try { localStorage.setItem(RECOVERY_KEY, JSON.stringify(cacheLocal.snapshots)); return true; }
             catch(e) { return false; }
         }
-        function guardarSnapshotRecuperacion(motivo, json, baseData=null, opciones={}) {
+        async function guardarSnapshotRecuperacion(motivo, json, baseData=null, opciones={}) {
             const texto = String(json || '');
             if (!texto || texto.length < 20) return false;
             const lista = leerSnapshotsRecuperacion();
-            if (lista[0]?.json === texto) return false;
+            if (lista[0]?.json === texto) return opciones.forzar ? guardarListaSnapshotsRecuperacion(lista) : false;
             const ahoraMs = Date.now();
             if (!opciones.forzar && lista[0]?.fechaMs && ahoraMs - Number(lista[0].fechaMs) < RECOVERY_MIN_INTERVAL) return false;
             const resumen = resumenContenido(baseData || getData());
@@ -328,18 +338,23 @@
                 return null;
             }
         }
-        function crearSnapshotActual(motivo='punto_recuperacion') {
+        async function crearSnapshotActual(motivo='punto_recuperacion') {
             try {
                 const data = getData();
                 const snapshot = crearSnapshotCompartido(data);
                 const json = JSON.stringify(snapshot);
-                return guardarSnapshotRecuperacion(motivo, json, snapshot, {forzar:true});
+                return await guardarSnapshotRecuperacion(motivo, json, snapshot, {forzar:true,permitirVacio:true});
             } catch(e) {
                 console.warn('No se pudo crear punto de recuperación:', e);
                 return false;
             }
         }
         async function guardarRestauracionLocal(motivo='restauracion_local') {
+            // Retener antes del primer await: ni eventos de red ni autoguardado publican esta copia.
+            const retencion={id:crearRevisionId(),motivo,fecha:new Date().toISOString()};
+            cacheLocal.restauracion=retencion;
+            const generacion=++generacionRestauracion;
+            reiniciarReintentos();
             const data=getData();
             const ahora=Date.now();
             data._versionBase=versionRemotaConocida || Number(data._versionBase) || Number(data._version) || 0;
@@ -350,12 +365,59 @@
             const snapshot=crearSnapshotCompartido(data);
             const json=JSON.stringify(snapshot);
             if(!json || json.length<20) return false;
-            await guardarEstadoLocal(json);
-            await guardarPendienteLocal(json);
+            const retencionGuardada=await guardarRetencionRestauracion(retencion);
+            if(generacion!==generacionRestauracion) return false;
+            if(!retencionGuardada){
+                // Conservar solo en memoria: no crear un pendiente durable sin su bloqueo.
+                cacheLocal.estado={json,fecha:new Date().toISOString()};
+                cacheLocal.pendiente=cacheLocal.estado;
+                avisarPersistenciaFallida();
+                return false;
+            }
+            const estadoGuardado=await guardarEstadoLocal(json,generacion);
+            const pendienteGuardado=await guardarPendienteLocal(json,generacion);
+            if(generacion!==generacionRestauracion) return false;
             ctx.setCambiosPendientes?.(true);
+            if(!retencionGuardada || !estadoGuardado || !pendienteGuardado){
+                avisarPersistenciaFallida();
+                return false;
+            }
             establecerEstadoSync('pendiente','Restauración local pendiente');
             ctx.setSaveStatus?.('error','Restaurado localmente',false);
             return true;
+        }
+        async function guardarRetencionRestauracion(retencion){
+            if(localDbDisponible){
+                try { await escribirRegistroLocal(LOCAL_KEYS.restauracion,retencion); return true; }
+                catch(e){ localDbDisponible=false; }
+            }
+            try { localStorage.setItem(RESTAURACION_KEY,JSON.stringify(retencion)); return true; }
+            catch(e){ return false; }
+        }
+        function copiarRetencionAlFallback(){
+            // El contenido retenido nunca debe sobrevivir en otro almacén sin su bloqueo.
+            if(cacheLocal.restauracion) localStorage.setItem(RESTAURACION_KEY,JSON.stringify(cacheLocal.restauracion));
+        }
+        async function liberarRetencionRestauracion(id){
+            if(!id || cacheLocal.restauracion?.id!==id) return;
+            await guardarRetencionRestauracion(null);
+            if(cacheLocal.restauracion?.id!==id) return;
+            try { localStorage.removeItem(RESTAURACION_KEY); } catch(e) {}
+            cacheLocal.restauracion=null;
+        }
+        function restauracionBloqueada(opciones={}){
+            return !!cacheLocal.restauracion && opciones.restauracionAutorizada!==cacheLocal.restauracion.id;
+        }
+        function indicarRestauracionRetenida(){
+            ctx.setCambiosPendientes?.(true);
+            establecerEstadoSync('pendiente','Restauración pendiente de confirmación');
+            ctx.setSaveStatus?.('error','Confirma desde Sincronizar',false);
+        }
+        function avisarPersistenciaFallida(){
+            ctx.setCambiosPendientes?.(true);
+            establecerEstadoSync('pendiente','Almacenamiento local no disponible');
+            ctx.setSaveStatus?.('error','Sin copia local segura',false);
+            ctx.toast?.('No se pudo guardar una copia local segura. Descarga un respaldo antes de cerrar esta página.','error');
         }
         const AUSENTE=Symbol('ausente');
         const META_SYNC=new Set(['_version','_versionBase','_revisionId','_savedBy','_savedAt']);
@@ -836,6 +898,7 @@
             if(tipoError==='integridad'||tipoError==='transitorio') programarReintento({verificarRemoto:true});
         }
         async function aplicarRemoto(remoto, jsonRemoto) {
+            if(restauracionBloqueada()){ indicarRestauracionRetenida(); return false; }
             const data = getData();
             const localAntes = JSON.stringify(crearSnapshotCompartido(data));
             const remotoTexto = jsonRemoto || JSON.stringify(remoto);
@@ -981,6 +1044,8 @@
             });
         }
         async function resolverPendienteConRemoto(pendiente,remoto,opciones={}){
+            const generacion=generacionRestauracion;
+            if(restauracionBloqueada(opciones)){ indicarRestauracionRetenida(); return false; }
             establecerEstadoSync('comparando');
             let local;
             try { local=JSON.parse(pendiente?.json||''); } catch(e) { ctx.toast('El respaldo local pendiente no se pudo leer. No se modificó la nube.','error'); return false; }
@@ -1003,6 +1068,7 @@
                 if(!decisiones){ establecerEstadoSync('conflicto'); return false; }
                 fusion=aplicarDecisionesFusion(resultado,decisiones);
             }
+            if(generacion!==generacionRestauracion || restauracionBloqueada(opciones)){ indicarRestauracionRetenida(); return false; }
             const data=getData();
             guardarSnapshotRecuperacion('antes_fusion_tres_vias',JSON.stringify(crearSnapshotCompartido(data)),data,{forzar:true});
             Object.assign(data,fusion);
@@ -1020,7 +1086,7 @@
             ctx.normalizarDatos?.();
             ctx.reconstruirIndices();
             ctx.refrescarTodo();
-            const ok=await guardar({forzar:true,sobrescribirRemoto:true,revisionRemotaEsperada:String(remoto._revisionId||''),versionRemotaEsperada:Number(remoto._version)||0,motivo:'fusion_tres_vias'});
+            const ok=await guardar({forzar:true,sobrescribirRemoto:true,revisionRemotaEsperada:String(remoto._revisionId||''),versionRemotaEsperada:Number(remoto._version)||0,motivo:'fusion_tres_vias',restauracionAutorizada:opciones.restauracionAutorizada});
             if(ok) ctx.toast(resultado.conflictos.length?'Conflictos resueltos y cambios combinados':'Cambios locales y remotos combinados automáticamente','success');
             return ok;
         }
@@ -1033,11 +1099,14 @@
         function instalarSnapshot(ref, onSnapshot) {
             onSnapshot(ref, {includeMetadataChanges:true}, (snapLive) => {
                 colaSnapshotRemoto=colaSnapshotRemoto.catch(()=>{}).then(async()=>{
+                    const generacion=generacionRestauracion;
+                    if(restauracionBloqueada()){ indicarRestauracionRetenida(); return; }
                     if (!snapLive.exists()) return;
                     if (snapLive.metadata?.hasPendingWrites) return;
                     const cabecera = snapLive.data() || {};
                     try {
                     const remoto = await leerRemotoConsistente(ref);
+                    if(generacion!==generacionRestauracion || restauracionBloqueada()){ indicarRestauracionRetenida(); return; }
                     if(!remoto) return;
                     const jsonRemoto = JSON.stringify(remoto);
                     integridadRemotaAvisada='';
@@ -1088,11 +1157,20 @@
         }
         async function recargarDesdeFirestore(silencioso=false) {
             const opciones = typeof silencioso === 'object' ? silencioso : { silencioso: !!silencioso };
+            if(cacheLocal.restauracion){
+                if(opciones.automatico){ indicarRestauracionRetenida(); return false; }
+                const id=cacheLocal.restauracion.id;
+                const confirmado=opciones.confirmarRestauracion===true || await ctx.confirmarRestauracion?.();
+                if(!confirmado || cacheLocal.restauracion?.id!==id){ indicarRestauracionRetenida(); return false; }
+                opciones.restauracionAutorizada=id;
+            }
             try {
                 establecerEstadoSync('reconectando');
                 const { db, doc } = window._fb;
                 const ref = doc(db, 'planificador', 'datos');
+                const generacion=generacionRestauracion;
                 const remoto = await leerRemotoConsistente(ref);
+                if(generacion!==generacionRestauracion || restauracionBloqueada(opciones)){ indicarRestauracionRetenida(); return false; }
                 if (!remoto) { establecerEstadoSync('sincronizado'); return false; }
                 establecerEstadoSync('comparando');
                 const jsonRemoto = JSON.stringify(remoto);
@@ -1103,6 +1181,8 @@
                     ctx.setCambiosPendientes?.(true);
                     return opciones.automatico ? await resolverPendienteAutomatico(pendiente,remoto) : await resolverPendienteConRemoto(pendiente,remoto,opciones);
                 }
+                await liberarRetencionRestauracion(opciones.restauracionAutorizada);
+                if(generacion!==generacionRestauracion){ indicarRestauracionRetenida(); return false; }
                 await aplicarRemoto(remoto, jsonRemoto);
                 modoLocalInicio = false;
                 conflictoRemoto = false;
@@ -1154,8 +1234,14 @@
             });
         }
         async function guardarAhora(opciones={}) {
+            const generacion=generacionRestauracion;
             const data = getData();
+            if(cacheLocal.restauracion && !await guardarRetencionRestauracion(cacheLocal.restauracion)){
+                avisarPersistenciaFallida();
+                return false;
+            }
             ctx.reconstruirIndices();
+            if(generacion!==generacionRestauracion) return false;
             const versionBase = versionRemotaConocida || Number(data._version) || 0;
             let snapshot = crearSnapshotCompartido(data);
             if(!opciones.forzar&&lastSave&&contenidoComparable(snapshot)===contenidoComparable(lastSave)) return true;
@@ -1175,9 +1261,15 @@
             registrarRevisionLocal(data._revisionId);
             establecerEstadoSync('local_modificado');
             guardarSnapshotRecuperacion(opciones.motivo || 'guardado_seguro', json, snapshot, {forzar:!!opciones.snapshotForzado});
-            await guardarEstadoLocal(json);
-            await guardarPendienteLocal(json);
+            const estadoGuardado=await guardarEstadoLocal(json,generacion);
+            const pendienteGuardado=await guardarPendienteLocal(json,generacion);
+            if(generacion!==generacionRestauracion) return false;
             establecerEstadoSync('pendiente');
+            if(!estadoGuardado || !pendienteGuardado){
+                avisarPersistenciaFallida();
+                return false;
+            }
+            if(restauracionBloqueada(opciones)){ indicarRestauracionRetenida(); return false; }
             if (modoLocalInicio && !opciones.forzar) {
                 ctx.setCambiosPendientes?.(true);
                 establecerEstadoSync('modo_local');
@@ -1218,6 +1310,7 @@
                                 throw err;
                             }
                         }
+                        if(restauracionBloqueada(opciones)) throw new Error('restauracion-retenida');
                         await escribirPayloadFirestore({db, doc, transaction, ref, payload, json});
                     });
                 } else {
@@ -1239,8 +1332,10 @@
                             throw err;
                         }
                     }
+                    if(restauracionBloqueada(opciones)) throw new Error('restauracion-retenida');
                     await escribirPayloadFirestore({db, doc, setDoc, ref, payload, json});
                 }
+                if(generacion!==generacionRestauracion || restauracionBloqueada(opciones)){ indicarRestauracionRetenida(); return false; }
                 cambioLocal = true;
                 lastSave = json;
                 versionRemotaConocida = Number(data._version) || Date.now();
@@ -1248,6 +1343,7 @@
                 await guardarEstadoLocal(json);
                 await guardarBaseComun(json);
                 await limpiarPendienteLocal();
+                await liberarRetencionRestauracion(opciones.restauracionAutorizada);
                 ctx.setCambiosPendientes?.(false);
                 registrarUltimoRemoto(data);
                 reiniciarReintentos();
@@ -1255,6 +1351,7 @@
                 ctx.setSaveStatus?.('success','✓ Guardado');
                 return true;
             } catch(e) {
+                if(e?.message==='restauracion-retenida'){ indicarRestauracionRetenida(); return false; }
                 if (e?.message === 'sobrescritura-regresiva') {
                     conflictoRemoto = true;
                     establecerEstadoSync('conflicto');
@@ -1281,6 +1378,7 @@
             }
         }
         function programarReintento(opciones={}){
+            if(cacheLocal.restauracion){ indicarRestauracionRetenida(); return; }
             if(opciones.verificarRemoto) reintentoVerificacionRemota=true;
             if(reintentoTimer||conflictoRemoto||(!leerPendienteLocal()?.json&&!reintentoVerificacionRemota)) return;
             if(!navigator.onLine){ establecerEstadoSync('sin_conexion'); return; }
@@ -1304,6 +1402,7 @@
             finally { reconexionActiva=null; }
         }
         async function ejecutarReintentoPendienteLocal() {
+            if(cacheLocal.restauracion){ indicarRestauracionRetenida(); return false; }
             const pendiente = leerPendienteLocal();
             if (!pendiente?.json) return false;
             if (conflictoRemoto) {
@@ -1347,7 +1446,14 @@
             const data = getData();
             await inicializarAlmacenLocal();
             const pendienteInicio=leerPendienteLocal();
-            let conectadoNube = false;
+            let conectadoNube = !!cacheLocal.restauracion;
+            if(cacheLocal.restauracion){
+                cargarLocal(data);
+                modoLocalInicio=true;
+                indicarRestauracionRetenida();
+                const {db,doc,onSnapshot}=window._fb;
+                instalarSnapshot(doc(db,'planificador','datos'),onSnapshot);
+            }
             while (!conectadoNube) {
                 establecerEstadoSync('reconectando');
                 window._planhorStartupSync?.set('Conectando con Firebase...');

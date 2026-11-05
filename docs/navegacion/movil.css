@@ -1,0 +1,114 @@
+/* Vista móvil local. Todas las reglas quedan limitadas a pantallas pequeñas. */
+@media(max-width:600px), (max-width:950px) and (max-height:500px) and (orientation:landscape){
+ :root,html.application-menu-collapsed{--application-sidebar-width:0px;--preview-notice-height:24px;}
+ .preview-notice{font-size:8px;justify-content:flex-start;padding:0 8px;}
+ #appRoot{padding-bottom:calc(68px + env(safe-area-inset-bottom));}
+ .app-header{flex-wrap:wrap;padding:5px 8px;gap:4px;}
+ .header-brand-status{flex:1 1 100%;justify-content:space-between;}
+ .header-actions{flex:1 1 100%;justify-content:flex-end;gap:6px;}
+ .app-header .app-logo-img{width:90px;}
+ .navigation-canvas{width:100%;margin-left:0;overflow-x:hidden;}
+ .application-sidebar,.application-menu-collapsed .application-sidebar{top:auto;bottom:0;left:0;width:100%;height:calc(68px + env(safe-area-inset-bottom));padding:4px 4px env(safe-area-inset-bottom);display:flex;align-items:stretch;gap:4px;border-right:0;border-top:1px solid var(--border);overflow:visible;box-shadow:0 -3px 12px #10284012;}
+ .application-sidebar-heading,.application-season,.application-search,.application-search-empty,.application-search-count,.application-sidebar>small{display:none!important;}
+ .application-sidebar .tab-nav{flex:1;min-width:0;flex-direction:row;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;gap:3px;}
+ .application-sidebar .tab-btn,.application-menu-collapsed .application-sidebar .tab-btn{flex:0 0 76px;width:76px;min-height:54px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:4px!important;white-space:nowrap;font-size:10px;}
+ .application-sidebar .navigation-label{display:block!important;font-size:10px;}
+ .application-sidebar .tab-btn:before,.application-sidebar .tab-btn:after{display:none!important;}
+ .application-settings{margin:0!important;padding:0!important;flex:0 0 44px;border:0!important;}
+ .application-settings #btnMenu{height:54px;min-height:54px;justify-content:center;padding:4px;}
+ .application-settings #btnMenu .navigation-label{display:none!important;}
+ .application-settings .dropdown-menu{left:8px!important;bottom:76px!important;max-width:calc(100vw - 16px);}
+ .navigation-canvas .tab-panel{padding:8px;}
+ .navigation-canvas .card-header{align-items:flex-start;}
+ .navigation-canvas .card-header>div{flex-wrap:wrap;}
+ .navigation-canvas .form-row{gap:8px;}
+ .navigation-canvas .form-row>*{min-width:min(100%,160px);}
+ .navigation-canvas :is(input,select,textarea){max-width:100%;font-size:16px!important;}
+ .navigation-canvas .card-header :is(.btn,.form-select),.navigation-canvas .form-row .btn{min-height:40px;}
+ .navigation-canvas :is(.dashboard-validation-grid,.global-score-grid,.dashboard-quality-grid){grid-template-columns:repeat(2,minmax(0,1fr));}
+ .navigation-canvas :is(.dashboard-validation-list,.global-score-losses,.dashboard-criteria-grid,.gestor-filter-grid,.teacher-defensible-metrics){grid-template-columns:1fr;}
+ .navigation-canvas .dashboard-progress-row{grid-template-columns:1fr auto;}
+ .table-container,.table-responsive{max-width:100%;overflow:auto;}
+ .table-container>table,.table-responsive>table{min-width:600px;}
+ .modal-overlay{padding:8px!important;}
+ .modal{width:100%!important;min-width:0!important;max-width:100%!important;max-height:calc(100dvh - 24px)!important;}
+ .modal-actions{flex-wrap:wrap;gap:8px;}
+ .modal-actions .btn{min-height:40px;}
+ .toast-container{right:8px;bottom:80px;max-width:calc(100vw - 16px);}
+ .toast{max-width:100%;}
+ .navigation-canvas #panelPlanificacion.active{grid-template-columns:1fr;}
+ .navigation-canvas #panelPlanificacion .selection-panel{min-height:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;padding:8px;}
+ .navigation-canvas #panelPlanificacion #scheduleContainer{overflow:auto;max-height:65dvh;}
+ .navigation-canvas #panelPlanificacion #scheduleGrid{min-width:900px;grid-template-columns:72px repeat(6,minmax(130px,1fr));height:750px;}
+ #panelOrganizarSalas.active{position:relative;height:calc(var(--os-height) - 68px);}
+ #panelOrganizarSalas .os-mobile-toggle{display:block;width:100%;height:42px;flex:none;text-align:left;padding:8px 12px;font-size:12px;}
+ #panelOrganizarSalas .workspace{grid-template-columns:minmax(0,1fr);}
+ #panelOrganizarSalas .room-catalog{display:none;}
+ #panelOrganizarSalas.os-catalog-open .room-catalog{display:flex;position:absolute;top:42px;left:0;right:0;bottom:22px;z-index:5;border-bottom:1px solid var(--border);box-shadow:0 6px 18px #10284022;}
+ #panelOrganizarSalas .schedule-body{grid-template-columns:70px minmax(0,1fr);}
+ #panelOrganizarSalas .days{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));}
+ #panelOrganizarSalas .days .btn{height:40px;min-height:40px;}
+ #panelOrganizarSalas .room-catalog :is(th,td){padding-top:6px!important;padding-bottom:6px!important;}
+ #panelOrganizarSalas .catalog-page input{font-size:16px!important;}
+ #panelOrganizarSalas .legend{overflow-x:auto;}
+}
+.os-mobile-toggle{display:none;}
+@media(max-width:600px), (max-width:950px) and (max-height:500px) and (orientation:landscape){
+ .application-sidebar,.application-menu-collapsed .application-sidebar{flex-direction:row!important;}
+ .application-sidebar .tab-nav{height:58px!important;flex:1 1 0!important;width:0;}
+ .application-sidebar .application-settings{width:44px!important;max-width:44px;flex:0 0 44px!important;}
+ .application-sidebar .navigation-status{display:none!important;}
+}
+
+/* Teléfono apaisado: reservar altura para el contenido, sin encoger los bloques. */
+@media(max-width:950px) and (max-height:500px) and (orientation:landscape){
+ .app-header{flex-wrap:nowrap;}
+ .header-brand-status{flex:1 1 auto;justify-content:flex-start;}
+ .header-actions{flex:0 1 auto;}
+ .header-brand-status .save-status{display:none;}
+ #appRoot{padding-bottom:56px;}
+ .application-sidebar,.application-menu-collapsed .application-sidebar{height:56px;}
+ .application-sidebar .tab-nav{height:48px!important;}
+ .application-sidebar .tab-btn,.application-menu-collapsed .application-sidebar .tab-btn,.application-settings #btnMenu{height:46px;min-height:46px;}
+ .navigation-canvas :is(.dashboard-validation-grid,.global-score-grid,.dashboard-quality-grid){grid-template-columns:repeat(4,minmax(0,1fr));}
+ .navigation-canvas #panelPlanificacion .selection-panel{grid-template-columns:repeat(4,minmax(0,1fr));}
+ #panelOrganizarSalas.active{height:calc(100dvh - var(--planning-top-offset,70px) - 56px)!important;}
+ #panelOrganizarSalas .schedule-body{grid-template-rows:560px;overflow-y:auto;}
+ .toast-container{bottom:64px;}
+}
+@media(max-width:950px) and (max-height:500px) and (orientation:landscape){
+ #panelOrganizarSalas.os-catalog-open .page-heading{display:none;}
+ #panelOrganizarSalas.os-catalog-open .day-picker{padding:4px 8px;}
+ #panelOrganizarSalas.os-catalog-open .field-label{display:none;}
+ #panelOrganizarSalas.os-catalog-open .catalog-heading{min-height:24px;padding:3px 8px;}
+ #panelOrganizarSalas.os-catalog-open .catalog-scroll{min-height:50px;}
+}
+.mobile-more,.mobile-apps-panel{display:none;}
+@media(max-width:600px), (max-width:950px) and (max-height:500px) and (orientation:landscape){
+ .application-sidebar,.application-menu-collapsed .application-sidebar{background:var(--surface)!important;isolation:isolate;gap:0;}
+ .application-sidebar .tab-nav{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr));overflow:hidden;background:var(--surface)!important;}
+ .application-sidebar .tab-btn{display:none!important;}
+ .application-sidebar .tab-btn:is([data-tab=dashboard],[data-tab=planificacion],[data-tab=organizarSalas],[data-tab=vistaHorarios]){display:flex!important;width:100%;min-width:0;margin:0;border-radius:4px;}
+ .application-sidebar .tab-btn:not(.active){background:var(--surface)!important;color:var(--text-secondary);border-color:transparent;}
+ .application-sidebar .tab-btn .navigation-label{max-width:100%;overflow:hidden;text-overflow:ellipsis;}
+ .application-sidebar .application-settings{display:none!important;}
+ .mobile-more{display:flex;flex:0 0 20%;flex-direction:column;align-items:center;justify-content:center;gap:4px;border:0;background:var(--surface);color:var(--text-secondary);font:500 10px var(--font);cursor:pointer;}
+ .mobile-apps-panel:not([hidden]){display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;position:fixed;left:8px;right:8px;bottom:76px;max-height:calc(100dvh - 160px);overflow:auto;padding:10px;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow);z-index:120;}
+ .mobile-app-option{display:flex;align-items:center;gap:8px;min-height:44px;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text);font:12px var(--font);text-align:left;}
+ .mobile-app-option svg{width:18px;height:18px;flex-shrink:0;}
+ .mobile-app-option:focus-visible{outline:2px solid var(--accent);}
+}
+@media(max-width:950px) and (max-height:500px) and (orientation:landscape){.mobile-apps-panel:not([hidden]){bottom:64px;grid-template-columns:repeat(3,minmax(0,1fr));}}
+@media(max-width:600px), (max-width:950px) and (max-height:500px) and (orientation:landscape){
+ .application-sidebar .application-settings{display:contents!important;}
+ .application-settings #btnMenu{display:none!important;}
+}
+@media(max-width:600px), (max-width:950px) and (max-height:500px) and (orientation:landscape){
+ .application-sidebar .tab-nav{width:80%!important;flex:0 0 80%!important;}
+ .application-sidebar .application-settings{display:block!important;position:absolute!important;width:0!important;height:0!important;max-width:0;right:0;bottom:0;}
+}
+
+@media(max-width:600px), (max-width:950px) and (max-height:500px) and (orientation:landscape){
+ .application-sidebar .tab-btn .navigation-label{font-size:0!important;}
+ .application-sidebar .tab-btn .navigation-label::after{content:attr(data-mobile-label);font-size:10px;}
+}

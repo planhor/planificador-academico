@@ -1,6 +1,6 @@
 self.window=self;
 
-importScripts('planificacion.js?v=20260622-solver-hibrido');
+importScripts('planificacion.js?v=20261104-publicacion');
 
 const DIAS=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
 const BLOQUES=[

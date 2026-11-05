@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" data-planhor-motion="full">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+<meta charset="UTF-8">
+    <meta name="viewport" content="width=1280, user-scalable=yes">
     <title>Planificador Académico</title>
     <link rel="icon" type="image/x-icon" href="planificador_modulos/favicon.ico?v=5">
     <link rel="shortcut icon" type="image/x-icon" href="planificador_modulos/favicon.ico?v=5">
@@ -10,9 +10,17 @@
     <link rel="apple-touch-icon" sizes="180x180" href="planificador_modulos/icono-planhor-180.png?v=5">
     <link rel="manifest" href="planificador_modulos/site.webmanifest?v=2">
     <meta name="theme-color" content="#245f67">
-<link rel="stylesheet" href="planificador_modulos/estilos.css?v=20260720-carga-externa-mini-grid-3">
+<link rel="stylesheet" href="planificador_modulos/estilos.css?v=20261102-notificaciones-inferiores">
+<link rel="stylesheet" href="navegacion/estilos.css?v=20261102-consolidacion44">
+<link rel="stylesheet" href="navegacion/sistema-visual.css?v=20261104-hora-ficha2">
+<link rel="stylesheet" href="navegacion/animaciones.css?v=20261104-fluidez">
+<link rel="stylesheet" href="aplicaciones/organizar-salas.css?v=20261102-organizar79">
+<link rel="stylesheet" href="navegacion/tamano-fijo.css?v=2">
+<link rel="stylesheet" href="navegacion/tema-profesional.css?v=20261104-tablas">
+<style>:root{--preview-notice-height:0px!important;}</style>
 </head>
 <body>
+<a class="navigation-skip" href="#contenidoPrincipal">Saltar al contenido</a>
 <div id="appRoot" style="display:none;">
 <header class="app-header">
     <div class="app-logo" aria-label="Planificador Académico">
@@ -60,21 +68,23 @@
         <span id="headerUsuario" class="user-badge" style="display:none;" title=""><span class="user-icon">👤</span><span id="headerUsuarioTexto" class="user-email"></span></span>
     </div>
 </header>
-<nav class="tab-nav">
-    <button class="tab-btn" data-tab="dashboard">📊 Dashboard</button>
-    <button class="tab-btn active" data-tab="secciones">📋 Secciones</button>
+<aside class="application-sidebar" aria-label="Aplicaciones de Planhor"><div class="application-sidebar-heading"><span>APLICACIONES</span><button type="button" id="btnPlegarNavegacion" aria-expanded="true" aria-controls="navegacionAplicaciones" aria-label="Contraer menú">«</button></div>
+<nav class="tab-nav" id="navegacionAplicaciones" aria-label="Módulos">
+    <button class="tab-btn active" data-tab="dashboard">📊 Dashboard</button>
+    <button class="tab-btn" data-tab="secciones">📋 Secciones</button>
     <button class="tab-btn" data-tab="asignaturas">📚 Asignaturas</button>
     <button class="tab-btn" data-tab="docentes">👨‍🏫 Docentes</button>
     <button class="tab-btn" data-tab="salas">🏫 Salas</button>
+    <button class="tab-btn" data-tab="organizarSalas">🏫 Organizar salas</button>
     <button class="tab-btn" data-tab="planificacion">🎯 Planificación</button>
     <button class="tab-btn" data-tab="vistaHorarios">👁️ Vista Horarios</button>
     <button class="tab-btn" data-tab="reportes">📊 Reportes</button>
     <button class="tab-btn" data-tab="gestorSecciones">🧩 Gestor Secciones</button>
     <button class="tab-btn" data-tab="historial">🕘 Historial</button>
     <button class="tab-btn" data-tab="fichaDocente">👤 Ficha Docente</button>
-</nav>
-    <div class="main-content">
-    <div class="tab-panel active" id="panelSecciones">
+</nav><span class="navigation-status" role="status" aria-live="polite"></span></aside>
+    <div class="navigation-canvas"><div class="main-content" id="contenidoPrincipal" tabindex="-1">
+    <div class="tab-panel" id="panelSecciones">
         <div class="card"><div class="card-header"><span class="card-title">📋 Secciones</span><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><button class="btn btn-sm" id="btnCrearPlantillaSecciones">📄 Crear archivo de importación</button><button class="btn btn-sm" id="btnImportarSecciones">📥 Importar archivo secciones</button><button class="btn btn-sm" id="btnExportarArchivoSecciones">📤 Exportar archivo</button><input type="file" id="inputImportarSecciones" accept=".xlsx,.xls,.csv" style="display:none;"><button class="btn btn-primary btn-sm" id="btnNuevaCarrera">+ Nueva Carrera</button></div></div><div class="section-area-toolbar"><label for="seccionesFiltroArea">Ver área</label><select class="form-select form-select-sm" id="seccionesFiltroArea"><option value="">Todas</option></select><span>Organiza el listado por Área → Carrera → Nivel → Jornada → Sección.</span></div><div id="listaCarreras"></div></div>
     </div>
     <div class="tab-panel" id="panelAsignaturas">
@@ -86,6 +96,7 @@
     <div class="tab-panel" id="panelSalas">
         <div class="card"><div class="card-header"><span class="card-title">🏫 Salas</span><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><button class="btn btn-sm" id="btnCrearPlantillaSalas">📄 Crear archivo de importación</button><button class="btn btn-sm" id="btnImportarSalas">📥 Importar archivo salas</button><button class="btn btn-sm" id="btnCopiarSalasTemporada">↪ Copiar desde temporada</button><button class="btn btn-sm" id="btnExportarArchivoSalas">📤 Exportar archivo</button><input type="file" id="inputImportarSalas" accept=".xlsx,.xls,.csv" style="display:none;"><button class="btn btn-primary btn-sm" id="btnNuevaSala">+ Nueva</button></div></div><div id="listaSalas"></div></div>
     </div>
+    <div class="tab-panel" id="panelOrganizarSalas"></div>
     <div class="tab-panel" id="panelPlanificacion">
         <div class="selection-panel">
             <div class="form-group"><label class="form-label">Área</label><select class="form-select" id="planArea"></select></div>
@@ -93,11 +104,13 @@
             <div class="form-group"><label class="form-label">Nivel</label><select class="form-select" id="planNivel" disabled></select></div>
             <div class="form-group"><label class="form-label">Jornada</label><select class="form-select" id="planJornada" disabled></select></div>
             <div class="form-group"><label class="form-label">Sección</label><select class="form-select" id="planSeccion" disabled></select></div>
+            <div class="planning-work-fields"><div class="planning-work-fields-inner">
             <div class="form-group plan-work-control"><label class="form-label">Asignatura</label><select class="form-select" id="planAsignatura" disabled></select></div>
             <div class="form-group plan-work-control" id="planComponenteGroup" style="display:none;"><label class="form-label">Componente</label><select class="form-select" id="planComponente"></select></div>
             <div class="form-group plan-work-control"><label class="form-label">Docente</label><select class="form-select" id="planDocente" disabled></select></div>
             <div class="form-group plan-work-control"><label class="form-label">Sala</label><select class="form-select" id="planSala" disabled></select></div>
             <div class="form-group plan-work-control"><label class="form-label">Tipo</label><select class="form-select" id="planTipo"><option value="presencial">Presencial</option><option value="virtual">Virtual</option></select></div>
+            </div></div>
             <div class="plan-action-bar">
                 <div class="plan-mode-switch">
                     <div class="plan-mode-group plan-mode-idle" id="planModeIdle">
@@ -216,7 +229,7 @@
             <div id="reporteContenido" style="margin-top:16px;"></div>
         </div>
     </div>
-    <div class="tab-panel" id="panelDashboard">
+    <div class="tab-panel active" id="panelDashboard">
         <div id="dashboardContenido" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;"></div>
         <div style="margin-top:12px;"><h3 style="margin-bottom:8px;font-size:0.9rem;">⚠️ Conflictos detectados</h3><div id="dashboardConflictos"></div></div>
     </div>
@@ -331,7 +344,7 @@
         <div id="fichaContenido" style="display:none;"></div>
     </div>
 </div>
-<footer class="app-footer">
+</div><footer class="app-footer">
     <span>Planhor © 2026</span><i aria-hidden="true"></i><span>Sistema de Planificación Académica</span><i aria-hidden="true"></i><span>Planifica. Organiza. Optimiza.</span>
 </footer>
 <div class="toast-container" id="toastContainer"></div>
@@ -347,7 +360,7 @@
     </div>
 </div>
 
-<!-- Firebase SDK -->
+<!-- Firebase SDK: conexión y acceso conservados de producción -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail, EmailAuthProvider, reauthenticateWithCredential, updatePassword } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
@@ -527,15 +540,27 @@ onAuthStateChanged(auth, async (user) => {
 });
 </script>
 
-<script src="planificador_modulos/utils.js"></script>
-<script src="planificador_modulos/sync.js?v=20260720-carga-externa-docente"></script>
-<script src="planificador_modulos/exportaciones.js?v=20260608-subsecciones-reportes"></script>
-<script src="planificador_modulos/vista-horario.js?v=20260701-texto-bloques-vistas"></script>
-<script src="planificador_modulos/reportes.js?v=20260702-integridad-dashboard-reparar"></script>
-<script src="planificador_modulos/ficha-docente.js?v=20260720-ficha-carga-contextual-8"></script>
-<script src="planificador_modulos/entidades.js?v=20260702-electivos-dictados"></script>
-<script src="planificador_modulos/planificacion.js?v=20260720-carga-externa"></script>
-<script src="planificador_modulos/configuracion.js?v=20260702-config-ordenada"></script>
-<script src="planificador_modulos/app.js?v=20260720-carga-externa-legada-ficha"></script>
+<script src="aplicaciones/secciones.js?v=20261104-publicacion"></script>
+<script src="aplicaciones/asignaturas.js?v=20261104-publicacion"></script>
+<script src="aplicaciones/docentes.js?v=20261104-publicacion"></script>
+<script src="aplicaciones/organizar-salas.js?v=20261104-publicacion"></script>
+<script src="aplicaciones/salas.js?v=20261104-publicacion"></script>
+<script src="aplicaciones/dashboard.js?v=20261104-publicacion"></script>
+<script src="aplicaciones/historial.js?v=20261104-publicacion"></script>
+<script src="aplicaciones/gestor-secciones.js?v=20261104-publicacion"></script>
+<script src="planificador_modulos/utils.js?v=20261104-publicacion"></script>
+<script src="planificador_modulos/sync.js?v=20261104-publicacion"></script>
+<script src="planificador_modulos/exportaciones.js?v=20261104-publicacion"></script>
+<script src="planificador_modulos/vista-horario.js?v=20261104-publicacion"></script>
+<script src="planificador_modulos/reportes.js?v=20261104-publicacion"></script>
+<script src="planificador_modulos/ficha-docente.js?v=20261104-publicacion"></script>
+<script src="planificador_modulos/entidades.js?v=20261104-publicacion"></script>
+<script src="planificador_modulos/planificacion.js?v=20261104-publicacion"></script>
+<script src="planificador_modulos/configuracion.js?v=20261104-publicacion"></script>
+<script src="planificador_modulos/app.js?v=20261104-publicacion"></script>
+<script src="navegacion/menu.js?v=20261104-publicacion"></script>
+<script src="navegacion/cuenta.js?v=20261104-publicacion"></script>
+<script src="navegacion/iconos.js?v=20261104-publicacion"></script>
+
 </body>
 </html>

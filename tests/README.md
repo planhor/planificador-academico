@@ -43,3 +43,6 @@ El solver matemático se valida con:
 ```bash
 node --test tests/solver-glpk.test.js
 ```
+# Regresión de restauración
+
+`node --test tests/restauracion-sync.test.js` ejecuta 21 casos con almacenamiento y Firebase sintéticos, sin red. Incluye cancelación/confirmación, eventos automáticos, reinicio mediante API pública, abortos de IndexedDB, fallback, operaciones remotas anteriores y compatibilidad histórica. `helpers/entorno-sync.js` permite controlar las esperas sin temporizadores arbitrarios. La suite completa incluye estos casos.

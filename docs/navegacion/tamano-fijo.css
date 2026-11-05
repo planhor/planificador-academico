@@ -1,0 +1,7 @@
+/* En teléfonos el viewport de 1280px conserva el diseño de escritorio y permite zoom.
+   En computador se mantiene el comportamiento original de la ventana. */
+:root{--planhor-ancho-fijo:1280px;}
+@media (hover:none) and (pointer:coarse){
+ html,body{min-width:var(--planhor-ancho-fijo);}
+}
+.os-mobile-toggle{display:none!important;}

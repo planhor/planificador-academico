@@ -1,0 +1,296 @@
+/* Escala compartida de la copia de revisión. No se aplica a clones de exportación. */
+:root{--ui-text:12px;--ui-caption:11px;--ui-title:14px;--ui-metric:20px;--ui-control:30px;--ui-radius:4px;--ui-space:8px;--ui-panel-padding:12px;}
+#contenidoPrincipal, :is(#modalContainer,#motorOverlay,#themeOverlay){font-family:var(--font);font-size:var(--ui-text);line-height:1.4;}
+#contenidoPrincipal :is(button,input,select,textarea),:is(#modalContainer,#motorOverlay,#themeOverlay) :is(button,input,select,textarea){font-family:var(--font);font-size:var(--ui-text)!important;}
+/* Normaliza también los tamaños en línea heredados de las distintas pantallas. */
+#contenidoPrincipal .tab-panel :where(div,p,span,small,strong,b,label,td,th,summary,em):not(:where(.schedule-grid,.schedule-grid *,.vista-general-grid,.vista-general-grid *,#planProgreso,#planProgreso *)){font-size:var(--ui-text)!important;}
+#contenidoPrincipal :is(h2,h3,h4,.card-title,.gestor-hero h2,.dashboard-progress-title), :is(#modalContainer,#motorOverlay,#themeOverlay) :is(h2,h3,h4,.modal-title){font-family:var(--font);font-size:var(--ui-title)!important;line-height:1.4;font-weight:700;}
+#contenidoPrincipal :is(p,small,em), :is(#modalContainer,#motorOverlay,#themeOverlay) :is(p,small){line-height:1.4;}
+#contenidoPrincipal .tab-panel :is(.form-label,.gestor-summary span,.dashboard-progress-subtitle,.dashboard-validation-item em,.history-meta){font-size:var(--ui-caption)!important;font-weight:500;letter-spacing:0;text-transform:none;}
+#contenidoPrincipal :is(.btn,.btn-sm,.btn-xs), :is(#modalContainer,#motorOverlay,#themeOverlay) :is(.btn,.btn-sm,.btn-xs), .application-sidebar :is(.application-season .btn,.application-settings>.btn){font-family:var(--font);font-size:var(--ui-text)!important;line-height:18px;min-height:var(--ui-control);padding:5px 8px!important;border-radius:var(--ui-radius);gap:6px;font-weight:500;box-sizing:border-box;}
+#contenidoPrincipal .planning-automation>summary{min-height:var(--ui-control);font-size:var(--ui-text)!important;}
+#contenidoPrincipal :is(.form-select,.form-input), :is(#modalContainer,#motorOverlay,#themeOverlay) :is(.form-select,.form-input){font-family:var(--font);font-size:var(--ui-text)!important;line-height:18px;height:var(--ui-control);min-height:var(--ui-control);padding:5px 8px!important;border-radius:var(--ui-radius);box-sizing:border-box;}
+#contenidoPrincipal textarea.form-input,:is(#modalContainer,#motorOverlay,#themeOverlay) textarea.form-input{height:auto;min-height:80px;}
+#contenidoPrincipal .tab-panel .form-label,:is(#modalContainer,#motorOverlay,#themeOverlay) .form-label{display:block;font-size:var(--ui-caption)!important;line-height:12px;margin-bottom:2px;text-transform:none;font-weight:500;}
+#contenidoPrincipal .tab-panel :is(.card,.gestor-hero,.dashboard-progress-panel,.dashboard-criteria-panel,.dashboard-quality-panel,.dashboard-validation-panel,.dashboard-preparation-panel,.global-score-panel){padding:var(--ui-panel-padding)!important;border-radius:var(--ui-radius);box-shadow:none;border-color:var(--border);margin-top:0;}
+#contenidoPrincipal .tab-panel .card{margin-bottom:var(--ui-space);border-radius:var(--ui-radius);}
+#contenidoPrincipal .tab-panel :is(.card-header,.gestor-hero,.dashboard-validation-header){gap:var(--ui-space);flex-wrap:wrap;align-items:center;}
+#contenidoPrincipal .tab-panel :is(.card-header,.dashboard-validation-header){margin-bottom:var(--ui-space);}
+#contenidoPrincipal :is(.gestor-layout,.gestor-summary,.dashboard-criteria-grid){gap:var(--ui-space)!important;}
+#contenidoPrincipal #dashboardContenido{gap:var(--ui-space)!important;grid-template-columns:repeat(auto-fit,minmax(160px,1fr))!important;}
+/* Una familia de tarjetas métricas: misma caja, misma cifra, misma etiqueta. */
+#contenidoPrincipal :is(.dashboard-card,.gestor-summary>div){min-height:72px;padding:12px!important;border-radius:var(--ui-radius);border:1px solid var(--border);box-shadow:none;display:flex;flex-direction:column;justify-content:center;gap:4px;text-align:left;}
+#contenidoPrincipal .dashboard-card>div:first-child, #contenidoPrincipal .gestor-summary strong, #contenidoPrincipal :is(.dashboard-quality-card,.dashboard-validation-grid>div,.global-score-grid>div)>strong{font-size:var(--ui-metric)!important;line-height:24px;font-weight:700;}
+#contenidoPrincipal .dashboard-card>div:last-child,#contenidoPrincipal .gestor-summary span{font-size:var(--ui-caption)!important;line-height:15px;margin:0!important;}
+#contenidoPrincipal .gestor-summary{grid-template-columns:repeat(auto-fit,minmax(160px,1fr));}
+#contenidoPrincipal .gestor-summary>div>span{order:1;}
+#contenidoPrincipal .gestor-summary>div>strong{order:0;}
+#contenidoPrincipal :is(.global-score-value,.global-score-number){font-size:var(--ui-metric)!important;line-height:24px;}
+#contenidoPrincipal :is(.dashboard-quality-card,.dashboard-validation-grid>div,.global-score-grid>div){min-height:72px;padding:12px!important;border-radius:var(--ui-radius);}
+#contenidoPrincipal :is(.dashboard-quality-card,.dashboard-validation-grid>div,.global-score-grid>div)>span{font-size:var(--ui-caption)!important;line-height:15px;}
+#contenidoPrincipal :is(.dashboard-validation-item,.dashboard-progress-row,.global-score-loss,.gestor-summary>div){border-radius:var(--ui-radius);}
+#contenidoPrincipal table:not(:where(.schedule-grid *)){font-size:var(--ui-text);line-height:1.4;}
+#contenidoPrincipal table:not(:where(.schedule-grid *)) :is(th,td){padding:8px!important;}
+#contenidoPrincipal .tab-panel table th{font-size:var(--ui-caption)!important;font-weight:600;}
+:is(#modalContainer,#motorOverlay,#themeOverlay) .modal{font-size:var(--ui-text);}
+:is(#modalContainer,#motorOverlay,#themeOverlay) .modal-actions{gap:var(--ui-space);}
+/* El planificador conserva la unión de superficies y su altura útil. */
+#contenidoPrincipal #panelPlanificacion .selection-panel{border-radius:0;}
+#contenidoPrincipal #planProgreso{font-size:var(--ui-caption)!important;}
+/* Buscadores y acciones comparten línea base, sin el espacio de línea de un input inline. */
+#contenidoPrincipal .search-box>.form-input{display:block;}
+#contenidoPrincipal .search-box{min-width:0;}
+#contenidoPrincipal .input-with-clear>.form-input{padding-right:30px!important;}
+#contenidoPrincipal .input-with-clear>.clear-btn{width:24px;height:24px;right:3px;line-height:24px;padding:0;}
+#contenidoPrincipal .report-toolbar{gap:var(--ui-space);align-items:center;}
+#contenidoPrincipal .vista-selector{align-items:end;}
+#contenidoPrincipal .vista-selector>.form-group{margin-bottom:0;}
+/* Reportes: una fila cuando cabe; dos filas completas en anchos menores. */
+#contenidoPrincipal .report-filters{display:flex;align-items:end;flex-wrap:wrap;gap:var(--ui-space);}
+#contenidoPrincipal .report-filters>.form-group{flex:0 1 210px;min-width:180px;margin:0;}
+#contenidoPrincipal .report-filters>.form-group:nth-child(2){flex-basis:260px;min-width:230px;}
+#contenidoPrincipal .report-filters>.report-toolbar{flex:1 1 570px;min-width:0;margin:0;}
+#contenidoPrincipal .report-filters .report-search{flex:1 1 180px;min-width:160px;max-width:320px;}
+#contenidoPrincipal .report-filters #reporteTamanoPagina{flex:0 0 88px;width:88px;}
+#contenidoPrincipal .report-filters .report-toolbar>.btn{flex:0 0 auto;}
+/* Catálogo docente: el filtro conserva un ancho útil junto a las acciones. */
+#contenidoPrincipal #panelDocentes #docentesFiltroEspecialidad{flex:0 1 210px;width:210px;max-width:210px;min-width:190px;}
+#contenidoPrincipal #panelDocentes .card-header>div{flex:1 1 970px;min-width:0;justify-content:flex-end;gap:8px!important;}
+/* Ficha: campos y botones alineados por su borde inferior, sin margen de formulario. */
+#contenidoPrincipal #panelFichaDocente>.selection-panel{padding:12px;gap:8px;align-items:end;margin:0 0 8px;border-radius:4px;}
+#contenidoPrincipal #panelFichaDocente>.selection-panel>.form-group{flex:0 1 180px;min-width:160px;margin-bottom:0;}
+#contenidoPrincipal #panelFichaDocente>.selection-panel>.form-group:nth-child(2){flex:0 1 260px!important;min-width:200px;}
+#contenidoPrincipal .teacher-sheet-actions{display:flex;align-items:center;flex-wrap:wrap;gap:8px;flex:1 1 560px;min-width:0;}
+#contenidoPrincipal .teacher-sheet-actions>.btn{flex:0 0 auto;}
+/* Resumen persistente al pie del panel, sin recalcular reglas académicas. */
+#contenidoPrincipal #panelPlanificacion .selection-panel{display:flex;flex-direction:column;align-items:stretch;gap:4px;}
+#contenidoPrincipal #panelPlanificacion .selection-panel>*{flex-shrink:0;}
+#contenidoPrincipal #panelPlanificacion #planProgreso{display:none!important;}
+#contenidoPrincipal .planning-summary-card{margin-top:auto;padding:6px 8px;background:var(--surface-alt);border:1px solid var(--border);border-radius:4px;}
+#contenidoPrincipal .planning-summary-row{display:flex;justify-content:space-between;align-items:baseline;gap:8px;line-height:16px;min-height:16px;}
+#contenidoPrincipal .planning-summary-row>span{font-size:11px!important;color:var(--text-secondary);}
+#contenidoPrincipal .planning-summary-row>strong{font-size:12px!important;text-align:right;overflow-wrap:anywhere;}
+#contenidoPrincipal .planning-summary-note{font-size:11px!important;line-height:1.3;margin:4px 0 0;}
+/* Menú flotante distinguible de los filtros y de la grilla. */
+#contenidoPrincipal #panelPlanificacion .plan-action-bar{position:relative;z-index:20;}
+#contenidoPrincipal .planning-automation[open]>summary{background:color-mix(in srgb,var(--accent) 12%,var(--surface));border-color:var(--accent);color:var(--accent);}
+#contenidoPrincipal .planning-automation-options{left:calc(100% + 8px);bottom:0;width:220px;min-width:220px;padding:8px;gap:4px;background:var(--surface);border:1px solid var(--accent);border-radius:6px;box-shadow:0 10px 28px rgba(25,20,55,.24),0 2px 6px rgba(25,20,55,.12);}
+#contenidoPrincipal .planning-automation-options>.btn{justify-content:flex-start;background:var(--surface-alt);border-color:var(--border-light);}
+#contenidoPrincipal .planning-automation-options>.btn:hover{background:color-mix(in srgb,var(--accent) 12%,var(--surface));border-color:var(--accent);}
+#contenidoPrincipal .planning-automation-options>#btnRevertirAutoRapido{margin-top:4px;border-top:1px solid var(--border);color:var(--danger);background:var(--surface);}
+/* Ventanas flotantes: misma escala, tres anchos según la tarea. */
+:is(#modalContainer,#motorOverlay,#themeOverlay) .modal-overlay{padding:48px 16px 16px;}
+:is(#modalContainer,#motorOverlay,#themeOverlay) .modal{width:100%;max-width:min(560px,calc(100vw - 32px));max-height:calc(100dvh - 64px);padding:16px!important;border:1px solid var(--border);border-radius:6px;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;box-shadow:0 12px 36px rgba(16,25,45,.24);}
+:is(#modalContainer,#motorOverlay,#themeOverlay) .modal:has(table th:nth-child(n/**/+5),.mini-grid,.floating-form-grid,.config-section){max-width:min(800px,calc(100vw - 32px));}
+:is(#modalContainer,#motorOverlay,#themeOverlay) .modal:is(.modal-wide,.auto-general-modal,.dashboard-detail-modal,.motor-modal,.theme-modal,.recovery-manager-modal){max-width:min(960px,calc(100vw - 32px))!important;width:100%;}
+:is(#modalContainer,#motorOverlay,#themeOverlay) .modal :where(p,span,div,strong,small,label,td,th,li):not(:where(.schedule-grid,.schedule-grid *,.mini-grid,.mini-grid *,.grid-cell,.grid-cell *,.grid-time,.grid-header)){font-size:12px!important;line-height:1.4;}
+:is(#modalContainer,#motorOverlay,#themeOverlay) .modal :is(h2,h3,h4,.card-title){font-size:14px!important;line-height:1.4;font-weight:700;}
+:is(#modalContainer,#motorOverlay,#themeOverlay) .modal>h3,:is(#modalContainer,#motorOverlay,#themeOverlay) .modal-header{margin:0 0 12px;}
+:is(#modalContainer,#motorOverlay,#themeOverlay) .modal-header p{font-size:11px!important;margin:4px 0 0;}
+:is(#modalContainer,#motorOverlay,#themeOverlay) .modal .form-label{font-size:11px!important;line-height:12px;}
+:is(#modalContainer,#motorOverlay,#themeOverlay) .modal .form-group{margin-bottom:8px;min-width:0;}
+:is(#modalContainer,#motorOverlay,#themeOverlay) .modal .form-row{gap:8px;align-items:end;margin-bottom:8px;}
+:is(#modalContainer,#motorOverlay,#themeOverlay) .modal .form-row>.form-group{margin-bottom:0;}
+:is(#modalContainer,#motorOverlay,#themeOverlay) .floating-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:8px;}
+:is(#modalContainer,#motorOverlay,#themeOverlay) .floating-form-grid>.form-group{margin-bottom:0;}
+:is(#modalContainer,#motorOverlay,#themeOverlay) .floating-form-grid>.form-group:has(.mini-grid,.checkbox-grid,.search-box,table,textarea){grid-column:1/-1;}
+:is(#modalContainer,#motorOverlay,#themeOverlay) .modal .modal-actions{position:sticky;z-index:4;display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:12px;border-top:1px solid var(--border);}
+:is(#modalContainer,#motorOverlay,#themeOverlay) .modal-actions .action-right{display:flex;flex-wrap:wrap;gap:8px;}
+:is(#modalContainer,#motorOverlay,#themeOverlay) .modal table{width:100%;border-collapse:collapse;}
+:is(#modalContainer,#motorOverlay,#themeOverlay) .modal table :is(td,th){padding:6px!important;vertical-align:middle;}
+:is(#modalContainer,#motorOverlay,#themeOverlay) .modal table th{font-size:11px!important;font-weight:600;}
+:is(#modalContainer,#motorOverlay,#themeOverlay) .help-modal{overflow:hidden;display:flex;flex-direction:column;}
+:is(#modalContainer,#motorOverlay,#themeOverlay) .help-layout{grid-template-columns:180px minmax(0,1fr);gap:12px;min-height:0;}
+:is(#modalContainer,#motorOverlay,#themeOverlay) :is(.help-nav,.help-content){max-height:calc(100dvh - 168px);min-height:0;overscroll-behavior:contain;}
+:is(#modalContainer,#motorOverlay,#themeOverlay) .help-nav a{font-size:12px;padding:6px 8px;}
+/* Menús, sugerencias y acciones de bloque comparten densidad y profundidad. */
+:is(.application-settings .dropdown-menu,#vistaExportDropdown,.action-popup,.action-popup-submenu-panel){font-family:var(--font);font-size:12px;border-radius:6px;border-color:var(--border);background:var(--surface);box-shadow:0 8px 24px rgba(16,25,45,.2);padding:4px;}
+:is(.application-settings .dropdown-item,#vistaExportDropdown .dropdown-item,.action-popup button){font-family:var(--font);font-size:12px!important;line-height:18px;min-height:30px;padding:6px 8px;border-radius:4px;white-space:normal;}
+.action-popup-note{font-size:11px;line-height:1.4;padding:8px;}
+.plan-block-tooltip{font-family:var(--font);padding:12px;border-radius:6px;box-shadow:0 8px 24px rgba(16,25,45,.2);}
+.plan-block-tooltip-title{font-size:12px;}
+:is(.plan-block-tooltip-sub,.plan-block-tooltip-grid,.plan-block-tooltip-note){font-size:11px;line-height:1.4;}
+#contenidoPrincipal .search-results{border-radius:4px;box-shadow:0 8px 24px rgba(16,25,45,.16);}
+#contenidoPrincipal .search-results li{padding:6px 8px;min-height:30px;}
+@media (max-width:800px){:is(#modalContainer,#motorOverlay,#themeOverlay) .help-layout{grid-template-columns:140px minmax(0,1fr);}
+}
+@media (max-width:600px){:is(#modalContainer,#motorOverlay,#themeOverlay) .floating-form-grid{grid-template-columns:minmax(0,1fr);}
+}
+@media print{#contenidoPrincipal{font-size:12px;}
+}
+:is(#motorOverlay,#themeOverlay){padding:48px 16px 16px;}
+:is(#modalContainer,#motorOverlay,#themeOverlay) .auto-general-form{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:12px;}
+:is(#modalContainer,#motorOverlay,#themeOverlay) .auto-general-form>.form-group{margin-bottom:0;}
+:is(#modalContainer,#motorOverlay,#themeOverlay) .auto-general-form>label{display:flex;align-items:center;gap:6px;min-height:30px;}
+:is(#modalContainer,#motorOverlay,#themeOverlay) .auto-general-form>:not(.form-group):not(label){grid-column:1/-1;}
+:is(#modalContainer,#motorOverlay,#themeOverlay) .config-section{padding:12px 0;}
+:is(#modalContainer,#motorOverlay,#themeOverlay) .config-subsection{padding:12px;border-radius:4px;margin-top:8px;}
+@media (max-width:800px){:is(#modalContainer,#motorOverlay,#themeOverlay) .auto-general-form{grid-template-columns:repeat(2,minmax(0,1fr));}
+}
+@media (max-width:600px){:is(#modalContainer,#motorOverlay,#themeOverlay) .auto-general-form{grid-template-columns:minmax(0,1fr);}
+}
+/* Identidad y acciones personales, independientes de ajustes académicos. */
+.account-control{position:relative;flex:0 0 auto;}
+.account-avatar{display:flex;align-items:center;justify-content:center;width:30px;height:30px;border:1px solid var(--accent);border-radius:50%;background:var(--accent);color:#fff;font:700 12px var(--font);list-style:none;cursor:pointer;user-select:none;}
+.account-avatar::-webkit-details-marker{display:none;}
+.account-avatar:focus-visible{outline:3px solid var(--accent);outline-offset:2px;}
+.account-control[open]>.account-avatar{box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 20%,transparent);}
+.account-menu{position:fixed;right:8px;top:calc(var(--planning-top-offset,70px) + 4px);width:260px;max-width:calc(100vw - 16px);padding:6px;border:1px solid var(--border);border-radius:6px;background:var(--surface);box-shadow:0 10px 28px rgba(16,25,45,.22);z-index:150;}
+.account-control:not([open])>.account-menu{display:none;}
+.account-identity{display:flex;flex-direction:column;gap:3px;padding:8px;border-bottom:1px solid var(--border);margin-bottom:4px;color:var(--text);font:12px var(--font);}
+.account-identity strong{overflow-wrap:anywhere;}
+.account-identity>span{font-size:11px;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.account-menu .account-menu-action{display:flex;align-items:center;gap:6px;min-height:32px;width:100%;padding:6px 8px;border:0;border-radius:4px;text-align:left;background:var(--surface);color:var(--text);font:12px var(--font);cursor:pointer;}
+.account-menu .account-menu-action:hover,.account-menu .account-menu-action:focus-visible{background:var(--surface-alt);outline:1px solid var(--accent);}
+.account-menu .account-signout{margin-top:4px;border-top:1px solid var(--border);border-radius:0;color:var(--danger);}
+.account-action-source{display:none!important;}
+#modalContainer .account-profile-modal{max-width:440px!important;}
+#modalContainer .account-profile-status{font-size:11px!important;color:var(--text-secondary);min-height:16px;margin:0;}
+.planhor-icon{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;vertical-align:-3px;flex:0 0 16px;color:inherit;pointer-events:none;}
+.planhor-icon>svg{display:block;width:100%;height:100%;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;}
+.application-sidebar .navigation-icon>.planhor-icon{width:19px;height:19px;flex-basis:19px;vertical-align:middle;}
+.application-sidebar .navigation-icon{display:flex;align-items:center;justify-content:center;}
+.application-search-field{position:relative;min-width:0;}
+.application-search-field>.planhor-icon{position:absolute;left:9px;top:50%;transform:translateY(-50%);width:17px;height:17px;color:var(--text-secondary);}
+.application-search-field>#buscarAplicacion{padding-left:32px;}
+.application-search-compact>.planhor-icon{width:18px;height:18px;}
+.application-season-compact>.planhor-icon{width:18px;height:18px;}
+#btnPlegarNavegacion .planhor-icon{width:16px;height:16px;}
+.application-season #btnGestionarTemps>.planhor-icon{width:14px;height:14px;flex-basis:14px;}
+.account-menu-action>.planhor-icon{width:16px;height:16px;}
+/* Una sola superficie para conexión, guardado y sincronización originales. */
+#syncStatus #saveStatus{display:none;border:0;padding:0;min-height:0;font:inherit;transform:none;background:transparent;}
+#syncStatus:has(#saveStatus.visible)>:not(#saveStatus){display:none;}
+#syncStatus #saveStatus.visible{display:inline-flex;}
+/* Las celdas ocupadas conservan la retícula completa, sin huecos por margen. */
+#panelPlanificacion #scheduleGrid .grid-cell.planned{margin:0;border-radius:0;border-right:1px solid var(--border);border-bottom:1px solid var(--border);}
+/* Recuperar efectos suaves sin desplazar los menús de su anclaje. */
+/* Bloques ordinarios: sin contorno de asignatura ni relieve superior. */
+#panelPlanificacion #scheduleGrid .grid-cell.planned:not(.fixed-plan):not(.linked-plan):not(.plan-carga-externa):not(.block-selected){border-top:0;border-left:0;box-shadow:none;}
+/* Separación neutra de horas y aprovechamiento de la altura disponible. */
+.navigation-canvas #panelPlanificacion #scheduleGrid .grid-time{border-right:1px solid var(--border);}
+.navigation-canvas #panelPlanificacion #scheduleGrid{grid-template-rows:24px repeat(var(--planning-row-count,18),minmax(0,1fr));}
+.navigation-canvas #panelPlanificacion #scheduleGrid .grid-header{padding:2px 3px;line-height:18px;}
+.navigation-canvas #panelPlanificacion .plan-grid-legend{min-height:22px;padding:2px 6px;gap:3px 8px;line-height:16px;}
+.navigation-canvas #panelPlanificacion .plan-grid-legend .legend-swatch{width:12px;height:12px;}
+/* Retícula común: mismo trazo en espacios libres, ocupados y columna horaria. */
+.navigation-canvas #panelPlanificacion #scheduleGrid .grid-cell, .navigation-canvas #panelPlanificacion #scheduleGrid .grid-time{border-right:1px solid var(--border);border-bottom:1px solid var(--border);}
+.navigation-canvas #panelPlanificacion #scheduleGrid .grid-header{border-bottom:1px solid var(--border);}
+/* Menú automático y selección explícita de estado fijo. */
+.sidebar-pin-menu{position:fixed;left:12px;top:calc(var(--planning-top-offset,70px) + 36px);z-index:400;width:176px;padding:6px;display:flex;flex-direction:column;gap:4px;border:1px solid var(--border);border-radius:4px;background:var(--surface);box-shadow:var(--shadow-lg);}
+.sidebar-pin-menu[hidden]{display:none;}
+.sidebar-pin-menu .btn{text-align:left;justify-content:flex-start;}
+.sidebar-pin-menu .btn[aria-pressed=true]{background:var(--accent);color:white;}
+#btnPlegarNavegacion[aria-pressed=true]{color:var(--accent);background:var(--surface-alt);}
+#contenidoPrincipal #dashboardContenido{padding:8px 0;margin:0;}
+.navigation-canvas #contenidoPrincipal #panelDashboard{padding:8px;box-sizing:border-box;}
+.application-sidebar .application-season #selectorTemporada{font-family:var(--font);font-size:var(--ui-text,12px)!important;line-height:18px;font-weight:400;}
+/* Memoria: dos filas con la misma columna de opciones y controles compactos. */
+#modalOverlay .modal .config-section.config-help-entry{padding:12px;gap:16px;flex-wrap:wrap;}
+#modalOverlay .config-help-entry>div:first-child{flex:1 1 280px;min-width:0;}
+#modalOverlay .config-help-actions{display:flex;align-items:center;gap:8px;flex:0 0 auto;}
+.modal-overlay .modal>.floating-close{position:sticky;top:0;float:right;z-index:20;display:flex;align-items:center;justify-content:center;width:30px;height:30px;padding:0;margin:0 0 -30px 8px;border:1px solid var(--border);border-radius:var(--ui-radius,4px);background:var(--surface);color:var(--text-secondary);cursor:pointer;transition:background-color 120ms ease,color 120ms ease;}
+.modal-overlay .modal>.floating-close:hover{background:var(--surface-alt);color:var(--accent);}
+.modal-overlay .modal>.floating-close:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+.modal-overlay .modal:has(>.floating-close)>:is(h3,.modal-header){padding-right:38px;}
+#modalOverlay .config-section :is(.memory-toolbar,.form-row):has(#cfgMemoriaActiva,#cfgMemoriaUsarAuto){display:grid;grid-template-columns:minmax(0,1fr) 168px;align-items:center;gap:8px 16px;margin:0 0 8px;}
+#modalOverlay .config-section :is(.memory-toolbar,.form-row):has(#cfgMemoriaActiva,#cfgMemoriaUsarAuto)>.check-line{display:flex;align-items:center;gap:8px;min-width:0;min-height:30px;margin:0;line-height:18px;}
+#modalOverlay .config-section :is(.memory-toolbar,.form-row):has(#cfgMemoriaActiva,#cfgMemoriaUsarAuto)>.form-group{display:grid;grid-template-columns:52px minmax(0,1fr);align-items:center;gap:8px;width:auto;max-width:none;margin:0;}
+#modalOverlay .config-section :is(.memory-toolbar,.form-row):has(#cfgMemoriaActiva,#cfgMemoriaUsarAuto) .form-label{margin:0;}
+#modalOverlay :is(#cfgMemoriaMax,#cfgMemoriaFuerza){width:100%;min-width:0;}
+@media(max-width:600px){#modalOverlay .config-section :is(.memory-toolbar,.form-row):has(#cfgMemoriaActiva,#cfgMemoriaUsarAuto){grid-template-columns:minmax(0,1fr);gap:4px;}#modalOverlay .config-section :is(.memory-toolbar,.form-row):has(#cfgMemoriaActiva,#cfgMemoriaUsarAuto)>.form-group{width:168px;margin-left:20px;}}
+/* El pie cubre el ancho y el padding inferior del diálogo. */
+:is(#modalContainer,#motorOverlay,#themeOverlay) .modal .modal-actions{bottom:-16px;margin:12px -16px -16px;padding:8px 16px;width:calc(100% + 32px);box-sizing:border-box;background:var(--surface);box-shadow:0 -4px 8px var(--surface);}
+.application-sidebar-heading{position:relative;padding-left:38px;}
+#btnPlegarNavegacion{position:fixed;left:14px;top:calc(var(--planning-top-offset,70px) + 8px);z-index:401;}
+/* Movimiento visible solicitado para esta revisión, independiente del sistema. */
+html[data-planhor-motion=full] :is(.dropdown-menu,.search-results){transform:translateY(5px) scale(.985)!important;}
+html[data-planhor-motion=full] .dropdown-menu.show{transform:translateY(0) scale(1)!important;}
+html[data-planhor-motion=full] .search-results.show{transform:translateY(0) scale(1)!important;}
+/* Expansión funcional del comparador y de las herramientas de planificación. */
+html[data-planhor-motion=full] .navigation-canvas .plan-mode-tools{display:flex;max-height:0;min-height:0;overflow:hidden;opacity:0;visibility:hidden;pointer-events:none;transform:translateY(-6px);}
+html[data-planhor-motion=full] .navigation-canvas .plan-mode-active .plan-mode-tools{max-height:300px;overflow:visible;opacity:1;visibility:visible;pointer-events:auto;transform:translateY(0);}
+/* La altura real de los campos se despliega y recoge en ambas direcciones. */
+.planning-work-fields{display:grid;grid-template-rows:0fr;opacity:0;visibility:hidden;min-height:0;}
+.planning-work-fields-inner{min-height:0;overflow:hidden;display:flex;flex-direction:column;gap:4px;}
+.selection-panel .planning-work-fields .plan-work-control{display:block;margin:0;}
+.selection-panel.plan-mode-active .planning-work-fields{grid-template-rows:1fr;opacity:1;visibility:visible;}
+/* Respuesta al puntero en los accesos del menú de aplicaciones. */
+.application-sidebar .tab-btn:hover, .application-sidebar .tab-btn:focus-visible{background:color-mix(in srgb,var(--accent) 13%,var(--surface));border-color:color-mix(in srgb,var(--accent) 35%,var(--border));color:var(--accent);box-shadow:inset 3px 0 0 var(--accent);}
+/* Evitar recalcular la grilla en cada cuadro al abrir/cerrar el lateral. */
+html[data-planhor-motion=full] .application-sidebar .tab-btn:hover .navigation-icon, html[data-planhor-motion=full] .application-sidebar .tab-btn:focus-visible .navigation-icon{transform:scale(1.06);}
+/* El lateral se desliza sobre el contenido: la grilla conserva su ancho. */
+html[data-planhor-motion=full]:not(:has(#btnPlegarNavegacion[aria-pressed=true])) .navigation-canvas{width:calc(100% - 56px);margin-left:56px;}
+/* Fijar y soltar mantienen la transición del lateral y del espacio reservado. */
+/* Escala común de movimiento: respuesta140ms, superficies180ms, expansión220ms. */
+html[data-planhor-motion=full] .account-control[open]>.account-menu{transform-origin:top right;}
+.account-avatar:hover{box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 20%,transparent);}
+html[data-planhor-motion=full] .account-avatar:hover{transform:scale(1.06);}
+/* Interacciones internas de todos los módulos, con la escala común. */
+/* Los cierres usan la salida, sin repetir la animación de entrada. */
+/* Indicación de posición, sin mover filas ni alterar el tamaño de controles. */
+#contenidoPrincipal :is(.career-header,.dashboard-card-action,.dashboard-quality-card,.dashboard-preparation-link,.global-score-loss,.auto-general-strategy,.predictive-scenario,.recovery-option):hover{background-color:color-mix(in srgb,var(--accent) 8%,var(--surface));border-color:color-mix(in srgb,var(--accent) 32%,var(--border));}
+#contenidoPrincipal table tbody tr:hover{background-color:color-mix(in srgb,var(--accent) 5%,var(--surface));}
+/* Campos interactivos: respuesta al puntero sin dejar una marca persistente. */
+:is(#contenidoPrincipal,.application-sidebar,#modalContainer,#motorOverlay,#themeOverlay,.account-profile-overlay) :is(input:not([type=checkbox]):not([type=radio]):not([type=hidden]),select,textarea):not(:disabled):not([readonly]):hover{border-color:color-mix(in srgb,var(--accent) 55%,var(--border));background-color:color-mix(in srgb,var(--accent) 5%,var(--surface));box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 10%,transparent);}
+/* Respuesta común a controles secundarios; no cambia colores de estado. */
+:where(#appRoot,#modalContainer,#motorOverlay,#themeOverlay) :is(button,summary,a[href],[role=button],[role=option],.clear-btn,.theme-swatch,.mini-cell,.external-load-slot):not(:disabled):not([aria-disabled=true]):hover{outline:1px solid color-mix(in srgb,var(--accent) 60%,transparent);outline-offset:-1px;}
+:where(#appRoot,#modalContainer,#motorOverlay,#themeOverlay) :is(input[type=checkbox],input[type=radio]):not(:disabled){accent-color:var(--accent);cursor:pointer;}
+:where(#appRoot,#modalContainer,#motorOverlay,#themeOverlay) :is(input[type=checkbox],input[type=radio]):not(:disabled):hover{outline:2px solid color-mix(in srgb,var(--accent) 35%,transparent);outline-offset:2px;}
+:where(#appRoot,#modalContainer,#motorOverlay,#themeOverlay) label:has(input:is([type=checkbox],[type=radio]):not(:disabled)):hover{color:var(--accent);cursor:pointer;}
+/* Foco visible de teclado para los elementos que admiten navegación. */
+:where(#appRoot,#modalContainer,#motorOverlay,#themeOverlay) :is(button,summary,a[href],input,select,textarea,[tabindex]):not(:disabled):not([aria-disabled=true]):focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+/* Muestras y celdas retienen su relleno semántico al señalarse. */
+#panelPlanificacion #scheduleGrid .grid-cell:not(.block-selected):not(.compare-jump-focus):hover{outline:1px solid color-mix(in srgb,var(--accent) 65%,transparent);outline-offset:-2px;}
+/* Una misma lupa SVG en buscadores estáticos y formularios dinámicos. */
+.planhor-search-field{position:relative;min-width:0;max-width:100%;}
+.planhor-search-field>.planhor-search-symbol{position:absolute;left:9px;top:50%;transform:translateY(-50%);width:17px;height:17px;pointer-events:none;color:var(--text-secondary);z-index:1;}
+.planhor-search-field>input{padding-left:32px!important;width:100%;box-sizing:border-box;}
+/* La reserva de la lupa prevalece sobre el padding compacto general. */
+:is(#contenidoPrincipal,#modalContainer,#motorOverlay,#themeOverlay,#appRoot) .planhor-search-field>input{padding-left:34px!important;}
+/* Vista Horarios: conservar composición original; aclarar solo la columna horaria. */
+#panelVistaHorarios .vista-general-mini-grid-active .vista-general-mini{grid-template-columns:88px repeat(6,minmax(0,1fr));}
+#panelVistaHorarios .vista-general-mini-grid-active .vista-general-time{flex-direction:column;gap:2px;padding:3px 2px;border-right:1px solid var(--border);white-space:nowrap;}
+#panelVistaHorarios .vista-general-mini-grid-active .vista-general-time small{font-size:10px;line-height:1.2;margin:0;overflow:visible;text-overflow:clip;}
+/* Lateral unificado: superficie deslizante, iconos fijos y textos en fundido. */
+.application-sidebar{background:transparent;border-right:0;isolation:isolate;padding:8px 5px!important;overflow:visible;clip-path:none;width:var(--application-sidebar-width);}
+.application-sidebar::before{content:"";position:absolute;inset:0 auto 0 0;width:184px;background:var(--surface);border-right:1px solid var(--border);z-index:-1;transform:translateX(0);pointer-events:none;}
+.application-menu-collapsed .application-sidebar::before{transform:translateX(-128px);}
+.application-sidebar .tab-nav{width:174px;overflow-x:hidden;overflow-y:auto;overscroll-behavior-y:contain;}
+.application-sidebar .tab-nav>.tab-btn{flex-shrink:0;}
+.application-sidebar .tab-btn,.application-sidebar .application-settings-button{width:174px;justify-content:flex-start!important;padding:6px 12px!important;white-space:nowrap;}
+.application-menu-collapsed .application-sidebar .tab-btn,.application-menu-collapsed .application-settings-button{width:46px;padding:6px 12px!important;}
+.application-sidebar .navigation-icon{flex:0 0 20px;width:20px;}
+.application-sidebar .navigation-label{display:block!important;white-space:nowrap;opacity:1;visibility:visible;}
+.application-menu-collapsed .application-sidebar .navigation-label{opacity:0;visibility:hidden;pointer-events:none;}
+.application-sidebar-heading>span{display:block!important;opacity:1;visibility:visible;}
+.application-menu-collapsed .application-sidebar-heading>span{opacity:0;visibility:hidden;}
+.application-sidebar-heading{padding:0 0 0 42px!important;justify-content:flex-start!important;width:174px;}
+.application-season,.application-search{position:relative;width:174px;padding:0!important;}
+.application-season{height:64px;}
+.application-search{height:72px;}
+.application-season-content,.application-search-content{display:grid!important;opacity:1;visibility:visible;}
+.application-menu-collapsed :is(.application-season-content,.application-search-content){opacity:0;visibility:hidden;pointer-events:none;}
+.application-season-compact,.application-search-compact{display:block!important;position:absolute;left:0;top:0;width:46px;opacity:0;visibility:hidden;pointer-events:none;}
+.application-menu-collapsed :is(.application-season-compact,.application-search-compact){opacity:1;visibility:visible;pointer-events:auto;}
+html:not(:has(#btnPlegarNavegacion[aria-pressed=true])) .navigation-canvas{width:calc(100% - 56px);margin-left:56px;}
+.application-menu-collapsed .application-sidebar .tab-btn::before{display:none;}
+.application-menu-collapsed :is(.application-season,.application-search){border-color:transparent;}
+/* Área contraída ajustada a la zona visible. */
+.application-menu-collapsed .application-sidebar :is(.tab-nav,.application-sidebar-heading,.application-season,.application-search,.application-settings){width:46px;max-width:46px;}
+/* Una única duración; el contenido no se recomprime durante el fundido. */
+.application-sidebar :is(.application-season-content,.application-search-content){width:174px;}
+html[data-planhor-motion=full] .application-sidebar::before{will-change:transform;}
+/* El espacio reservado solo cambia al fijar/soltar, no durante el hover automático. */
+/* La página desplaza contenido largo; tablas y paneles conservan su scroll propio. */
+.navigation-canvas{overflow-x:clip;overflow-y:visible;}
+/* Transición de la ventana de contenido; escala interior sin desbordamiento. */
+html[data-planhor-motion=full] .tab-panel.active{transform-origin:top center;}
+/* Ficha Docente: resumen lateral adaptable, sin salto prematuro de fila. */
+#fichaContenido{container-type:inline-size;}
+#contenidoPrincipal #panelFichaDocente .teacher-sheet-main table tr>td:nth-child(2){font-size:9px!important;line-height:1.2;white-space:nowrap;font-variant-numeric:tabular-nums;letter-spacing:-.1px;}
+#panelFichaDocente .teacher-sheet-layout{display:grid;grid-template-columns:minmax(0,1fr) clamp(220px,28%,320px);gap:12px;align-items:start;}
+#panelFichaDocente :is(.teacher-sheet-main,.teacher-sheet-summary){min-width:0;}
+#panelFichaDocente .teacher-sheet-summary table{table-layout:fixed;overflow-wrap:anywhere;}
+@container (max-width:640px){#panelFichaDocente .teacher-sheet-layout{grid-template-columns:minmax(0,1fr);}
+}

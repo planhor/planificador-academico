@@ -2,7 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-const { cargarModulo } = require('./cargar-modulo');
+const { cargarModulo, registrarAplicaciones } = require('./cargar-modulo');
 
 function cargarGestorPrueba() {
     const ruta = path.resolve(__dirname, '../../docs/planificador_modulos/app.js');
@@ -35,6 +35,7 @@ function cargarGestorPrueba() {
         setTimeout,
         clearTimeout
     });
+    registrarAplicaciones(contexto);
     vm.runInContext(original.replace(marcador, `${inyeccion}${marcador}`), contexto, { filename: ruta });
     window._iniciarApp();
     if (!window.__gestorPruebas) throw new Error('No se pudieron exponer las funciones del Gestor');

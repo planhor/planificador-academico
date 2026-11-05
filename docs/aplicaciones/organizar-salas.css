@@ -1,0 +1,170 @@
+/* Organizar salas: estilos limitados a su panel, paleta y fuente heredadas de Planhor. */
+#panelOrganizarSalas{--ink:var(--text);--muted:var(--text-secondary);--soft:var(--surface-alt);--purple:color-mix(in srgb,var(--accent) 10%,var(--surface));--motion:180ms;}
+#panelOrganizarSalas *{box-sizing:border-box}
+#panelOrganizarSalas.active{height:var(--os-height,calc(100dvh - 70px));min-height:0;display:flex;flex-direction:column;gap:0;padding:0;}
+#panelOrganizarSalas .page-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:39px}
+#panelOrganizarSalas h2{font-size:14px;margin:0}
+#panelOrganizarSalas h2 span{font-size:10px;font-weight:400;color:var(--muted);margin-left:8px}
+#panelOrganizarSalas p{margin:0;color:var(--muted);font-size:11px;line-height:1.4}
+#panelOrganizarSalas .page-heading>div{min-width:0}
+#panelOrganizarSalas #os-message{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11px;line-height:15px;}
+#panelOrganizarSalas #os-message[data-tone=blocked]{color:#905322}
+#panelOrganizarSalas #os-message[data-tone=success]{color:#217c66}
+#panelOrganizarSalas button,#panelOrganizarSalas input{font:inherit;color:inherit}
+#panelOrganizarSalas button{border:1px solid var(--border);background:white;border-radius:4px;min-height:30px;padding:5px 9px;cursor:pointer;transition:background-color var(--motion),border-color var(--motion)}
+#panelOrganizarSalas button:not(:disabled):hover{border-color:var(--accent);background:var(--purple)}
+#panelOrganizarSalas button[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:white}
+#panelOrganizarSalas button:disabled{cursor:default;opacity:.45}
+#panelOrganizarSalas :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+#panelOrganizarSalas .workspace{display:grid;grid-template-columns:208px minmax(0,1fr);gap:0;flex:1;min-height:0}
+#panelOrganizarSalas .room-catalog{display:flex;flex-direction:column;min-height:0;background:var(--surface);border:0;border-right:1px solid var(--border);border-radius:0}
+#panelOrganizarSalas .day-picker{padding:6px 8px;border-bottom:1px solid var(--border)}
+#panelOrganizarSalas .field-label{display:block;font-size:11px;color:var(--muted);margin-bottom:4px}
+#panelOrganizarSalas .days{display:flex;gap:3px}
+#panelOrganizarSalas .days button{flex:1;padding:4px 0;font-size:11px;min-width:0}
+#panelOrganizarSalas .catalog-heading{padding:6px 8px;min-height:30px;display:flex;align-items:center;justify-content:space-between;gap:4px;font-size:12px}
+#panelOrganizarSalas .catalog-heading span{font-size:10px;color:var(--muted)}
+#panelOrganizarSalas .catalog-scroll{overflow:auto;min-height:0;flex:1}
+#panelOrganizarSalas table{border-collapse:collapse;width:100%;font-size:10px;table-layout:fixed}
+#panelOrganizarSalas th,#panelOrganizarSalas td{padding:8px 3px;text-align:left;border-bottom:1px solid var(--border);vertical-align:middle;overflow-wrap:anywhere}
+#panelOrganizarSalas th{background:var(--soft);color:var(--muted);font-weight:500;font-size:10px;position:sticky;top:0}
+#panelOrganizarSalas th:first-child{width:25px}
+#panelOrganizarSalas th:nth-child(2){width:70px}
+#panelOrganizarSalas th:nth-child(3){width:33px}
+#panelOrganizarSalas td:nth-child(2){font-weight:600;color:var(--ink)}
+#panelOrganizarSalas td:nth-child(3),#panelOrganizarSalas th:nth-child(3){text-align:center}
+#panelOrganizarSalas td label{display:block;cursor:pointer}
+#panelOrganizarSalas input[type=checkbox]{accent-color:var(--accent);cursor:pointer;width:13px;height:13px;margin:0 3px}
+#panelOrganizarSalas tbody tr{cursor:pointer;transition:background-color var(--motion)}
+#panelOrganizarSalas tbody tr:hover{background:var(--purple)}
+#panelOrganizarSalas tbody tr:has(input:checked){background:#f6f3fc}
+#panelOrganizarSalas .catalog-help{font-size:10px;padding:8px;border-top:1px solid var(--border)}
+#panelOrganizarSalas .board{min-width:0;min-height:0;border:0;border-radius:0;overflow:auto;background:var(--surface);flex:1}
+#panelOrganizarSalas .room-grid{display:grid;grid-template-columns:repeat(var(--room-count,1),200px);grid-template-rows:24px repeat(var(--os-rows,18),minmax(0,1fr));height:100%;width:max-content;min-width:0}
+#panelOrganizarSalas .grid-heading,#panelOrganizarSalas .time,#panelOrganizarSalas .slot{border-right:1px solid var(--border);border-bottom:1px solid var(--border);min-width:0;min-height:0}
+#panelOrganizarSalas .grid-heading{text-align:center;padding:4px;background:var(--soft);position:sticky;top:0;z-index:2;font-size:12px}
+#panelOrganizarSalas [data-os-heading] strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;line-height:19px;}
+#panelOrganizarSalas .time{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:1px;background:var(--soft);font-size:10px}
+#panelOrganizarSalas .time small{font-size:10px;color:var(--muted)}
+#panelOrganizarSalas .slot{padding:2px;display:flex;align-items:stretch;position:relative;transition:background-color var(--motion)}
+#panelOrganizarSalas .lesson{width:100%;height:100%;min-height:0;text-align:left;background:#e2eeef;border-color:#c3d8db;color:var(--ink);padding:1px 6px;cursor:grab;touch-action:none;user-select:none;overflow:hidden;font-size:11px;white-space:nowrap;text-overflow:ellipsis}
+#panelOrganizarSalas .lesson strong{font-weight:600}
+#panelOrganizarSalas .lesson[aria-pressed=true]{background:var(--purple);color:var(--ink);border-color:var(--accent);box-shadow:inset 3px 0 var(--accent)}
+#panelOrganizarSalas .slot.available{background:#edf7f2}
+#panelOrganizarSalas .slot.available::after{content:"";position:absolute;inset:2px;border:1px dashed #90bba9;pointer-events:none}
+#panelOrganizarSalas .slot.unavailable{background:repeating-linear-gradient(135deg,#fff6ed,#fff6ed 5px,#f9eee3 5px,#f9eee3 7px)}
+#panelOrganizarSalas .slot.drop-target{background:#d6eddf;box-shadow:inset 0 0 0 2px #3e9273}
+#panelOrganizarSalas .slot.drop-blocked{box-shadow:inset 0 0 0 2px #bd804c}
+#panelOrganizarSalas .drag-source{opacity:.3}
+#panelOrganizarSalas .legend{display:flex;gap:14px;align-items:center;font-size:10px;color:var(--muted);min-height:17px}
+#panelOrganizarSalas .legend span{display:flex;align-items:center;gap:5px}
+#panelOrganizarSalas .sample{width:11px;height:11px;border:1px solid var(--border);border-radius:2px}
+#panelOrganizarSalas .sample.occupied{background:#e2eeef}
+#panelOrganizarSalas .sample.available{background:#edf7f2;border:1px dashed #90bba9}
+#panelOrganizarSalas .sample.blocked{background:#fff5ed;border-color:#bd804c}
+#panelOrganizarSalas .keyboard-hint{margin-left:auto}
+#panelOrganizarSalas .empty{grid-column:1/-1;grid-row:1/-1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--muted);text-align:center}
+#panelOrganizarSalas .empty strong{font-size:14px;color:var(--ink)}
+@media (max-width:900px){#panelOrganizarSalas .workspace{grid-template-columns:196px minmax(0,1fr)}
+#panelOrganizarSalas .keyboard-hint{display:none}}
+@media (max-width:600px){#panelOrganizarSalas .workspace{grid-template-columns:170px minmax(0,1fr)}
+#panelOrganizarSalas th:nth-child(2){width:51px}
+#panelOrganizarSalas th:nth-child(3){width:28px}
+#panelOrganizarSalas th:first-child{width:20px}
+#panelOrganizarSalas .room-grid{min-width:0}
+#panelOrganizarSalas .legend{gap:7px}
+#panelOrganizarSalas.active{height:var(--os-height,calc(100dvh - 70px));min-height:0;display:flex;flex-direction:column;gap:0;padding:0;}}
+@media (prefers-reduced-motion:reduce){#panelOrganizarSalas *{transition:none!important}}
+#panelOrganizarSalas .slot{flex-direction:column;gap:1px;overflow:auto;}
+#panelOrganizarSalas .lesson{flex:1;min-height:20px;height:auto;}
+#panelOrganizarSalas .page-heading h2{margin:0;}
+#panelOrganizarSalas .legend small{margin-left:auto;color:var(--text-secondary);font-size:10px;}
+#panelOrganizarSalas.os-dragging,#panelOrganizarSalas.os-dragging *{cursor:grabbing!important;}
+.os-drag-ghost{position:fixed;z-index:500;pointer-events:none;background:color-mix(in srgb,var(--accent) 10%,var(--surface));color:var(--text);border:1px solid var(--accent);border-radius:4px;padding:3px 6px;box-shadow:0 6px 18px #24395126;opacity:.95;will-change:transform;display:flex;align-items:center;overflow:hidden;white-space:nowrap;font:11px var(--font);}
+.os-drag-ghost.invalid{border-color:var(--warning);}
+@media(max-width:1100px){#panelOrganizarSalas .legend small{display:none;}}
+/* El catálogo conserva encabezados legibles bajo la escala global de 12px. */
+#panelOrganizarSalas .room-catalog table :is(th,td){padding:2px 3px!important;font-size:11px!important;line-height:14px;overflow-wrap:normal;word-break:normal;}
+#panelOrganizarSalas .room-catalog th:first-child{width:24px;}
+#panelOrganizarSalas .room-catalog th:nth-child(2){width:44px;}
+#panelOrganizarSalas .room-catalog th:nth-child(3){width:34px;white-space:nowrap;}
+#panelOrganizarSalas .room-catalog td:nth-child(3){white-space:nowrap;}
+
+#panelOrganizarSalas .page-heading{display:block;min-height:36px;padding:8px;flex:none;}
+#panelOrganizarSalas .schedule-area{display:flex;flex-direction:column;min-width:0;min-height:0;}
+#panelOrganizarSalas .legend{flex:none;width:100%;min-height:22px;padding:2px 6px;background:var(--surface);overflow:hidden;white-space:nowrap;gap:10px;}
+#panelOrganizarSalas .legend>span{flex-shrink:0;}
+#panelOrganizarSalas .organizer-status{margin-top:3px;padding:0;height:15px;min-height:15px;max-height:15px;overflow:hidden;border:0;}
+
+/* Columnas uniformes y navegación horizontal dentro de la grilla. */
+#panelOrganizarSalas .board{overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;scrollbar-width:thin;scrollbar-color:var(--text-secondary) var(--surface-alt);}
+#panelOrganizarSalas .board::-webkit-scrollbar{height:10px;}
+#panelOrganizarSalas .board::-webkit-scrollbar-track{background:var(--surface-alt);}
+#panelOrganizarSalas .board::-webkit-scrollbar-thumb{background:var(--text-secondary);border:2px solid var(--surface-alt);border-radius:5px;}
+#panelOrganizarSalas .room-grid.is-empty{grid-template-columns:1fr;width:100%;min-width:0;}
+
+#panelOrganizarSalas .schedule-body{display:grid;grid-template-columns:88px minmax(0,1fr);flex:1;min-height:0;background:var(--surface-alt);}
+#panelOrganizarSalas .schedule-body.no-rooms{grid-template-columns:minmax(0,1fr);}
+#panelOrganizarSalas .schedule-body.no-rooms .time-rail{display:none;}
+#panelOrganizarSalas .time-rail{display:grid;grid-template-rows:24px repeat(var(--os-rows,18),minmax(0,1fr));height:calc(100% - var(--os-scrollbar,0px));min-height:0;}
+#panelOrganizarSalas .time-rail .grid-heading{position:static;display:flex;align-items:center;justify-content:center;}
+#panelOrganizarSalas .board{position:relative;z-index:0;contain:paint;}
+#panelOrganizarSalas .time-rail{position:relative;z-index:1;background:var(--surface-alt);}
+#panelOrganizarSalas .schedule-body{isolation:isolate;}
+#panelOrganizarSalas .time-rail{contain:strict;isolation:isolate;overflow:hidden;}
+
+#panelOrganizarSalas .catalog-nav{display:flex;flex:none;gap:6px;padding:6px;border-top:1px solid var(--border);background:var(--surface);}
+#panelOrganizarSalas .catalog-nav .btn{flex:1;min-width:0;}
+
+/* Prolonga el fondo del encabezado sin cambiar el ancho de las salas. */
+#panelOrganizarSalas .board{background:linear-gradient(to bottom,var(--soft) 0 23px,var(--border) 23px 24px,var(--surface) 24px);}
+
+/* Páginas reales; las salas seleccionadas son independientes del catálogo. */
+#panelOrganizarSalas .catalog-nav{flex-direction:column;align-items:center;gap:3px;padding:5px;}
+#panelOrganizarSalas .catalog-controls{display:grid;grid-template-columns:24px 24px minmax(0,1fr) 24px 24px;align-items:center;gap:2px;width:100%;}
+#panelOrganizarSalas .catalog-nav .btn{display:grid;place-items:center;width:24px;min-height:30px!important;height:30px!important;padding:0!important;font-size:16px!important;line-height:1;margin:0;}
+#panelOrganizarSalas .catalog-page{display:flex;align-items:center;justify-content:center;gap:3px;flex:1;white-space:nowrap;font-size:10px;}
+#panelOrganizarSalas .catalog-page input{width:28px!important;min-width:0;min-height:30px!important;height:30px!important;margin:0;padding:0!important;text-align:center;font-size:10px!important;appearance:textfield;}
+#panelOrganizarSalas .catalog-page input::-webkit-inner-spin-button{appearance:none;}
+#panelOrganizarSalas #os-catalog-range{font-size:10px;color:var(--muted);}
+#panelOrganizarSalas .lesson{white-space:normal;padding:1px 3px;font-size:11px;line-height:1.2;}
+#panelOrganizarSalas .lesson-name{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;overflow-wrap:anywhere;}
+
+/* Ejes de alineación comunes: encabezados, celdas y controles. */
+#panelOrganizarSalas .room-catalog :is(th,td):nth-child(2),#panelOrganizarSalas .room-catalog :is(th,td):nth-child(4){text-align:left;padding-left:4px!important;padding-right:4px!important;}
+#panelOrganizarSalas .room-catalog thead th{height:24px;}
+#panelOrganizarSalas .room-catalog input[type=checkbox]{display:block;margin:0 auto;width:13px;height:13px;}
+#panelOrganizarSalas .days .btn{display:grid;place-items:center;height:30px;min-height:30px;padding:0!important;font-size:12px!important;line-height:18px;}
+#panelOrganizarSalas .page-heading h2{line-height:20px;}
+#panelOrganizarSalas .catalog-page{height:30px;line-height:1;}
+#panelOrganizarSalas .grid-heading{display:flex;align-items:center;justify-content:center;}
+#panelOrganizarSalas [data-os-heading] strong{width:100%;min-width:0;}
+#panelOrganizarSalas .lesson{display:flex;align-items:center;justify-content:center;}
+#panelOrganizarSalas .lesson-name{width:100%;text-align:center;}
+
+/* Las veinte filas de una página completa reparten la altura del listado. */
+#panelOrganizarSalas .catalog-scroll.full-page table{height:100%;}
+#panelOrganizarSalas .catalog-scroll.full-page thead{height:24px;}
+
+/* Misma escala efectiva que Planificación, ante las reglas generales del shell. */
+#panelOrganizarSalas .grid-heading,#panelOrganizarSalas .grid-heading strong{font-size:12px!important;font-weight:700;line-height:18px;}
+#panelOrganizarSalas .time,#panelOrganizarSalas .time strong,#panelOrganizarSalas .time small{font-size:10px!important;font-weight:400;line-height:11px;}
+#panelOrganizarSalas .time{gap:0;}
+#panelOrganizarSalas .lesson,#panelOrganizarSalas .lesson-name{font-size:10px!important;font-weight:400;line-height:11.5px;}
+#panelOrganizarSalas .field-label{font-size:11px;font-weight:500;line-height:12.1px;}
+#panelOrganizarSalas .catalog-page,#panelOrganizarSalas .catalog-page span,#panelOrganizarSalas .catalog-page input,#panelOrganizarSalas #os-catalog-range{font-size:11px!important;line-height:14px;}
+
+/* El paginador responde al ancho real del panel, incluso con el menú abierto. */
+#panelOrganizarSalas .room-catalog{container-type:inline-size;min-width:0;}
+@container (max-width:200px){
+ #panelOrganizarSalas .catalog-controls{grid-template-columns:repeat(4,24px);justify-content:space-between;row-gap:4px;}
+ #panelOrganizarSalas .catalog-page{grid-row:1;grid-column:1/-1;min-width:0;}
+ #panelOrganizarSalas #os-catalog-first{grid-row:2;grid-column:1;}
+ #panelOrganizarSalas #os-catalog-prev{grid-row:2;grid-column:2;}
+ #panelOrganizarSalas #os-catalog-next{grid-row:2;grid-column:3;}
+ #panelOrganizarSalas #os-catalog-last{grid-row:2;grid-column:4;}
+}
+@container (max-width:180px){
+ #panelOrganizarSalas .days{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));}
+ #panelOrganizarSalas .catalog-heading{flex-wrap:wrap;}
+}
