@@ -120,7 +120,8 @@
             try{
                 const result=await ctx.aplicar(p.id,destination.id,expected);
                 if(String(expected.temporadaId||'')===periodo()){
-                    render();notify(result.ok?`${result.cantidad} bloque(s) trasladados a ${destination.nombre}. ${result.msg}`:result.msg,result.ok?'success':'blocked');
+                    if(!result.ok)render();
+                    notify(result.ok?`${result.cantidad} bloque(s) trasladados a ${destination.nombre}. ${result.msg}`:result.msg,result.ok?'success':'blocked');
                 }
             }catch(error){
                 console.error('Organizar salas:',error);

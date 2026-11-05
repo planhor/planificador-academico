@@ -1,6 +1,6 @@
 self.window=self;
 
-importScripts('planificacion.js?v=20261104-publicacion');
+importScripts('planificacion.js?v=20261104-fluidez-salas');
 
 const DIAS=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
 const BLOQUES=[

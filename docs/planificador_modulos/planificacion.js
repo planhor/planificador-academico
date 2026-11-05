@@ -2539,8 +2539,9 @@
             });
             ctx.auditoria?.('salas_reorganizadas',{cantidad:cambios.length,cambios});
             ctx.reconstruirIndices();
-            const guardado=await ctx.guardar();
+            // Mostrar el cambio validado sin esperar la transacción remota.
             ctx.refrescarTodo?.();
+            const guardado=await ctx.guardar();
             return {ok:true,cantidad:cambios.length,guardado,msg:guardado===false?'Traslado guardado localmente; sincronización pendiente.':'Sala actualizada. Puedes deshacer desde la barra superior.'};
         }
 

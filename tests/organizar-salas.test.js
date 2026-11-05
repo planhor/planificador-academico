@@ -51,3 +51,16 @@ test('consultar destinos no modifica datos ni historial',()=>{
  const {api,data,calls}=escenario();const before=JSON.stringify(data);assert.equal(api.validarOrganizarSalas('p1','destino').ok,true);
  assert.equal(JSON.stringify(data),before);assert.equal(calls.undo,0);assert.equal(calls.guardar,0);
 });
+
+test('el traslado se refleja una vez antes de completar el guardado remoto',async()=>{
+ const {api,data,ctx,calls}=escenario();
+ let terminar;const remoto=new Promise(resolve=>{terminar=resolve;});
+ let renders=0;let guardando=false;
+ ctx.refrescarTodo=()=>{renders++;assert.equal(data.planificaciones[0].salaId,'destino');assert.equal(calls.indices,1);};
+ ctx.guardar=()=>{guardando=true;return remoto;};
+ const pendiente=api.aplicarOrganizarSalas('p1','destino');
+ assert.equal(guardando,true);assert.equal(renders,1);assert.equal(calls.undo,1);
+ terminar(false);const resultado=await pendiente;
+ assert.equal(resultado.ok,true);assert.equal(resultado.guardado,false);assert.equal(renders,1);
+ assert.match(resultado.msg,/sincronización pendiente/);
+});
