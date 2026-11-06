@@ -15,7 +15,7 @@
         const rooms=()=>data().salas.filter(s=>!s.esVirtual&&String(s.id)!==String(ctx.SALA_VIRTUAL_ID)).sort((a,b)=>ordenSalas.compare(nombreSala(a),nombreSala(b)));
         const room=id=>data().salas.find(s=>String(s.id)===String(id));
         const plan=id=>data().planificaciones.find(p=>String(p.id)===String(id));
-        const grupo=p=>p?ctx.grupo(p.id):[];
+        const grupo=p=>p?ctx.grupo(p.id,state.moveMode||'single'):[];
         const nombre=p=>{
             const a=data().asignaturas.find(a=>String(a.id)===String(p.asignaturaId));
             return a?[a.codigo,a.nombre].filter(Boolean).join(' - '):(p.nombreExterno||p.nombre||'Carga externa');
@@ -36,7 +36,7 @@
         function bloques(p){return grupo(p).map(p=>Number(p.bloque));}
         function snapshot(p){
             const campos=['id','salaId','dia','bloque','asignaturaId','seccionId','componenteId','docenteId','fijo'];
-            return {temporadaId:data().sel?.temporadaId,bloques:grupo(p).map(p=>Object.fromEntries(campos.map(k=>[k,p[k]??null])))};
+            return {temporadaId:data().sel?.temporadaId,modo:state.moveMode||'single',bloques:grupo(p).map(p=>Object.fromEntries(campos.map(k=>[k,p[k]??null])))};
         }
         function paint(targetId=null){
             const source=plan(state.selected),group=grupo(source),ids=new Set(group.map(p=>String(p.id)));
@@ -44,7 +44,7 @@
             root.querySelectorAll('.slot').forEach(cell=>{
                 cell.classList.remove('available','unavailable','drop-target','drop-blocked');
                 if(!source||!bloques(source).includes(Number(cell.dataset.block))||String(source.salaId)===cell.dataset.room)return;
-                const result=ctx.validar(source.id,cell.dataset.room);
+                const result=ctx.validar(source.id,cell.dataset.room,snapshot(source));
                 cell.classList.add(result.ok?'available':'unavailable');
                 if(String(targetId)===cell.dataset.room)cell.classList.add(result.ok?'drop-target':'drop-blocked');
                 cell.title=result.ok?(result.advertencia||'Sala disponible'):result.msg;
@@ -106,7 +106,7 @@
                         html+=`<div class="slot" data-room="${attr(s.id)}" data-block="${b.n}" style="grid-column:${i+1};grid-row:${index+2}">${items.map(p=>{
                             const sec=data().secciones.find(s=>String(s.id)===String(p.seccionId));
                             const title=[nombre(p),sec?.nombre||'',s.nombre,ctx.DIAS[state.day]+' B'+b.n,p.fijo?'Bloque fijo':''].filter(Boolean).join(' · ');
-                            return `<button type="button" class="lesson" data-os-plan="${attr(p.id)}" aria-label="${attr(title)}" aria-pressed="false">${p.fijo?'🔒 ':''}<span class="lesson-name">${h(data().asignaturas.find(a=>String(a.id)===String(p.asignaturaId))?.nombre||nombre(p))}</span></button>`;
+                            return `<button type="button" class="lesson" style="--om-subject-color:${attr(ctx.colorAsignaturaPlanhor?.(data().asignaturas.find(a=>String(a.id)===String(p.asignaturaId)))||'#dce4ec')}" data-os-plan="${attr(p.id)}" aria-label="${attr(title)}" aria-pressed="false">${p.fijo?'🔒 ':''}<span class="lesson-name">${h(data().asignaturas.find(a=>String(a.id)===String(p.asignaturaId))?.nombre||nombre(p))}</span><span class="lesson-section">${h(sec?.nombre||'Sin sección')}</span></button>`;
                         }).join('')}</div>`;
                     });
                 });
@@ -222,7 +222,7 @@
             ctx.ocultarDetalle?.();
             const button=event.target.closest('[data-os-plan]');if(!button||event.button!==0||!event.isPrimary||busy)return;
             const p=plan(button.dataset.osPlan);if(!p)return;
-            state.selected=p.id;state.keyboardRoom=null;paint();
+            state.selected=p.id;state.keyboardRoom=null;state.moveMode=(event.ctrlKey||event.metaKey)?'continuo':'single';paint();
             const group=grupo(p);
             if(!group.length||group.some(p=>p.fijo))return notify('Este grupo contiene bloques fijos o se modifica desde Planificación.','blocked');
             drag={button,source:p,id:event.pointerId,x:event.clientX,y:event.clientY,lastX:event.clientX,lastY:event.clientY,rect:button.getBoundingClientRect(),active:false,ghost:null,target:null,expected:snapshot(p)};
@@ -257,7 +257,7 @@
             if(event.key==='ArrowLeft'||event.key==='ArrowRight'){
                 event.preventDefault();const shown=rooms().filter(s=>state.visible.has(String(s.id))),index=shown.findIndex(s=>String(s.id)===String(state.keyboardRoom||p.salaId));
                 const target=shown[Math.max(0,Math.min(shown.length-1,index+(event.key==='ArrowRight'?1:-1)))];if(!target)return;
-                state.keyboardRoom=target.id;revealRoom(target.id);paint(target.id);const result=ctx.validar(p.id,target.id);
+                state.keyboardRoom=target.id;revealRoom(target.id);paint(target.id);const result=ctx.validar(p.id,target.id,snapshot(p));
                 notify(result.ok?target.nombre+': pulsa Enter para trasladar.':result.msg,result.ok?'normal':'blocked');
             }else if(event.key==='Enter'&&state.keyboardRoom){event.preventDefault();void move(p,room(state.keyboardRoom),snapshot(p));}
         });

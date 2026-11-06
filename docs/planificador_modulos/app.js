@@ -904,7 +904,8 @@ get vincularSeccionAGrupo(){return vincularSeccionAGrupo;},
     let organizadorSalas=null;
     function renderOrganizadorSalas(){
         if(!organizadorSalas) organizadorSalas=window.PlanhorAplicaciones['optimizador-manual'].create({
-            getData:()=>data, DIAS, BLOQUES, SALA_VIRTUAL_ID, escapeHTML, escapeAttr,
+            getData:()=>data, DIAS, BLOQUES, SALA_VIRTUAL_ID, escapeHTML, escapeAttr, colorAsignaturaPlanhor,
+            grupoContinuo:Planificacion.grupoContinuoManual,
             validarMovimiento:Planificacion.validarMovimientoManual,
             aplicarMovimiento:Planificacion.aplicarMovimientoManual,
             abrirDestino:(planId,destino)=>{

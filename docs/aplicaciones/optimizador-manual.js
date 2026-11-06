@@ -76,7 +76,7 @@
      const result=source?ctx.validarMovimiento(source.id,day,b.n,expected):null;
      const sectionBusy=source&&data().planificaciones.some(p=>!eq(p.id,source.id)&&eq(p.seccionId,source.seccionId)&&Number(p.dia)===day&&Number(p.bloque)===b.n);
      const items=visible.filter(p=>Number(p.dia)===day&&Number(p.bloque)===b.n);
-     html+=`<div class="om-slot ${result?(result.ok?'om-available':'om-blocked'):''}" data-om-day="${day}" data-om-block="${b.n}" title="${a(result?(result.ok?(result.advertencia||'Destino disponible'):result.msg):'')}">${sectionBusy?'<small class="om-section-busy">Sección ocupada</small>':''}${items.map(p=>`<button class="om-lesson" draggable="${!p.fijo&&!p.esCargaExterna}" data-om-plan="${a(p.id)}" aria-pressed="${eq(p.id,selected)}"><strong>${h(asignatura(p)?.codigo||p.nombreExterno||'Actividad')}</strong><span>${h(docName(docente(p)))}</span><span>${h(seccion(p)?.nombre||'Sin sección')}</span>${p.fijo?'<span>Fijo</span>':''}</button>`).join('')}</div>`;
+     html+=`<div class="om-slot ${result?(result.ok?'om-available':'om-blocked'):''}" data-om-day="${day}" data-om-block="${b.n}" title="${a(result?(result.ok?(result.advertencia||'Destino disponible'):result.msg):'')}">${sectionBusy?'<small class="om-section-busy">Sección ocupada</small>':''}${items.map(p=>`<button class="om-lesson" style="--om-subject-color:${a(ctx.colorAsignaturaPlanhor?.(asignatura(p))||'#dce4ec')}" draggable="${!p.fijo&&!p.esCargaExterna}" data-om-plan="${a(p.id)}" aria-pressed="${eq(p.id,selected)}"><strong>${h(asignatura(p)?.codigo||p.nombreExterno||'Actividad')}</strong><span>${h(docName(docente(p)))}</span><span>${h(seccion(p)?.nombre||'Sin sección')}</span>${p.fijo?'<span>Fijo</span>':''}</button>`).join('')}</div>`;
     });
    }
    $('.om-grid').style.setProperty('--om-days',ctx.DIAS.length);$('.om-grid').style.setProperty('--om-rows',ctx.BLOQUES.length);$('.om-grid').innerHTML=html;adjustHeight();
@@ -113,7 +113,9 @@
    const lesson=e.target.closest('[data-om-plan]');if(lesson){choose(lesson.dataset.omPlan);return;}
    const slot=e.target.closest('[data-om-day]');if(slot&&selected)void move(Number(slot.dataset.omDay),Number(slot.dataset.omBlock));
   });
-  root.addEventListener('dragstart',e=>{const b=e.target.closest('[data-om-plan]');if(!b)return;selected=b.dataset.omPlan;const p=plan();expected={temporadaId:data().sel?.temporadaId,plan:JSON.stringify(p)};e.dataTransfer.setData('text/plain',String(p.id));e.dataTransfer.effectAllowed='move';ctx.ocultarDetalle?.();paintTargets();});
+  let groupGesture=false;
+  root.addEventListener('pointerdown',e=>{if(e.target.closest('[data-om-plan]'))groupGesture=e.ctrlKey||e.metaKey;});
+  root.addEventListener('dragstart',e=>{const b=e.target.closest('[data-om-plan]');if(!b)return;selected=b.dataset.omPlan;const p=plan();expected={temporadaId:data().sel?.temporadaId,plan:JSON.stringify(p)};if(groupGesture||e.ctrlKey||e.metaKey)expected.grupo=JSON.stringify(ctx.grupoContinuo(p.id));groupGesture=false;e.dataTransfer.setData('text/plain',String(p.id));e.dataTransfer.effectAllowed='move';ctx.ocultarDetalle?.();paintTargets();});
   root.addEventListener('dragover',e=>{if(selected&&e.target.closest('[data-om-day]')){e.preventDefault();e.dataTransfer.dropEffect='move';}});
   root.addEventListener('drop',e=>{const slot=e.target.closest('[data-om-day]');if(!slot||!selected)return;e.preventDefault();void move(Number(slot.dataset.omDay),Number(slot.dataset.omBlock));});
   root.addEventListener('contextmenu',e=>{

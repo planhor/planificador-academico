@@ -2491,10 +2491,12 @@
         }
 
         // Servicio compartido por Organizar salas. Solo cambia salaId; conserva horario y relaciones.
-        function grupoOrganizarSalas(planId){
+        function grupoOrganizarSalas(planId,modo){
             const data=getData();
             const origen=data.planificaciones.find(p=>mismoId(p.id,planId));
             if(!origen||origen.esCargaExterna||origen.tipoPresencial===false) return [];
+            if(modo==='single')return [origen];
+            if(modo==='continuo')return grupoContinuoManual(planId);
             return data.planificaciones.filter(p=>!p.esCargaExterna&&p.tipoPresencial!==false&&
                 mismoId(p.asignaturaId,origen.asignaturaId)&&mismoId(p.seccionId,origen.seccionId)&&
                 String(p.componenteId||'')===String(origen.componenteId||'')&&
@@ -2504,7 +2506,7 @@
             const data=getData();
             const falla=msg=>({ok:false,msg,planes:[]});
             if(esperado.temporadaId!==undefined&&!mismoId(esperado.temporadaId,data.sel?.temporadaId)) return falla('La temporada cambió. Vuelve a tomar el bloque.');
-            const planes=grupoOrganizarSalas(planId);
+            const planes=grupoOrganizarSalas(planId,esperado.modo);
             if(!planes.length) return falla('Este bloque se modifica desde Planificación.');
             const sala=data.salas.find(s=>mismoId(s.id,salaId));
             if(!sala||sala.esVirtual||mismoId(salaId,ctx.SALA_VIRTUAL_ID)) return falla('Selecciona una sala presencial.');
@@ -2545,6 +2547,17 @@
             return {ok:true,cantidad:cambios.length,guardado,msg:guardado===false?'Traslado guardado localmente; sincronización pendiente.':'Sala actualizada. Puedes deshacer desde la barra superior.'};
         }
 
+        // Mismo tramo contiguo que el movimiento grupal del Planificador.
+        function grupoContinuoManual(planId){
+            const planes=getData().planificaciones, p=planes.find(x=>mismoId(x.id,planId));
+            if(!p||p.fijo||p.esCargaExterna)return [];
+            const lista=planes.filter(x=>mismoId(x.seccionId,p.seccionId)&&mismoId(x.asignaturaId,p.asignaturaId)&&Number(x.dia)===Number(p.dia)&&x.tipoPresencial===p.tipoPresencial&&String(x.componenteId||'')===String(p.componenteId||'')&&mismoId(x.docenteId,p.docenteId)&&mismoId(x.salaId,p.salaId)&&!x.fijo&&!x.esCargaExterna);
+            const porBloque=new Map(lista.map(x=>[Number(x.bloque),x])), grupo=[];
+            if(porBloque.size!==lista.length||porBloque.get(Number(p.bloque))!==p)return [];
+            for(let b=Number(p.bloque);porBloque.has(b);b--)grupo.unshift(porBloque.get(b));
+            for(let b=Number(p.bloque)+1;porBloque.has(b);b++)grupo.push(porBloque.get(b));
+            return grupo;
+        }
         // Ajuste fino individual: conserva identidad, docente, sala y relaciones.
         function validarMovimientoManual(planId,dia,bloque,esperado){
             const data=getData(),plan=data.planificaciones.find(p=>mismoId(p.id,planId));
@@ -2554,6 +2567,20 @@
             if(plan.fijo) return falla('Desbloquea el bloque antes de moverlo.');
             if(esAsignaturaVinculada(plan.asignaturaId,plan.seccionId)) return falla('Modifica esta asignatura desde la sección madre.');
             if(esperado && (String(esperado.temporadaId)!==String(data.sel?.temporadaId)||esperado.plan!==JSON.stringify(plan))) return falla('La planificación cambió. Selecciona nuevamente el bloque.');
+            if(esperado?.grupo){
+                const grupo=grupoContinuoManual(planId);
+                if(!grupo.length)return falla('Hay bloques superpuestos; revisa la planificación antes de mover el grupo.');
+                if(JSON.stringify(grupo)!==esperado.grupo)return falla('La planificación cambió. Selecciona nuevamente los bloques.');
+                if(grupo.some(p=>esAsignaturaVinculada(p.asignaturaId,p.seccionId)))return falla('Modifica esta asignatura desde la sección madre.');
+                const delta=Number(bloque)-Number(plan.bloque), ids=new Set(grupo.map(p=>String(p.id)));
+                const targets=grupo.map(p=>({...p,dia:Number(dia),bloque:Number(p.bloque)+delta}));
+                const planes=data.planificaciones.filter(p=>!ids.has(String(p.id))).concat(targets);
+                for(const p of targets){
+                    const ev=evaluarRestriccionesPlan(p,p.dia,p.bloque,planes);
+                    if(!ev.valido)return falla(ev.duras.map(r=>r.detalle||r.label).join(' '));
+                }
+                return {ok:true,plan,dia:Number(dia),bloque:Number(bloque),grupo,targets};
+            }
             const candidato={...plan,dia:Number(dia),bloque:Number(bloque)};
             const planes=data.planificaciones.map(p=>p===plan?candidato:p);
             const evaluacion=evaluarRestriccionesPlan(candidato,candidato.dia,candidato.bloque,planes);
@@ -2566,8 +2593,9 @@
             const p=resultado.plan;
             if(p.dia===resultado.dia&&p.bloque===resultado.bloque) return {ok:true,msg:'El bloque permanece en su horario.'};
             ctx.pushUndo({tipo:'optimizador_manual',resumen:'Mover bloque',temporadaId:getData().sel?.temporadaId});
-            const antes={...p};p.dia=resultado.dia;p.bloque=resultado.bloque;
-            ctx.auditoria?.('bloques_movidos',{cantidad:1,antes:[antes],despues:[{...p}]});
+            const grupo=resultado.grupo||[p], antes=grupo.map(item=>({...item}));
+            grupo.forEach((item,i)=>{const target=resultado.targets?.[i]||resultado;item.dia=target.dia;item.bloque=target.bloque;});
+            ctx.auditoria?.('bloques_movidos',{cantidad:grupo.length,antes,despues:grupo.map(item=>({...item}))});
             ctx.reconstruirIndices();ctx.refrescarTodo?.();
             const guardado=await ctx.guardar();
             return {ok:true,msg:guardado===false?'Cambio local; sincronización pendiente.':'Bloque actualizado.'};
@@ -6891,7 +6919,7 @@
                 ghost.className=`drag-plan-ghost ${totalBloques>1?'drag-plan-ghost-stack':''}`;
                 if(rect){
                     const ancho=Math.max(96,rect.width);
-                    const alto=Math.max(54,rect.height);
+                    const alto=rect.height;
                     ghost.style.width=`${ancho}px`;
                     ghost.style.setProperty('--ghost-cell-height',`${alto}px`);
                     ghost.style.height=totalBloques>1?'auto':`${alto}px`;
@@ -7005,11 +7033,11 @@
                 const preferirPuntero=opciones.preferirPuntero!==false;
                 const {x,y}=coordenadasEvento(e);
                 if(preferirPuntero && Number.isFinite(x) && Number.isFinite(y)){
-                    const celda=celdaDesdeCoordenadas(x,y);
-                    if(celda?.dataset?.dia!==undefined) return celda;
                     const bajoPuntero=document.elementFromPoint(x,y);
                     const celdaDom=bajoPuntero?.closest?.('.grid-cell')||null;
-                    if(celdaDom?.dataset?.dia!==undefined) return celdaDom;
+                    if(celdaDom&&scheduleGrid.contains(celdaDom)&&celdaDom.dataset.dia!==undefined) return celdaDom;
+                    const celda=celdaDesdeCoordenadas(x,y);
+                    if(celda?.dataset?.dia!==undefined) return celda;
                 }
                 const directa=e.target?.closest?.('.grid-cell');
                 if(directa?.dataset?.dia!==undefined) return directa;
@@ -7266,6 +7294,7 @@
             document.addEventListener('pointermove',(e)=>{
                 if(!arrastre.activo) return;
                 if(e.pointerType==='mouse' && e.buttons===0) return finalizarArrastre(e);
+                if(scheduleGrid.contains(e.target)) return;
                 moverFantasmaArrastre(e);
                 const data=getData();
                 const cell=celdaDesdeEvento(e);
@@ -7399,6 +7428,7 @@
             actualizarSelectoresPlan,
             actualizarProgresoPlan,
             validarSeleccionManual,
+            grupoContinuoManual,
             validarMovimientoManual,
             aplicarMovimientoManual,
             grupoOrganizarSalas,

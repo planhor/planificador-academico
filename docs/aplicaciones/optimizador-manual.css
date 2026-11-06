@@ -42,3 +42,7 @@ body:has(.om-context-menu) #planBlockTooltip{visibility:hidden!important;opacity
 .om-lesson{box-sizing:border-box;flex:1;width:100%;min-height:20px;height:auto;border:1px solid #c3d8db;border-radius:4px;background:#e2eeef;color:var(--text);font:inherit;line-height:11.5px;padding:1px 3px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:grab;transition:background-color 180ms ease,border-color 180ms ease;}
 #panelOptimizadorManual .om-lesson :is(strong,span){font-size:10px!important;font-weight:400;line-height:11.5px;}
 .om-lesson:hover,.om-lesson[aria-pressed=true]{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 23%,var(--surface));}.om-lesson:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}.om-section-busy{font-size:10px;color:var(--text-secondary);text-align:center;}
+
+#panelOptimizadorManual .om-lesson:not([aria-pressed=true]),html #panelOptimizadorManual #panelOrganizarSalas .lesson:not([aria-pressed=true]){background:var(--om-subject-color,#e2eeef);}
+#panelOptimizadorManual #panelOrganizarSalas .lesson{flex-direction:column;}
+#panelOptimizadorManual #panelOrganizarSalas .lesson-section{display:block;max-width:100%;font-size:10px;line-height:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
