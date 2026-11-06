@@ -7,7 +7,7 @@
 #panelOrganizarSalas h2 span{font-size:10px;font-weight:400;color:var(--muted);margin-left:8px}
 #panelOrganizarSalas p{margin:0;color:var(--muted);font-size:11px;line-height:1.4}
 #panelOrganizarSalas .page-heading>div{min-width:0}
-#panelOrganizarSalas #os-message{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11px;line-height:15px;}
+#panelOrganizarSalas #os-message{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:10px!important;line-height:13px;}
 #panelOrganizarSalas #os-message[data-tone=blocked]{color:#905322}
 #panelOrganizarSalas #os-message[data-tone=success]{color:#217c66}
 #panelOrganizarSalas button,#panelOrganizarSalas input{font:inherit;color:inherit}
@@ -90,7 +90,7 @@
 #panelOrganizarSalas .room-catalog th:nth-child(3){width:34px;white-space:nowrap;}
 #panelOrganizarSalas .room-catalog td:nth-child(3){white-space:nowrap;}
 
-#panelOrganizarSalas .page-heading{display:block;min-height:36px;padding:8px;flex:none;}
+#panelOrganizarSalas .page-heading{display:block;min-height:0;padding:3px 6px;flex:none;}
 #panelOrganizarSalas .schedule-area{display:flex;flex-direction:column;min-width:0;min-height:0;}
 #panelOrganizarSalas .legend{flex:none;width:100%;min-height:22px;padding:2px 6px;background:var(--surface);overflow:hidden;white-space:nowrap;gap:10px;}
 #panelOrganizarSalas .legend>span{flex-shrink:0;}
@@ -135,7 +135,7 @@
 #panelOrganizarSalas .room-catalog thead th{height:24px;}
 #panelOrganizarSalas .room-catalog input[type=checkbox]{display:block;margin:0 auto;width:13px;height:13px;}
 #panelOrganizarSalas .days .btn{display:grid;place-items:center;height:30px;min-height:30px;padding:0!important;font-size:12px!important;line-height:18px;}
-#panelOrganizarSalas .page-heading h2{line-height:20px;}
+#panelOrganizarSalas .page-heading h2{font-size:12px;line-height:16px;}
 #panelOrganizarSalas .catalog-page{height:30px;line-height:1;}
 #panelOrganizarSalas .grid-heading{display:flex;align-items:center;justify-content:center;}
 #panelOrganizarSalas [data-os-heading] strong{width:100%;min-width:0;}
@@ -156,15 +156,15 @@
 
 /* El paginador responde al ancho real del panel, incluso con el menú abierto. */
 #panelOrganizarSalas .room-catalog{container-type:inline-size;min-width:0;}
-@container (max-width:200px){
- #panelOrganizarSalas .catalog-controls{grid-template-columns:repeat(4,24px);justify-content:space-between;row-gap:4px;}
- #panelOrganizarSalas .catalog-page{grid-row:1;grid-column:1/-1;min-width:0;}
- #panelOrganizarSalas #os-catalog-first{grid-row:2;grid-column:1;}
- #panelOrganizarSalas #os-catalog-prev{grid-row:2;grid-column:2;}
- #panelOrganizarSalas #os-catalog-next{grid-row:2;grid-column:3;}
- #panelOrganizarSalas #os-catalog-last{grid-row:2;grid-column:4;}
-}
 @container (max-width:180px){
- #panelOrganizarSalas .days{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));}
+ #panelOrganizarSalas .days{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:2px;}
+ #panelOrganizarSalas .days .btn{height:26px;min-height:26px;font-size:11px!important;padding:0!important;}
  #panelOrganizarSalas .catalog-heading{flex-wrap:wrap;}
 }
+
+/* Paginación compacta, alineada en una sola fila con el catálogo de 180 px. */
+#panelOrganizarSalas .catalog-controls{grid-template-columns:20px 20px minmax(0,1fr) 20px 20px;gap:2px;}
+#panelOrganizarSalas .catalog-nav .btn{width:20px;height:26px!important;min-height:26px!important;font-size:14px!important;}
+#panelOrganizarSalas .catalog-page{height:26px;gap:3px;margin:0;}
+#panelOrganizarSalas .catalog-page input{width:25px!important;height:26px!important;min-height:26px!important;}
+#panelOrganizarSalas .catalog-page,#panelOrganizarSalas .catalog-page span,#panelOrganizarSalas .catalog-page input,#panelOrganizarSalas #os-catalog-range{font-size:10px!important;line-height:13px;}

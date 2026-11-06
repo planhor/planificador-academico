@@ -262,6 +262,12 @@
     ]
   },
   {
+    "app": "optimizador-manual",
+    "file": "aplicaciones/optimizador-manual.js",
+    "owner": "app.js",
+    "functions": ["render"]
+  },
+  {
     "app": "organizar-salas",
     "file": "aplicaciones/organizar-salas.js",
     "owner": "app.js",

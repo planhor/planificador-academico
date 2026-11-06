@@ -212,6 +212,9 @@
  let sidebarMode='auto';
  try{sidebarMode=localStorage.getItem('planhor:menu:modo')||'auto';}catch(e){}
  if(!['auto','expanded','collapsed'].includes(sidebarMode))sidebarMode='auto';
+ let seasonSelectionActive=false;
+ const sidebarHasInteraction=()=>seasonSelectionActive||sidebar.contains(document.activeElement);
+ const closeAutomaticSidebar=()=>{if(sidebarMode==='auto'&&!sidebarHasInteraction()&&!sidebar.matches(':hover'))setSidebarExpanded(false);};
  const setSidebarExpanded=expanded=>{
   document.documentElement.classList.toggle('application-menu-collapsed',!expanded);
 
@@ -221,16 +224,22 @@
  const canvas=document.querySelector('.navigation-canvas');
  let canvasMotion=null;
  const applySidebarMode=()=>{
-  const previousLeft=canvas?.getBoundingClientRect().left;
-  setSidebarExpanded(sidebarMode==='expanded'||(sidebarMode==='auto'&&sidebar.matches(':hover')));
+  const previousBounds=canvas?.getBoundingClientRect();
+  setSidebarExpanded(sidebarMode==='expanded'||(sidebarMode==='auto'&&(sidebar.matches(':hover')||sidebarHasInteraction())));
   toggle.setAttribute('aria-label','Fijar menú de aplicaciones');toggle.title='Fijar menú de aplicaciones';
   toggle.setAttribute('aria-pressed',String(sidebarMode!=='auto'));
-  // Resolver el ancho una sola vez; mover la superficie sin recalcularla en cada fotograma.
+  // Conservar el rectángulo visible completo: trasladar solamente dejaba
+  // un hueco o un recorte a la derecha al aplicar el ancho final de golpe.
   if(canvas){
    canvasMotion?.cancel();
-   const delta=previousLeft-canvas.getBoundingClientRect().left;
-   if(delta&&document.documentElement.dataset.planhorMotion==='full'){
-    canvasMotion=canvas.animate([{transform:`translateX(${delta}px)`},{transform:'translateX(0)'}],{duration:180,easing:'cubic-bezier(.25,.1,.25,1)'});
+   const bounds=canvas.getBoundingClientRect();
+   const delta=previousBounds.left-bounds.left;
+   const scale=bounds.width>0?previousBounds.width/bounds.width:1;
+   if((delta||scale!==1)&&document.documentElement.dataset.planhorMotion==='full'){
+    canvasMotion=canvas.animate([
+     {transformOrigin:'top left',transform:`translateX(${delta}px) scaleX(${scale})`},
+     {transformOrigin:'top left',transform:'translateX(0) scaleX(1)'}
+    ],{duration:180,easing:'cubic-bezier(.25,.1,.25,1)'});
    }
   }
   announcement.textContent=sidebarMode==='auto'?'Menú automático al pasar el puntero.':sidebarMode==='expanded'?'Menú fijado expandido.':'Menú fijado contraído.';
@@ -250,9 +259,32 @@
  };
  sidebar.addEventListener('pointerenter',enterSidebar);
  sidebar.addEventListener('pointermove',event=>{if(document.documentElement.classList.contains('application-menu-collapsed'))enterSidebar(event);});
- sidebar.addEventListener('pointerleave',()=>{if(sidebarMode==='auto')setSidebarExpanded(false);pinMenu.hidden=true;});
+ // El desplegable nativo puede extenderse fuera del lateral y emitir pointerleave.
+ seasonSelect.addEventListener('pointerdown',event=>{
+  if(seasonSelectionActive){
+   seasonSelectionActive=false;
+   event.preventDefault();
+   seasonSelect.blur();
+   queueMicrotask(closeAutomaticSidebar);
+  }else seasonSelectionActive=true;
+ });
+ seasonSelect.addEventListener('keydown',event=>{
+  if(['ArrowDown','ArrowUp','Home','End',' '].includes(event.key))seasonSelectionActive=true;
+  if(['Escape','Tab'].includes(event.key)){seasonSelectionActive=false;queueMicrotask(closeAutomaticSidebar);}
+ });
+ seasonSelect.addEventListener('change',()=>{seasonSelectionActive=false;queueMicrotask(closeAutomaticSidebar);});
+ document.addEventListener('pointerdown',event=>{
+  if(event.target===seasonSelect)return;
+  seasonSelectionActive=false;
+  if(sidebarMode==='auto'&&!sidebar.contains(event.target)&&!sidebar.matches(':hover'))setSidebarExpanded(false);
+ },true);
+ sidebar.addEventListener('pointerleave',()=>{closeAutomaticSidebar();pinMenu.hidden=true;});
  sidebar.addEventListener('focusin',()=>{if(sidebarMode==='auto')setSidebarExpanded(true);});
- sidebar.addEventListener('focusout',event=>{if(sidebarMode==='auto'&&!sidebar.contains(event.relatedTarget)&&!sidebar.matches(':hover'))setSidebarExpanded(false);});
+ sidebar.addEventListener('focusout',event=>{
+  if(seasonSelectionActive&&event.relatedTarget===null)return;
+  if(event.relatedTarget&&!sidebar.contains(event.relatedTarget))seasonSelectionActive=false;
+  queueMicrotask(closeAutomaticSidebar);
+ });
  document.addEventListener('click',event=>{if(!pinMenu.contains(event.target)&&!toggle.contains(event.target))pinMenu.hidden=true;});
  sidebar.addEventListener('keydown',event=>{if(event.key==='Escape'&&!pinMenu.hidden){pinMenu.hidden=true;toggle.focus();}});
  applySidebarMode();
@@ -267,7 +299,15 @@
  collapseOnPlanningEntry();
  navigation.addEventListener('click',event=>{
   const button=event.target.closest('.tab-btn');
-  if(button&&navigation.contains(button))announcement.textContent='Módulo '+button.getAttribute('aria-label')+'.';
+  if(button&&navigation.contains(button)){
+   announcement.textContent='Módulo '+button.getAttribute('aria-label')+'.';
+   // El clic deja foco en el módulo; retirarlo evita retener abierto el lateral.
+   // Con teclado se conserva para que la navegación siga siendo accesible.
+   if(inputMethod==='pointer'){
+    button.blur();
+    queueMicrotask(closeAutomaticSidebar);
+   }
+  }
  });
  // Al completar una elección con puntero, retirar solo el foco transitorio.
  // El teclado conserva su foco para seguir recorriendo opciones y controles.

@@ -2545,6 +2545,34 @@
             return {ok:true,cantidad:cambios.length,guardado,msg:guardado===false?'Traslado guardado localmente; sincronización pendiente.':'Sala actualizada. Puedes deshacer desde la barra superior.'};
         }
 
+        // Ajuste fino individual: conserva identidad, docente, sala y relaciones.
+        function validarMovimientoManual(planId,dia,bloque,esperado){
+            const data=getData(),plan=data.planificaciones.find(p=>mismoId(p.id,planId));
+            const falla=msg=>({ok:false,msg});
+            if(!Number.isInteger(Number(dia))||!Number.isInteger(Number(bloque)))return falla('Selecciona un día y un bloque válidos.');
+            if(!plan||plan.esCargaExterna) return falla('Este bloque se modifica desde su planificación de origen.');
+            if(plan.fijo) return falla('Desbloquea el bloque antes de moverlo.');
+            if(esAsignaturaVinculada(plan.asignaturaId,plan.seccionId)) return falla('Modifica esta asignatura desde la sección madre.');
+            if(esperado && (String(esperado.temporadaId)!==String(data.sel?.temporadaId)||esperado.plan!==JSON.stringify(plan))) return falla('La planificación cambió. Selecciona nuevamente el bloque.');
+            const candidato={...plan,dia:Number(dia),bloque:Number(bloque)};
+            const planes=data.planificaciones.map(p=>p===plan?candidato:p);
+            const evaluacion=evaluarRestriccionesPlan(candidato,candidato.dia,candidato.bloque,planes);
+            if(!evaluacion.valido) return falla(evaluacion.duras.map(r=>r.detalle||r.label).join(' '));
+            return {ok:true,plan,dia:candidato.dia,bloque:candidato.bloque,advertencia:textoRestriccionesBlandas(evaluacion.blandas)};
+        }
+        async function aplicarMovimientoManual(planId,dia,bloque,esperado){
+            const resultado=validarMovimientoManual(planId,dia,bloque,esperado);
+            if(!resultado.ok) return resultado;
+            const p=resultado.plan;
+            if(p.dia===resultado.dia&&p.bloque===resultado.bloque) return {ok:true,msg:'El bloque permanece en su horario.'};
+            ctx.pushUndo({tipo:'optimizador_manual',resumen:'Mover bloque',temporadaId:getData().sel?.temporadaId});
+            const antes={...p};p.dia=resultado.dia;p.bloque=resultado.bloque;
+            ctx.auditoria?.('bloques_movidos',{cantidad:1,antes:[antes],despues:[{...p}]});
+            ctx.reconstruirIndices();ctx.refrescarTodo?.();
+            const guardado=await ctx.guardar();
+            return {ok:true,msg:guardado===false?'Cambio local; sincronización pendiente.':'Bloque actualizado.'};
+        }
+
         function cambiarSalaAsignatura(plan){
             const data = getData();
             if(plan.fijo) return ctx.toast('Este bloque está fijo. Desbloquéalo antes de cambiar sala.','info');
@@ -7371,6 +7399,8 @@
             actualizarSelectoresPlan,
             actualizarProgresoPlan,
             validarSeleccionManual,
+            validarMovimientoManual,
+            aplicarMovimientoManual,
             grupoOrganizarSalas,
             mostrarTooltipOrganizarSalas,
             ocultarTooltipPlan,

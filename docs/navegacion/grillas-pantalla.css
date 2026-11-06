@@ -1,0 +1,43 @@
+/* Solo pantalla y solo bajo los paneles originales. Las copias de PDF/JPG
+   cuelgan de body fuera de estos paneles y conservan sus tamaños originales. */
+@media screen {
+ #contenidoPrincipal :is(#panelFichaDocente,#panelVistaHorarios).active[data-screen-fit=true]{height:var(--screen-panel-height);min-height:0;display:flex;flex-direction:column;gap:0;}
+ #contenidoPrincipal #panelFichaDocente[data-screen-fit=true]>.selection-panel{flex:none;margin:0 0 4px;padding:6px;gap:6px;}
+ #contenidoPrincipal #panelFichaDocente[data-screen-fit=true]>.selection-panel>.form-group{min-width:0;}
+ #contenidoPrincipal #panelFichaDocente[data-screen-fit=true] #fichaContenido{flex:1;min-height:0;}
+ #contenidoPrincipal #panelFichaDocente[data-screen-fit=true] .teacher-sheet-layout{height:100%;min-height:0;gap:8px;grid-template-rows:minmax(0,1fr);align-items:stretch;}
+ #contenidoPrincipal #panelFichaDocente[data-screen-fit=true] .teacher-sheet-main{display:flex;flex-direction:column;min-height:0;gap:4px;}
+ #contenidoPrincipal #panelFichaDocente[data-screen-fit=true] .teacher-sheet-main>div:first-child{margin-bottom:0!important;padding:2px 8px;line-height:16px;}
+ #contenidoPrincipal #panelFichaDocente[data-screen-fit=true] .teacher-defensible-panel{padding:6px;margin:0;flex:none;}
+ #contenidoPrincipal #panelFichaDocente[data-screen-fit=true] .teacher-defensible-header{gap:6px;margin-bottom:4px;align-items:center;}
+ #contenidoPrincipal #panelFichaDocente[data-screen-fit=true] .teacher-defensible-header span{margin-top:0;font-size:10px!important;line-height:12px;}
+ #contenidoPrincipal #panelFichaDocente[data-screen-fit=true] .teacher-defensible-header .btn{height:26px;min-height:26px;padding:2px 6px!important;font-size:11px!important;}
+ #contenidoPrincipal #panelFichaDocente[data-screen-fit=true] :is(.teacher-defensible-metrics,.teacher-defensible-detail){grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;}
+ #contenidoPrincipal #panelFichaDocente[data-screen-fit=true] .teacher-defensible-metrics>div{padding:4px 6px;}
+ #contenidoPrincipal #panelFichaDocente[data-screen-fit=true] .teacher-defensible-metrics span{font-size:9px!important;line-height:11px;margin-bottom:2px;}
+ #contenidoPrincipal #panelFichaDocente[data-screen-fit=true] .teacher-defensible-metrics strong{font-size:10px!important;line-height:12px;}
+ #contenidoPrincipal #panelFichaDocente[data-screen-fit=true] .teacher-defensible-detail{margin-top:4px;}
+ #contenidoPrincipal #panelFichaDocente[data-screen-fit=true] .teacher-defensible-detail>span{padding:3px 5px;font-size:9px!important;line-height:12px;}
+ #contenidoPrincipal #panelFichaDocente[data-screen-fit=true] .teacher-defensible-detail strong{font-size:9px!important;}
+ #contenidoPrincipal #panelFichaDocente[data-screen-fit=true] .teacher-sheet-main>div:last-child{flex:1;min-height:0;overflow:hidden!important;}
+ #contenidoPrincipal #panelFichaDocente[data-screen-fit=true] .teacher-sheet-main table{display:grid;height:100%;width:100%;grid-template-columns:38px 76px repeat(6,minmax(0,1fr));grid-template-rows:24px repeat(var(--screen-grid-rows,18),minmax(0,1fr));}
+ #contenidoPrincipal #panelFichaDocente[data-screen-fit=true] .teacher-sheet-main table colgroup{display:none;}
+ #contenidoPrincipal #panelFichaDocente[data-screen-fit=true] .teacher-sheet-main table :is(tbody,tr){display:contents;}
+ #contenidoPrincipal #panelFichaDocente[data-screen-fit=true] .teacher-sheet-main table :is(th,td){display:block;align-content:center;box-sizing:border-box;min-width:0;min-height:0;height:auto!important;padding:0 2px!important;border-top:0!important;border-left:0!important;overflow:hidden;line-height:10px!important;font-size:9px!important;}
+ #contenidoPrincipal #panelFichaDocente[data-screen-fit=true] .teacher-sheet-main table td{font-size:min(9px,var(--screen-sheet-line,9px))!important;line-height:var(--screen-sheet-line,9px)!important;}
+ #contenidoPrincipal #panelFichaDocente[data-screen-fit=true] .teacher-sheet-main table td :is(span,small){font-size:min(9px,var(--screen-sheet-line,9px))!important;line-height:var(--screen-sheet-line,9px)!important;}
+ #contenidoPrincipal #panelFichaDocente[data-screen-fit=true] .teacher-sheet-main table th{font-size:10px!important;line-height:12px!important;}
+ #contenidoPrincipal #panelFichaDocente[data-screen-fit=true] .teacher-sheet-main table td:nth-child(2){white-space:nowrap;font-size:9px!important;}
+ #contenidoPrincipal #panelFichaDocente[data-screen-fit=true] .teacher-sheet-summary{height:100%;min-height:0;overflow:auto;}
+ #contenidoPrincipal #panelFichaDocente[data-screen-fit=true] .teacher-sheet-summary>div:first-child{margin-bottom:4px!important;line-height:16px;}
+ #contenidoPrincipal #panelFichaDocente[data-screen-fit=true] .teacher-sheet-summary table :is(td,th){font-size:10px!important;padding:4px!important;line-height:13px;}
+ #contenidoPrincipal #panelVistaHorarios[data-screen-fit=true]>.vista-selector{flex:none;margin:0 0 4px;padding:6px;gap:6px;}
+ #contenidoPrincipal #panelVistaHorarios[data-screen-fit=true] .vista-selector .form-group{margin:0;}
+ #contenidoPrincipal #panelVistaHorarios[data-screen-fit=true] #vistaScheduleContainer{flex:1;min-height:0;margin:0;overflow:hidden;}
+ #contenidoPrincipal #panelVistaHorarios[data-screen-fit=true] #vistaGrid{height:100%;min-height:0;grid-template-rows:24px repeat(var(--screen-grid-rows,18),minmax(0,1fr));}
+ #contenidoPrincipal #panelVistaHorarios[data-screen-fit=true] #vistaGrid :is(.grid-time,.grid-cell){box-sizing:border-box;min-height:0;height:auto;max-height:none;padding:0 2px;gap:0;overflow:hidden;border-right:1px solid var(--border);border-bottom:1px solid var(--border);font-size:10px!important;line-height:11px;}
+ #contenidoPrincipal #panelVistaHorarios[data-screen-fit=true] #vistaGrid .grid-time :is(span,small,strong){font-size:10px!important;line-height:11px;}
+ #contenidoPrincipal #panelVistaHorarios[data-screen-fit=true] #vistaGrid .grid-cell.planned{margin:0;border-radius:0;}
+ #contenidoPrincipal #panelVistaHorarios[data-screen-fit=true] #vistaGrid .grid-cell :is(div,span,small,strong){font-size:min(10px,var(--screen-vista-line,10px))!important;line-height:var(--screen-vista-line,11px);}
+ #contenidoPrincipal #panelVistaHorarios[data-screen-fit=true] #vistaGrid .grid-header{font-size:12px!important;line-height:18px;padding:2px 3px;min-height:0;}
+}

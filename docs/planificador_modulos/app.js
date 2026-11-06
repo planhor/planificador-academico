@@ -125,7 +125,7 @@ get vincularSeccionAGrupo(){return vincularSeccionAGrupo;},
     const MAX_UNDO = 50;
     let undoStack = [], redoStack = [];
     const CAMPOS_UNDO = ['carreras','niveles','secciones','asignaturas','docentes','salas','asignaturaCarreraNivel','asignaturaSeccion','planificaciones','gruposDictacion','vinculosElectivos','gestorSecciones','ultimoAutoGeneral','ultimaAutoEjecucion','autoEjecuciones','sel'];
-    const TAB_LABELS = {dashboard:'Dashboard',secciones:'Secciones',asignaturas:'Asignaturas',docentes:'Docentes',salas:'Salas',organizarSalas:'Organizar salas',planificacion:'Planificación',vistaHorarios:'Vista Horarios',reportes:'Reportes',gestorSecciones:'Gestor Secciones',historial:'Historial',fichaDocente:'Ficha Docente'};
+    const TAB_LABELS = {dashboard:'Dashboard',secciones:'Secciones',asignaturas:'Asignaturas',docentes:'Docentes',salas:'Salas',organizarSalas:'Optimizador manual',planificacion:'Planificación',vistaHorarios:'Vista Horarios',reportes:'Reportes',gestorSecciones:'Gestor Secciones',historial:'Historial',fichaDocente:'Ficha Docente'};
     function tabActualId(){ return document.querySelector('.tab-btn.active')?.dataset?.tab || 'sistema'; }
     function tabLabel(tab){ return TAB_LABELS[tab] || tab || 'Sistema'; }
     function snapshotUndo(){
@@ -903,8 +903,17 @@ get vincularSeccionAGrupo(){return vincularSeccionAGrupo;},
 
     let organizadorSalas=null;
     function renderOrganizadorSalas(){
-        if(!organizadorSalas) organizadorSalas=window.PlanhorAplicaciones['organizar-salas'].create({
+        if(!organizadorSalas) organizadorSalas=window.PlanhorAplicaciones['optimizador-manual'].create({
             getData:()=>data, DIAS, BLOQUES, SALA_VIRTUAL_ID, escapeHTML, escapeAttr,
+            validarMovimiento:Planificacion.validarMovimientoManual,
+            aplicarMovimiento:Planificacion.aplicarMovimientoManual,
+            abrirDestino:(planId,destino)=>{
+                const p=data.planificaciones.find(p=>String(p.id)===String(planId));
+                if(!p)return toast('El bloque ya no está disponible.','info');
+                if(destino==='secciones')return irASeccionesDesdeGestor({seccionId:p.seccionId,asignaturaId:p.asignaturaId});
+                if(p.esCargaExterna)return abrirCargaExternaPlanificada(p);
+                irASeccion(p.seccionId,{asignaturaId:p.asignaturaId,docenteId:p.docenteId,salaId:p.salaId,componenteId:p.componenteId,tipo:p.tipoPresencial===false?'virtual':'presencial',dia:p.dia,bloque:p.bloque});
+            },
             grupo:Planificacion.grupoOrganizarSalas,
             validar:Planificacion.validarOrganizarSalas,
             aplicar:Planificacion.aplicarOrganizarSalas,
@@ -1714,7 +1723,7 @@ get vincularSeccionAGrupo(){return vincularSeccionAGrupo;},
         asignaturas:'panelAsignaturas',
         docentes:'panelDocentes',
         salas:'panelSalas',
-        organizarSalas:'panelOrganizarSalas',
+        organizarSalas:'panelOptimizadorManual',
         planificacion:'panelPlanificacion',
         vistaHorarios:'panelVistaHorarios',
         reportes:'panelReportes',
@@ -2983,7 +2992,7 @@ get vincularSeccionAGrupo(){return vincularSeccionAGrupo;},
         }
         document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active');
         document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
-        document.getElementById('panel'+tab.charAt(0).toUpperCase()+tab.slice(1)).classList.add('active');
+        document.getElementById(PANEL_POR_TAB[tab]).classList.add('active');
         renderTabActual();
         return true;
     }

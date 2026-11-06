@@ -1,0 +1,44 @@
+#panelOptimizadorManual{padding:0;min-width:0;}
+.om-toolbar{display:flex;flex-direction:column;align-items:stretch;gap:6px;padding:0 0 8px;background:var(--surface);border-bottom:1px solid var(--border);font-size:12px;}
+.om-toolbar>div{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;}
+#panelOptimizadorManual .om-toolbar .btn{display:flex;align-items:center;justify-content:center;width:100%;min-width:0;height:30px;min-height:30px;padding:3px 6px;}
+.om-view-tooltip{position:fixed;padding:4px 7px;border-radius:4px;background:var(--text);color:var(--surface);font:400 11px/16px var(--font);white-space:nowrap;z-index:10020;pointer-events:none;}
+.om-view-tooltip[hidden]{display:none!important;}
+#panelOptimizadorManual #panelOrganizarSalas .room-catalog>.om-toolbar{margin:8px 6px 0;}
+#panelOptimizadorManual #panelOrganizarSalas .legend{min-height:17px;padding:0 5px;}
+#panelOptimizadorManual #panelOrganizarSalas .legend :is(span,small){font-size:10px;line-height:16px;}
+/* Una sala ocupa el mismo sexto de la grilla que un día en las otras vistas. */
+#panelOptimizadorManual #panelOrganizarSalas .board{container-type:inline-size;}
+#panelOptimizadorManual #panelOrganizarSalas .room-grid:not(.is-empty){grid-template-columns:repeat(var(--room-count,1),max(130px,calc(100cqw / 6)));}
+.navigation-canvas #panelOptimizadorManual #panelOrganizarSalas .workspace{grid-template-columns:180px minmax(0,1fr);}
+#panelOptimizadorManual .om-toolbar [aria-pressed=true]{color:var(--accent);border-color:var(--accent);background:color-mix(in srgb,var(--accent) 9%,var(--surface));}
+#panelOptimizadorManual [hidden]{display:none!important;}
+.om-temporal{display:grid;grid-template-columns:180px minmax(0,1fr);min-height:0;height:var(--om-height,calc(100dvh - 70px));}
+.om-controls{display:flex;flex-direction:column;gap:10px;padding:8px 6px;border-right:1px solid var(--border);background:var(--surface);font-size:12px;min-width:0;}
+#panelOptimizadorManual .om-field{display:grid;grid-template-rows:16px 30px;gap:4px;min-width:0;margin:0;}
+#panelOptimizadorManual .om-field>label{margin:0;padding:0;line-height:16px;}
+#panelOptimizadorManual .om-field :is(select,input[type=search]){box-sizing:border-box;width:100%;height:30px!important;min-height:30px!important;margin:0!important;}
+#panelOptimizadorManual .om-field .planhor-search-field{width:100%;height:30px;margin:0;min-width:0;}
+.om-controls p{margin:0;line-height:1.5;color:var(--text-secondary);}
+#om-selection{margin:0;line-height:1.5;}
+.om-grid-wrap{overflow:auto;height:100%;min-height:0;}
+.om-schedule{display:flex;flex-direction:column;min-height:0;min-width:0;}
+.om-schedule .om-grid-wrap{flex:1;height:auto;}
+.om-legend{display:flex;align-items:center;gap:12px;min-height:17px;flex-shrink:0;color:var(--text-secondary);background:var(--surface);padding:0 5px;border-top:1px solid var(--border);}
+#panelOptimizadorManual .om-legend :is(span,small){font-size:10px!important;line-height:16px;white-space:nowrap;}
+.om-legend span{display:flex;align-items:center;gap:4px;}.om-legend small{margin-left:auto;}
+/* Presentación compartida con la leyenda de Planificación; cada vista conserva sus estados. */
+#panelOptimizadorManual :is(.om-legend,#panelOrganizarSalas .legend){box-sizing:border-box;min-height:22px;padding:2px 6px;gap:3px 8px;line-height:16px;border:1px solid var(--border-light);border-top:0;border-radius:0 0 var(--radius-sm) var(--radius-sm);background:var(--surface);color:var(--text-secondary);font-size:.68rem;}
+#panelOptimizadorManual :is(.om-legend,#panelOrganizarSalas .legend)>span{display:inline-flex;align-items:center;gap:4px;white-space:nowrap;}
+#panelOptimizadorManual :is(.om-key,#panelOrganizarSalas .sample){box-sizing:border-box;display:inline-block;width:12px;height:12px;flex:0 0 12px;border-radius:3px;}
+.om-key{display:inline-block;width:11px;height:11px;border:1px solid var(--border);border-radius:2px;}.om-key-class{background:#e2eeef;}.om-key-available{background:color-mix(in srgb,#27865f 12%,var(--surface));border-color:#27865f;border-style:dashed;}.om-key-blocked{background:color-mix(in srgb,#ad3d4a 8%,var(--surface));border-color:#ad3d4a;}.om-key-selected{background:color-mix(in srgb,var(--accent) 23%,var(--surface));border-color:var(--accent);}
+.om-context-menu{z-index:10010;}.om-controls input[type=search]{width:100%;box-sizing:border-box;}.om-controls label{display:block;}
+body:has(.om-context-menu) #planBlockTooltip{visibility:hidden!important;opacity:0!important;transition:none!important;}
+.om-grid{display:grid;grid-template-columns:88px repeat(var(--om-days,6),minmax(130px,1fr));grid-template-rows:24px repeat(var(--om-rows,18),minmax(0,1fr));font-size:10px;height:100%;}
+.om-heading,.om-time{background:var(--surface-alt,#f2f1ee);text-align:center;padding:5px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);}
+#panelOptimizadorManual .om-heading{position:sticky;top:0;z-index:2;font-size:12px!important;font-weight:700;line-height:18px;padding:2px 3px;}.om-time{display:flex;flex-direction:column;justify-content:center;gap:0;padding:0;}#panelOptimizadorManual .om-time :is(strong,small){font-size:10px!important;font-weight:400;line-height:11px;white-space:nowrap;}
+.om-slot{min-height:0;min-width:0;border-right:1px solid var(--border);border-bottom:1px solid var(--border);padding:2px;display:flex;flex-direction:column;gap:1px;background:var(--surface);overflow:auto;}
+.om-slot.om-available{background:color-mix(in srgb,#27865f 12%,var(--surface));cursor:pointer;}.om-slot.om-blocked{background:color-mix(in srgb,#ad3d4a 8%,var(--surface));}
+.om-lesson{box-sizing:border-box;flex:1;width:100%;min-height:20px;height:auto;border:1px solid #c3d8db;border-radius:4px;background:#e2eeef;color:var(--text);font:inherit;line-height:11.5px;padding:1px 3px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:grab;transition:background-color 180ms ease,border-color 180ms ease;}
+#panelOptimizadorManual .om-lesson :is(strong,span){font-size:10px!important;font-weight:400;line-height:11.5px;}
+.om-lesson:hover,.om-lesson[aria-pressed=true]{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 23%,var(--surface));}.om-lesson:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}.om-section-busy{font-size:10px;color:var(--text-secondary);text-align:center;}

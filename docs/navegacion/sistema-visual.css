@@ -256,11 +256,21 @@ html[data-planhor-motion=full] .account-avatar:hover{transform:scale(1.06);}
 .application-sidebar{background:transparent;border-right:0;isolation:isolate;padding:8px 5px!important;overflow:visible;clip-path:none;width:var(--application-sidebar-width);}
 .application-sidebar::before{content:"";position:absolute;inset:0 auto 0 0;width:184px;background:var(--surface);border-right:1px solid var(--border);z-index:-1;transform:translateX(0);pointer-events:none;}
 .application-menu-collapsed .application-sidebar::before{transform:translateX(-128px);}
-.application-sidebar .tab-nav{width:174px;overflow-x:hidden;overflow-y:auto;overscroll-behavior-y:contain;}
+.application-sidebar .tab-nav{width:174px;max-width:none;overflow-x:hidden;overflow-y:auto;overscroll-behavior-y:contain;clip-path:inset(0 0 0 0);}
+.application-menu-collapsed .application-sidebar .tab-nav{clip-path:inset(0 128px 0 0);}
 .application-sidebar .tab-nav>.tab-btn{flex-shrink:0;}
 .application-sidebar .tab-btn,.application-sidebar .application-settings-button{width:174px;justify-content:flex-start!important;padding:6px 12px!important;white-space:nowrap;}
-.application-menu-collapsed .application-sidebar .tab-btn,.application-menu-collapsed .application-settings-button{width:46px;padding:6px 12px!important;}
+.application-menu-collapsed .application-sidebar .tab-btn,.application-menu-collapsed .application-settings-button{width:174px;padding:6px 12px!important;}
+.application-sidebar .application-settings-button{clip-path:inset(0 0 0 0);}
+.application-sidebar .application-settings #btnMenu{width:174px;}
+.application-menu-collapsed .application-sidebar .application-settings-button{clip-path:inset(0 128px 0 0);}
 .application-sidebar .navigation-icon{flex:0 0 20px;width:20px;}
+/* El recorte conserva el ancho interno para el movimiento, pero el marco
+   debe cerrarse en el borde visible, no en el extremo oculto del botón. */
+.application-sidebar :is(.tab-btn,.application-settings-button){position:relative;isolation:isolate;border:0!important;background:transparent!important;}
+#appRoot .application-sidebar :is(.tab-btn,.application-settings-button)::before{content:"";display:block!important;position:absolute;inset:0 auto 0 0;width:174px;box-sizing:border-box;padding:0;box-shadow:none;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);z-index:-1;pointer-events:none;transition:width var(--sidebar-motion,180ms) var(--sidebar-ease,ease),background-color 180ms ease,border-color 180ms ease;}
+.application-menu-collapsed #appRoot .application-sidebar :is(.tab-btn,.application-settings-button)::before{width:46px;}
+#appRoot .application-sidebar :is(.tab-btn.active,.tab-btn:hover,.application-settings-button:hover,.application-settings-button[aria-expanded=true])::before{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 9%,var(--surface));}
 .application-sidebar .navigation-label{display:block!important;white-space:nowrap;opacity:1;visibility:visible;}
 .application-menu-collapsed .application-sidebar .navigation-label{opacity:0;visibility:hidden;pointer-events:none;}
 .application-sidebar-heading>span{display:block!important;opacity:1;visibility:visible;}
@@ -272,12 +282,22 @@ html[data-planhor-motion=full] .account-avatar:hover{transform:scale(1.06);}
 .application-season-content,.application-search-content{display:grid!important;opacity:1;visibility:visible;}
 .application-menu-collapsed :is(.application-season-content,.application-search-content){opacity:0;visibility:hidden;pointer-events:none;}
 .application-season-compact,.application-search-compact{display:block!important;position:absolute;left:0;top:0;width:46px;opacity:0;visibility:hidden;pointer-events:none;}
+.application-sidebar :is(.application-season-content,.application-search-content){gap:4px;}
+.application-sidebar :is(.application-season-content,.application-search-content)>label{height:14px;line-height:14px;margin:0;}
+.application-sidebar :is(.application-season-compact,.application-search-compact){top:18px;height:30px;min-height:30px;}
+.application-sidebar .application-season-content{grid-template-columns:46px minmax(0,1fr);}
+.application-sidebar .application-season #selectorTemporada{grid-column:2;grid-row:2;}
+.application-sidebar .application-season #btnGestionarTemps{grid-column:1;grid-row:2;position:relative;width:46px;height:30px;min-height:30px;justify-content:flex-end;padding-right:4px!important;}
+.application-sidebar #btnGestionarTemps>.planhor-icon{position:absolute;left:13px;width:18px;height:18px;}
+.application-sidebar .application-search-field>.planhor-icon{left:14px;width:18px;height:18px;}
+.application-sidebar .application-search-field>input{padding-left:38px!important;}
+.application-sidebar :is(.application-season-compact,.application-search-compact)>.planhor-icon{position:absolute;left:13px;top:50%;transform:translateY(-50%);width:18px;height:18px;}
 .application-menu-collapsed :is(.application-season-compact,.application-search-compact){opacity:1;visibility:visible;pointer-events:auto;}
 html:not(:has(#btnPlegarNavegacion[aria-pressed=true])) .navigation-canvas{width:calc(100% - 56px);margin-left:56px;}
 .application-menu-collapsed .application-sidebar .tab-btn::before{display:none;}
 .application-menu-collapsed :is(.application-season,.application-search){border-color:transparent;}
 /* Área contraída ajustada a la zona visible. */
-.application-menu-collapsed .application-sidebar :is(.tab-nav,.application-sidebar-heading,.application-season,.application-search,.application-settings){width:46px;max-width:46px;}
+.application-menu-collapsed .application-sidebar :is(.application-sidebar-heading,.application-season,.application-search,.application-settings){width:46px;max-width:46px;}
 /* Una única duración; el contenido no se recomprime durante el fundido. */
 .application-sidebar :is(.application-season-content,.application-search-content){width:174px;}
 html[data-planhor-motion=full] .application-sidebar::before{will-change:transform;}
@@ -294,3 +314,16 @@ html[data-planhor-motion=full] .tab-panel.active{transform-origin:top center;}
 #panelFichaDocente .teacher-sheet-summary table{table-layout:fixed;overflow-wrap:anywhere;}
 @container (max-width:640px){#panelFichaDocente .teacher-sheet-layout{grid-template-columns:minmax(0,1fr);}
 }
+
+/* Pantalla completa conserva su marco y área de clic fuera del historial. */
+.app-header #btnPantallaCompleta{flex:0 0 30px;width:30px;height:30px;padding:0;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);position:relative;transform:none;}
+.app-header #btnPantallaCompleta[aria-pressed=true]{border-color:var(--accent);color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,var(--surface));}
+.app-header #btnPantallaCompleta{touch-action:manipulation;cursor:pointer;display:inline-grid;place-items:center;--fullscreen-icon:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.7%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M8%203H3v5m13-5h5v5M3%2016v5h5m13-5v5h-5%22%2F%3E%3C%2Fsvg%3E");}
+.app-header #btnPantallaCompleta[aria-pressed=true]{--fullscreen-icon:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.7%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M3%208h5V3m8%200v5h5M8%2021v-5H3m13%205v-5h5%22%2F%3E%3C%2Fsvg%3E");}
+/* Decoración sin nodo interactivo: el botón es el único receptor del toque. */
+.app-header #btnPantallaCompleta::before{content:"";width:16px;height:16px;background:currentColor;mask:var(--fullscreen-icon) center/contain no-repeat;-webkit-mask:var(--fullscreen-icon) center/contain no-repeat;pointer-events:none;}
+
+/* Aviso móvil superpuesto: no desplaza ni reorganiza grillas. */
+.mobile-orientation-notice{position:fixed;bottom:12px;left:12px;z-index:10030;display:flex;align-items:center;gap:10px;width:max-content;max-width:min(420px,calc(100vw - 24px));padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);box-shadow:var(--shadow-sm);font:400 12px/1.4 var(--font);}
+.mobile-orientation-notice[hidden]{display:none!important;}
+.mobile-orientation-notice button{flex:none;min-width:30px;min-height:30px;}
