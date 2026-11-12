@@ -886,7 +886,7 @@ La interfaz debe ser profesional, sobria, modular, con desplazamiento horizontal
                         <div class="form-group"><label class="form-label">Bloques semestrales máximos</label><input class="form-input" type="number" id="cfgBloquesSemestral" value="${cfg.bloquesSemestralesMax}" min="1"></div>
                     </div>
                     <div class="form-row">
-                        <div class="form-group"><label class="form-label">Horas mínimas de descanso</label><input class="form-input" type="number" id="cfgHorasDescanso" value="${cfg.horasDescanso}" min="0"></div>
+                        <div class="form-group"><label class="form-label">Horas mínimas de descanso (0 desactiva)</label><input class="form-input" type="number" id="cfgHorasDescanso" value="${cfg.horasDescanso}" min="0"></div>
                         <div class="form-group"><label class="form-label">Sábado hasta bloque</label><input class="form-input" type="number" id="cfgSabadoBloque" value="${cfg.sabadoHastaBloque}" max="18" min="1"></div>
                     </div>
                     <label class="check-line"><input type="checkbox" id="cfgConfirmarElim" ${cfg.confirmarEliminacion?'checked':''}> Confirmar antes de eliminar datos</label>
@@ -1190,7 +1190,8 @@ La interfaz debe ser profesional, sobria, modular, con desplazamiento horizontal
                 const configAnterior=JSON.parse(JSON.stringify(data.configuracion||{}));
                 cfg.bloquesDiariosMax=parseInt(document.getElementById('cfgBloquesDiarios').value)||13;
                 cfg.bloquesSemestralesMax=parseInt(document.getElementById('cfgBloquesSemestral').value)||47;
-                cfg.horasDescanso=parseInt(document.getElementById('cfgHorasDescanso').value)||12;
+                const horasDescanso=parseInt(document.getElementById('cfgHorasDescanso').value,10);
+                cfg.horasDescanso=Number.isFinite(horasDescanso)&&horasDescanso>=0?horasDescanso:12;
                 cfg.sabadoHastaBloque=parseInt(document.getElementById('cfgSabadoBloque').value)||16;
                 cfg.exportacionExcel=document.getElementById('cfgExportacionExcel').value;
                 cfg.formatoTextoBloque=document.getElementById('cfgFormatoTextoBloque')?.value||'codigo_nombre_resumido';

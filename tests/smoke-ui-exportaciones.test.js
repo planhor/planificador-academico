@@ -117,6 +117,13 @@ test('el motor permite escoger heurístico, matemático o híbrido con fallback 
     assert.match(planificacion, /fallbackMotor/);
 });
 
+test('la configuración permite desactivar el descanso docente con cero', () => {
+    const configuracion = fs.readFileSync(path.join(DOCS, 'planificador_modulos/configuracion.js'), 'utf8');
+    assert.match(configuracion, /Horas mínimas de descanso \(0 desactiva\)/);
+    assert.match(configuracion, /Number\.isFinite\(horasDescanso\)&&horasDescanso>=0\?horasDescanso:12/);
+    assert.doesNotMatch(configuracion, /cfg\.horasDescanso=parseInt\([^;]+\)\|\|12/);
+});
+
 function crearXlsxFalso() {
     const escritos = [];
     const letra = indice => String.fromCharCode(65 + indice);

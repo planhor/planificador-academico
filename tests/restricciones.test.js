@@ -70,6 +70,8 @@ test('se respeta el descanso configurado entre jornadas', () => {
     assert.equal(api.checkDisponibilidad('doc-1', 1, 1, 'sec-1').ok, false);
     data.configuracion.horasDescanso = 8;
     assert.equal(api.checkDisponibilidad('doc-1', 1, 1, 'sec-1').ok, true);
+    data.configuracion.horasDescanso = 0;
+    assert.equal(api.checkDisponibilidad('doc-1', 1, 1, 'sec-1').ok, true);
 });
 
 test('Docente NN omite disponibilidad, pero no los topes de sección', () => {

@@ -2420,7 +2420,7 @@
                 if (planesAnt.length) {
                     let maxFin = 0;
                     planesAnt.forEach(p=>{ const bf=ctx.getBloque(p.bloque); if(bf&&bf.hFin>maxFin) maxFin=bf.hFin; });
-                    if (maxFin && (24*60 - maxFin + ctx.getBloque(bloque).hIni) < data.configuracion.horasDescanso*60) return {ok:false, msg:'No respeta descanso de 12 horas'};
+                    if (maxFin && (24*60 - maxFin + ctx.getBloque(bloque).hIni) < data.configuracion.horasDescanso*60) return {ok:false, msg:`No respeta descanso de ${data.configuracion.horasDescanso} horas`};
                 }
             }
             return {ok:true};
