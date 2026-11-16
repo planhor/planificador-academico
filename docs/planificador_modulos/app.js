@@ -720,6 +720,7 @@ get vincularSeccionAGrupo(){return vincularSeccionAGrupo;},
         asegurarXLSX,
         irASeccion,
         activarTab,
+        abrirDistribucion:datos=>{activarTab('gestorSecciones');distribucionEspaciosUI?.abrirDetalle(datos);},
         abrirModalSeccion: (...args) => abrirModalSeccion(...args),
         abrirModalAsignatura: (...args) => abrirModalAsignatura(...args),
         abrirModalDocente: (...args) => abrirModalDocente(...args),
@@ -1759,6 +1760,7 @@ get vincularSeccionAGrupo(){return vincularSeccionAGrupo;},
             toast(`No se pudo cargar ${tabLabel(tab)||'la vista'}. El resto de la app sigue operativo.`,'warning');
         }
     }
+    let distribucionEspaciosUI=null;
     function renderTabActual(){
         publicarCuentaActual();
         const tab=document.querySelector('.tab-btn.active')?.dataset?.tab || 'secciones';
@@ -1771,7 +1773,7 @@ get vincularSeccionAGrupo(){return vincularSeccionAGrupo;},
         else if(tab==='planificacion') ejecutarRenderTab(tab,()=>{ construirGrilla(); actualizarSelectoresPlan(); actualizarModoPlanificacionUI(); actualizarProgresoPlan(); });
         else if(tab==='vistaHorarios') ejecutarRenderTab(tab,actualizarVista);
         else if(tab==='reportes') ejecutarRenderTab(tab,actualizarReporte);
-        else if(tab==='gestorSecciones') ejecutarRenderTab(tab,renderGestorSecciones);
+        else if(tab==='gestorSecciones') ejecutarRenderTab(tab,()=>{renderGestorSecciones();distribucionEspaciosUI?.refrescar();});
         else if(tab==='historial') ejecutarRenderTab(tab,renderHistorial);
         else if(tab==='fichaDocente') ejecutarRenderTab(tab,()=>{ actualizarFichaDocentes(); renderFichaDocente(); });
     }
@@ -3391,6 +3393,7 @@ get vincularSeccionAGrupo(){return vincularSeccionAGrupo;},
         inicializarModuloSeguro('Vista Horarios',()=>VistaHorario.init());
         inicializarModuloSeguro('Planificación',()=>Planificacion.init());
         inicializarModuloSeguro('Configuración',()=>Configuracion.init());
+        inicializarModuloSeguro('Distribución semanal de espacios',()=>{distribucionEspaciosUI=window.PlanhorDistribucionEspaciosUI.create({container:document.getElementById('gestorDistribucionEspacios'),asegurarXLSX,getData:()=>data,guardar,pushUndo,irPlanificador:(id,opciones)=>irASeccion(id,opciones),irOptimizador:()=>activarTab('organizarSalas')});});
         inicializarAnimacionesResultados();
         refrescarInicial();
         window._planhorStartupSync?.hide();

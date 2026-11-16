@@ -8,7 +8,8 @@ function abrirModalSala(id=null){
             document.getElementById('modalContainer').innerHTML=`
             <div class="modal-overlay" id="modalOverlay"><div class="modal">
                 <h3>${s?'Editar':'Nueva'} Sala</h3>
-                <div class="form-group"><label class="form-label">Nombre</label><input class="form-input" id="nomSala" value="${shared.ctx.escapeAttr(s?.nombre||'')}"></div>
+                <div class="form-group"><label class="form-label">Número o identificador</label><input class="form-input" id="nomSala" value="${shared.ctx.escapeAttr(s?.nombre||'')}"></div>
+                <div class="form-group"><label class="form-label">Nombre descriptivo (opcional)</label><input class="form-input" id="descripcionSala" maxlength="250" value="${shared.ctx.escapeAttr(s?.nombreDescriptivo||'')}"></div>
                 <div class="form-group"><label class="form-label">Capacidad</label><input class="form-input" type="number" id="capSala" value="${s?.capacidad||30}" min="1"></div>
                 <div class="form-group"><label class="form-label">Tipo de espacio</label><select class="form-select" id="tipoSala">
                     ${['Sala de Clases','Laboratorio de Computación','Laboratorio de Especialidad','Taller de Especialidad'].map(t=>shared.ctx.optionHTML(t,t,(s?.tipoSala||'Sala de Clases')===t)).join('')}
@@ -28,7 +29,9 @@ function guardarSala(id){
             if(!cap||cap<=0) return shared.ctx.toast('La capacidad debe ser mayor a cero','error');
             const duplicado=data.salas.find(s=>s.nombre.toLowerCase()===nom.toLowerCase()&&s.id!==id&&s.id!==shared.ctx.SALA_VIRTUAL_ID&&s.id!==shared.ctx.SALA_TRO2_ID);
             if(duplicado) return shared.ctx.toast(`Ya existe una sala con el nombre "${nom}"`,'error');
-            const sala={...(id?data.salas.find(s=>s.id===id)||{}:{}),id:id||shared.ctx.genId(),nombre:nom,capacidad:cap,tipoSala,alertasImportacion:[]};
+            const nombreDescriptivo=String(document.getElementById('descripcionSala')?.value||'').replace(/[\u0000-\u001F\u007F]/g,'').trim().slice(0,250);
+            const sala={...(id?data.salas.find(s=>s.id===id)||{}:{}),id:id||shared.ctx.genId(),nombre:nom,nombreDescriptivo,capacidad:cap,tipoSala,alertasImportacion:[]};
+            shared.ctx.pushUndo?.({tipo:'sala',resumen:id?'Editar sala':'Crear sala'});
             if(id){const idx=data.salas.findIndex(s=>s.id===id); if(idx>=0) data.salas[idx]=sala;} else data.salas.push(sala);
             shared.ctx.guardar(); shared.ctx.cerrarModal(); shared.ctx.refrescarTodo(); shared.ctx.toast('Sala guardada','success');
         }
@@ -254,7 +257,7 @@ function renderSalas(){
                 const esFija=s.id===shared.ctx.SALA_VIRTUAL_ID||s.id===shared.ctx.SALA_TRO2_ID;
                 const alerta=s.alertasImportacion?.length?` <small class="import-warning-chip">${s.alertasImportacion.length} alerta(s)</small>`:'';
                 return `<span class="item-chip" style="${s.id===shared.ctx.SALA_VIRTUAL_ID?'background:color-mix(in srgb, var(--planhor-purple) 13%, var(--surface));':''}${s.id===shared.ctx.SALA_TRO2_ID?'background:color-mix(in srgb, var(--planhor-teal) 13%, var(--surface));':''}">
-                    ${shared.ctx.escapeHTML(s.nombre)}${alerta} (Cap:${Number(s.capacidad)||0})
+                    ${shared.ctx.escapeHTML(s.nombre)}${s.nombreDescriptivo?' · '+shared.ctx.escapeHTML(s.nombreDescriptivo):''}${alerta} (Cap:${Number(s.capacidad)||0})
                     <button class="btn btn-xs btn-editar-sala" data-id="${shared.ctx.escapeAttr(s.id)}">✎</button>
                     ${!esFija?`<button class="btn btn-xs btn-eliminar-sala" data-id="${shared.ctx.escapeAttr(s.id)}">🗑️</button>`:''}
                 </span>`;

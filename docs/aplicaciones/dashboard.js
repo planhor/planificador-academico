@@ -541,11 +541,23 @@ function renderDashboard(){
             const data = shared.getData();
             const cont=document.getElementById('dashboardContenido');
             if(!cont) return;
-            const firmaDashboard=shared.firmaDatosReporte();
+            const seguimiento=window.PlanhorDistribucionEspacios?.obtenerSeguimiento?.(data)||[];
+            // Las relaciones y observaciones pueden cambiar sin variar los conteos generales.
+            const resumenEspacios=seguimiento.reduce((cuentas,x)=>(cuentas[x.estado]=(cuentas[x.estado]||0)+1,cuentas),{});
+            const sinRelacion=window.PlanhorDistribucionEspacios?.espaciosSinRelacion?.(data)?.length||0;
+            const firmaDashboard=shared.firmaDatosReporte()+'|'+JSON.stringify(resumenEspacios)+'|'+sinRelacion;
             if(cont.dataset.dashboardFirma===firmaDashboard && cont.innerHTML.trim()) return;
             const cfg=data.configuracion.dashboard||{};
             const p=shared.ctx.getPlanificaciones();
             const cards=[];
+            if(seguimiento.length){
+                const contar=estado=>resumenEspacios[estado]||0;
+                cards.push({t:'Espacios: salas coincidentes',v:contar('coincide'),report:'seguimientoEspacios'});
+                cards.push({t:'Espacios: salas distintas',v:contar('sala_distinta'),c:'var(--warning)',report:'seguimientoEspacios'});
+                cards.push({t:'Espacios sin sala relacionada',v:sinRelacion,c:'var(--warning)',report:'seguimientoEspacios'});
+                cards.push({t:'Espacios: sala pendiente',v:contar('sala_pendiente'),c:'var(--warning)',report:'seguimientoEspacios'});
+                if(contar('revision_parcial')) cards.push({t:'Espacios: revisión parcial',v:contar('revision_parcial'),c:'var(--warning)',report:'seguimientoEspacios'});
+            }
             if(data.ultimoAutoGeneral){
                 const fecha=data.ultimoAutoGeneral.ts ? new Date(data.ultimoAutoGeneral.ts).toLocaleDateString() : '';
                 cards.push({t:`🧭 Último Auto-general${fecha?` · ${fecha}`:''}`,v:data.ultimoAutoGeneral.seccionesConCambio||0,c:'var(--accent)',autoGeneral:true});

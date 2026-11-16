@@ -272,13 +272,14 @@ get tonoSeveridad(){return tonoSeveridad;},
             comparativaHomologo:'Comparativa homólogo'
         };
         etiquetaReporte.integridadDatos='Integridad de datos';
+        etiquetaReporte.seguimientoEspacios='Recomendaciones de espacios';
         const categoriaReporte={
             pendientes:['tro2','docenteNN','incompletas','observacionesPlanificacion','seguimientoPlanificacion'],
             validacion:['validacionPrevia','integridadDatos','conflictos','calidadHorario'],
             recursos:['softwareSala','softwareAsignatura'],
             planificacion:['asignaturasPlanificadas','horasNegociacion','criticas','transversales','subseccionesAsignatura'],
             docentes:['cargaDocente','cargaDefendible','excedidos','comparativaHomologo'],
-            gestor:['gruposDictacion']
+            gestor:['gruposDictacion','seguimientoEspacios']
         };
         const ordenSeveridad={critico:0,advertencia:1,info:2};
         const etiquetaSeveridad={critico:'Crítico',advertencia:'Advertencia',info:'Revisión'};
@@ -884,7 +885,20 @@ get tonoSeveridad(){return tonoSeveridad;},
             const data = getData();
             const contadorDocente = ctx.getContadorDocente();
             let datos = [], columnas = [];
-            if (tipo === 'tro2') {
+            if (tipo === 'seguimientoEspacios') {
+                const etiquetas={sin_relacion:'Espacio sin sala relacionada',sin_planificacion:'Sin planificación',sala_pendiente:'Sala pendiente',sala_distinta:'Sala distinta',revision_parcial:'Revisión parcial',coincide:'Salas coincidentes',sin_datos:'Sin datos suficientes',sin_recomendacion:'Sin recomendación S1'};
+                const texto=(valor)=>Array.isArray(valor)?valor.map(texto).filter(Boolean).join(' · '):valor&&typeof valor==='object'?String(valor.texto||valor.observacion||valor.nombre||''):String(valor??'');
+                const seguimiento=window.PlanhorDistribucionEspacios?.obtenerSeguimiento?.(data)||[];
+                datos=seguimiento.map(x=>[
+                    x.plan||'',x.semestre||'',x.codigo||'',x.asignatura||'',x.seccionNombre||'Sin sección identificada',
+                    texto(x.espaciosRecomendados)||'—',texto(x.salasAsignadas)||'—',etiquetas[x.estado]||'Sin datos suficientes',
+                    texto(x.espaciosSinRelacion)||'—',x.motivo||'—',texto(x.observaciones)||'—',
+                    accionSeccion(x.seccionId,x.asignaturaId,'Planificador'),
+                    {text:'Gestor',html:`<button type="button" class="btn btn-xs" data-dist-gestor data-plan="${ctx.escapeAttr(x.plan||'')}" data-semestre="${ctx.escapeAttr(x.semestre||'')}" data-codigo="${ctx.escapeAttr(x.codigo||'')}">Gestor</button>`},
+                    {text:'Optimizador',html:'<button type="button" class="btn btn-xs" data-dist-optimizador>Optimizador</button>'}
+                ]);
+                columnas=['Plan','Semestre','Código','Asignatura','Sección','Espacios recomendados S1','Salas asignadas','Estado','Sin sala relacionada','Detalle del estado','Observaciones','Planificación','Gestor','Optimizador'];
+            } else if (tipo === 'tro2') {
                 const grupos = new Map();
                 data.planificaciones
                     .filter(p=>p.salaId===ctx.SALA_TRO2_ID)
@@ -1634,6 +1648,8 @@ get tonoSeveridad(){return tonoSeveridad;},
             return { datos, columnas };
         }
         function obtenerDatosReporte(tipo) {
+            // No reutilizar una tabla al modificar una relación u observación sin cambiar conteos.
+            if(tipo==='seguimientoEspacios') return calcularDatosReporte(tipo);
             const firma=firmaDatosReporte();
             const hit=cacheReportes.get(tipo);
             if(hit&&hit.firma===firma) return hit.valor;
@@ -2184,6 +2200,8 @@ get tonoSeveridad(){return tonoSeveridad;},
                 actualizarReporte();
             });
             document.getElementById('reporteContenido')?.addEventListener('click',(e)=>{
+                const dist=e.target.closest('[data-dist-gestor]');if(dist){ctx.abrirDistribucion?.(dist.dataset);return;}
+                if(e.target.closest('[data-dist-optimizador]')){ctx.activarTab?.('organizarSalas');return;}
                 const repair=e.target.closest('.report-repair-btn');
                 if(repair) return ejecutarReparacionDesdeBoton(repair);
                 const gestorPendientes=e.target.closest('[data-gestor-pendientes]');
@@ -2230,6 +2248,8 @@ get tonoSeveridad(){return tonoSeveridad;},
                 if(row && ctx.irASeccion) ctx.irASeccion(row.dataset.seccion,{mensaje:'Sección abierta desde el dashboard'});
             });
             document.getElementById('modalContainer')?.addEventListener('click',(e)=>{
+                const dist=e.target.closest('[data-dist-gestor]');if(dist){ctx.cerrarModal();ctx.abrirDistribucion?.(dist.dataset);return;}
+                if(e.target.closest('[data-dist-optimizador]')){ctx.cerrarModal();ctx.activarTab?.('organizarSalas');return;}
                 const repair=e.target.closest('.report-repair-btn');
                 if(repair) return ejecutarReparacionDesdeBoton(repair);
                 const gestorPendientes=e.target.closest('[data-gestor-pendientes]');

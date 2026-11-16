@@ -13,6 +13,7 @@
 <link rel="stylesheet" href="planificador_modulos/estilos.css?v=20261102-notificaciones-inferiores">
 <link rel="stylesheet" href="navegacion/estilos.css?v=20261102-consolidacion44">
 <link rel="stylesheet" href="navegacion/sistema-visual.css?v=20261105-icono-decorativo">
+<link rel="stylesheet" href="aplicaciones/distribucion-espacios-ui.css?v=20261116-distribucion">
 <link rel="stylesheet" href="navegacion/animaciones.css?v=20261105-sincronizacion-lateral">
 <link rel="stylesheet" href="aplicaciones/organizar-salas.css?v=20261105-paginador-compacto">
 <link rel="stylesheet" href="aplicaciones/optimizador-manual.css?v=20261105-colores-arrastre">
@@ -209,6 +210,7 @@
                 <option value="horasNegociacion">Horas negociables por asignatura</option>
                 <option value="observacionesPlanificacion">Observaciones de planificación</option>
                 <option value="seguimientoPlanificacion">Seguimiento de planificación</option>
+                <option value="seguimientoEspacios">Recomendaciones de espacios</option>
                 <option value="calidadHorario">Calidad de horario</option>
                 <option value="incompletas">Asignaturas con planificación incompleta</option>
                 <option value="cargaDocente">Resumen de carga docente</option>
@@ -251,6 +253,7 @@
                     <button class="btn" id="btnGestorExportarInforme" disabled>Exportar informe</button>
                 </div>
             </div>
+            <div id="gestorDistribucionEspacios"></div>
             <div id="gestorResumen" class="gestor-summary"></div>
             <div class="gestor-card">
                 <div class="card-header"><span class="card-title">Memoria de IDs</span></div>
@@ -552,19 +555,22 @@ onAuthStateChanged(auth, async (user) => {
 <script src="aplicaciones/organizar-salas.js?v=20261105-colores-arrastre"></script>
 <script src="aplicaciones/optimizador-manual.js?v=20261105-colores-arrastre"></script>
 <script src="aplicaciones/salas.js?v=20261102-modulos41"></script>
-<script src="aplicaciones/dashboard.js?v=20261102-modulos41"></script>
+<script src="aplicaciones/dashboard.js?v=20261116-distribucion"></script>
 <script src="aplicaciones/historial.js?v=20261102-modulos41"></script>
-<script src="aplicaciones/gestor-secciones.js?v=20261103-render-unico"></script>
+<script src="aplicaciones/gestor-secciones.js?v=20261116-distribucion"></script>
+<script src="aplicaciones/distribucion-espacios.js?v=20261116-distribucion"></script>
+<script src="aplicaciones/distribucion-excel.js?v=20261116-distribucion"></script>
+<script src="aplicaciones/distribucion-espacios-ui.js?v=20261116-distribucion"></script>
 <script src="planificador_modulos/utils.js"></script>
 <script src="planificador_modulos/sync.js?v=20261026-restauracion-segura"></script>
 <script src="planificador_modulos/exportaciones.js?v=20260608-subsecciones-reportes"></script>
 <script src="planificador_modulos/vista-horario.js?v=20261026-restauracion-segura"></script>
-<script src="planificador_modulos/reportes.js?v=20261102-modulos41"></script>
+<script src="planificador_modulos/reportes.js?v=20261116-distribucion"></script>
 <script src="planificador_modulos/ficha-docente.js?v=20261102-consolidacion44"></script>
 <script src="planificador_modulos/entidades.js?v=20261102-modulos41"></script>
-<script src="planificador_modulos/planificacion.js?v=20261112-descanso-configurable"></script>
+<script src="planificador_modulos/planificacion.js?v=20261116-distribucion"></script>
 <script src="planificador_modulos/configuracion.js?v=20261112-descanso-configurable"></script>
-<script src="planificador_modulos/app.js?v=20261105-colores-arrastre"></script>
+<script src="planificador_modulos/app.js?v=20261116-distribucion"></script>
 <script src="navegacion/menu.js?v=20261105-lateral-rectangulo"></script>
 <script src="navegacion/cuenta.js?v=20261102-consolidacion44"></script>
 <script src="navegacion/iconos.js?v=20261105-paginador-compacto"></script>

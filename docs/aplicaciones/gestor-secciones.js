@@ -249,6 +249,12 @@ function normalizarGestorSeccionesData(valor){
         const tablaTamano=tablaTamanoPermitido.includes(Number(valor.tablaTamano))?Number(valor.tablaTamano):(tablaTamanoPermitido.includes(Number(valor.tablaLimite))?Number(valor.tablaLimite):20);
         const tablaPagina=Math.max(1,Number(valor.tablaPagina)||1);
         const normalizado={cargas,ids,filas,enlacesManuales,ultimaCargaId:shared.limpiarTexto(valor.ultimaCargaId)||cargas[0]?.id||null,tablaLimite:tablaTamano,tablaPagina,tablaTamano,filtroAplicacion};
+        // Este campo pertenece a la temporada. No reconstruir ni recortar sus
+        // filas aquí: la importación valida sus límites antes de guardar y una
+        // versión posterior puede añadir datos que también debemos conservar.
+        if(Object.prototype.hasOwnProperty.call(valor,'distribucionEspacios')){
+            normalizado.distribucionEspacios=valor.distribucionEspacios;
+        }
         if(contextoRenderGestor)contextoRenderGestor.salida=normalizado;
         return normalizado;
     }

@@ -1346,6 +1346,7 @@
             mostrarDetalleBloque(plan,{},plan.seccionId,e);
         }
 
+        let cacheRecomendacionesTooltip={fuente:null,revision:null,datos:null,porBloque:new Map()};
         function mostrarDetalleBloque(plan,visible,secId,e){
             const data=getData();
             const asig=data.asignaturas.find(a=>a.id===plan.asignaturaId);
@@ -1370,6 +1371,16 @@
             ].filter(Boolean);
             const explicacion=textoExplicacionAuto(plan.explicacionAuto);
             const nota=String(plan.nota||'').trim();
+            const fuente=data.gestorSecciones?.distribucionEspacios;
+            if(cacheRecomendacionesTooltip.fuente!==fuente||cacheRecomendacionesTooltip.revision!==data._revisionId||cacheRecomendacionesTooltip.datos!==data){cacheRecomendacionesTooltip={fuente,revision:data._revisionId,datos:data,porBloque:new Map()};}
+            const claveRecomendacion=JSON.stringify([secId,plan.asignaturaId]);
+            if(fuente?.filas?.length&&!cacheRecomendacionesTooltip.porBloque.has(claveRecomendacion)){
+                const seguimiento=window.PlanhorDistribucionEspacios?.obtenerSeguimiento?.(data)||[];
+                for(const x of seguimiento)cacheRecomendacionesTooltip.porBloque.set(JSON.stringify([x.seccionId,x.asignaturaId]),x);
+                if(!cacheRecomendacionesTooltip.porBloque.has(claveRecomendacion))cacheRecomendacionesTooltip.porBloque.set(claveRecomendacion,null);
+            }
+            const seguimiento=cacheRecomendacionesTooltip.porBloque.get(claveRecomendacion);
+            const recomendacion=seguimiento?.espaciosRecomendados?.length?seguimiento.espaciosRecomendados.join(' · '):'';
             const tooltip=asegurarTooltipPlan();
             tooltip.innerHTML=`
                 <div class="plan-block-tooltip-title">${ctx.escapeHTML(titulo)}</div>
@@ -1378,6 +1389,7 @@
                     ${filas.map(([k,v])=>`<span>${ctx.escapeHTML(k)}</span><strong>${ctx.escapeHTML(v)}</strong>`).join('')}
                 </div>
                 ${nota?`<div class="plan-block-tooltip-note"><strong>Observación</strong><br>${ctx.escapeHTML(nota)}</div>`:''}
+                ${recomendacion?`<div class="plan-block-tooltip-note"><strong>Espacios recomendados · S1</strong><br>${ctx.escapeHTML(recomendacion)}<br>Referencia informativa para la sección.</div>`:''}
                 ${explicacion?`<div class="plan-block-tooltip-note">${ctx.escapeHTML(explicacion)}</div>`:''}
             `;
             tooltip.classList.add('visible');
