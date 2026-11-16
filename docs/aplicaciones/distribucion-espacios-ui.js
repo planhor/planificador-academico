@@ -15,7 +15,7 @@
   if(!container)throw new Error('Falta el contenedor de distribución de espacios.');
   let resultado=null,archivo='',filtro='',plan='',semana=1,seleccion=null,pagina=1,preview=false,temporadaActual='',hojaActual='',huellaActual='';
   container.innerHTML=`<section class="gestor-card distribucion-espacios" aria-label="Distribución semanal de espacios">
-   <div class="distribucion-encabezado"><div><strong>Distribución semanal de espacios</strong><p>Consulta recomendaciones y revisa su relación con salas y secciones.</p></div><div><button type="button" class="btn" data-dist-accion="plantilla">Crear archivo de importación</button><button type="button" class="btn" data-dist-accion="archivo">Importar archivo</button><button type="button" class="btn" data-dist-accion="copiar">Copiar desde temporada</button><button type="button" class="btn" data-dist-accion="exportar">Exportar observaciones</button><button type="button" class="btn" data-dist-accion="ejemplo">Ver ejemplo ficticio</button></div><input type="file" data-dist-archivo accept=".xlsx,.xls,.csv" hidden><input type="file" data-dist-original accept=".xlsx" hidden></div>
+   <div class="distribucion-encabezado"><div><strong>Distribución semanal de espacios</strong><p>Consulta recomendaciones y revisa su relación con salas y secciones.</p></div><div><button type="button" class="btn" data-dist-accion="plantilla">Crear archivo de importación</button><button type="button" class="btn" data-dist-accion="archivo">Importar archivo</button><button type="button" class="btn" data-dist-accion="copiar">Copiar desde temporada</button><button type="button" class="btn" data-dist-accion="exportar-archivo">Exportar archivo</button><button type="button" class="btn" data-dist-accion="exportar">Exportar observaciones</button><button type="button" class="btn" data-dist-accion="ejemplo">Ver ejemplo ficticio</button></div><input type="file" data-dist-archivo accept=".xlsx,.xls,.csv" hidden><input type="file" data-dist-original accept=".xlsx" hidden></div>
    <div data-dist-cuerpo><p class="distribucion-vacio">Selecciona un archivo para revisarlo. La vista previa no guarda cambios.</p></div>
    <div data-dist-estado role="status" aria-live="polite"></div>
   </section>`;
@@ -23,7 +23,7 @@
   if(!window._pruebaAislada)q('[data-dist-accion="ejemplo"]')?.remove();
   const mostrarEstado=(mensaje,error=false)=>{const el=estado();el.textContent=mensaje;el.classList.toggle('distribucion-error',error);};
   const data=()=>getData?.()||{};
-  const almacen=()=>data().gestorSecciones?.distribucionEspacios;
+  const almacen=()=>window.PlanhorDistribucionEspacios.obtenerDistribucion(data());
   function cargarGuardados(){
    const saved=almacen();temporadaActual=String(data().sel?.temporadaId||'');preview=false;seleccion=null;pagina=1;
    if(!saved?.filas?.length){resultado=null;archivo='';return;}
@@ -101,6 +101,11 @@
     cargarFilas([header,['TST-TST-1','1','TST101','Asignatura de prueba',72,'Laboratorio A',4,4,...primero,36],['TST-TST-1','1','TST101','Asignatura de prueba',72,'Laboratorio B',4,4,...segundo,36]],'Ejemplo ficticio');return;
    }
    if(action?.dataset.distAccion==='archivo'){const input=q('[data-dist-archivo]');input.value='';input.click();return;}
+   if(action?.dataset.distAccion==='exportar-archivo'){
+    const filas=almacen()?.filas;if(!filas?.length){mostrarEstado('Primero guarda una distribución.',true);return;}
+    if(filas.some(f=>f.horasTotales===null||f.horasTotales===undefined)){mostrarEstado('Faltan las horas totales del archivo original. Reimpórtalo para poder exportar una plantilla completa.',true);return;}
+    try{const blob=window.PlanhorDistribucionExcel.crearPlantilla(filas),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='Distribucion_Espacios.xlsx';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);mostrarEstado('Archivo de recomendaciones descargado.');}catch(err){mostrarEstado(err?.message||'No se pudo exportar el archivo.',true);}return;
+   }
    if(action?.dataset.distAccion==='plantilla'){
     if(window.PlanhorDistribucionExcel?.crearPlantilla){try{const blob=await window.PlanhorDistribucionExcel.crearPlantilla(),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='Plantilla_Distribucion_Espacios.xlsx';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);mostrarEstado('Plantilla descargada.');}catch(err){mostrarEstado(err?.message||'No se pudo generar la plantilla.',true);}return;}
     if(!window.XLSX?.utils?.book_new&&(!asegurarXLSX||!(await asegurarXLSX()))){mostrarEstado('No se pudo cargar Excel para crear la plantilla.',true);return;}
@@ -109,22 +114,22 @@
    }
    if(action?.dataset.distAccion==='exportar'){if(!almacen()?.filas?.length){mostrarEstado('Primero guarda una distribución.',true);return;}const input=q('[data-dist-original]');input.value='';input.click();return;}
    if(action?.dataset.distAccion==='copiar'){
-    const opciones=(data().temporadas||[]).filter(t=>String(t.id)!==String(data().sel?.temporadaId)&&data().temporadaData?.[t.id]?.gestorSecciones?.distribucionEspacios?.filas?.length);
+    const opciones=(data().temporadas||[]).filter(t=>String(t.id)!==String(data().sel?.temporadaId)&&window.PlanhorDistribucionEspacios.obtenerDistribucion(data(),t.id)?.filas?.length);
     if(!opciones.length){mostrarEstado('No hay otras temporadas con recomendaciones guardadas.',true);return;}
     const elegir=prompt('Escribe el número de la temporada que quieres copiar:\n'+opciones.map((t,i)=>`${i+1}. ${t.temporada} ${t.anio}`).join('\n'));if(elegir===null)return;
     const origen=opciones[Number(elegir)-1];if(!origen){mostrarEstado('Selecciona una temporada válida.',true);return;}
     if(almacen()?.filas?.length){mostrarEstado('Ya existe una distribución en esta temporada; no se reemplazó.',true);return;}
-    const temporadaOrigen=data().temporadaData[origen.id],copia=JSON.parse(JSON.stringify(temporadaOrigen.gestorSecciones.distribucionEspacios));copia.observaciones=[];
-    for(const f of copia.filas)f.salaIds=(f.salaIds||[]).filter(id=>{const antes=(temporadaOrigen.salas||[]).find(s=>String(s.id)===String(id)),ahora=(data().salas||[]).find(s=>String(s.id)===String(id));return antes&&ahora&&String(antes.nombre||'')===String(ahora.nombre||'');});
+    const temporadaOrigen=data().temporadaData[origen.id],copia=JSON.parse(JSON.stringify(window.PlanhorDistribucionEspacios.obtenerDistribucion(data(),origen.id)));copia.observaciones=[];
+    for(const f of copia.filas)f.salaIds=(f.salaIds||[]).filter(id=>{const antes=(temporadaOrigen?.salas||[]).find(s=>String(s.id)===String(id)),ahora=(data().salas||[]).find(s=>String(s.id)===String(id));return antes&&ahora&&String(antes.nombre||'')===String(ahora.nombre||'');});
     pushUndo?.({tipo:'distribución',resumen:'Copiar recomendaciones de espacios'});
-    data().gestorSecciones.distribucionEspacios=copia;await persistir('Recomendaciones copiadas; revisa las salas relacionadas.');cargarGuardados();render();return;
+    window.PlanhorDistribucionEspacios.establecerDistribucion(data(),copia);await persistir('Recomendaciones copiadas; revisa las salas relacionadas.');cargarGuardados();render();return;
    }
    if(action?.dataset.distAccion==='cancelar-importacion'){cargarGuardados();render();return;}
    if(action?.dataset.distAccion==='guardar-importacion'){
     if(!resultado?.ok)return;
-    if(resultado.asignaturas.some(a=>a.alertas.some(x=>x.tipo==='semana_invalida'||x.tipo==='recomendacion_invalida'||x.tipo==='horas_totales_invalidas'))){mostrarEstado('Hay valores inválidos en el archivo. Corrígelos antes de guardar.',true);return;}
+    if(resultado.asignaturas.some(a=>a.alertas.some(x=>['semana_invalida','recomendacion_invalida','horas_totales_invalidas','horas_totales_inconsistentes'].includes(x.tipo)))){mostrarEstado('Hay valores inválidos o inconsistentes en el archivo. Corrígelos antes de guardar.',true);return;}
     if(!huellaActual&&archivo!=='Ejemplo ficticio'){mostrarEstado('No se puede verificar el archivo. Vuelve a importarlo.',true);return;}
-    const filas=resultado.asignaturas.flatMap(a=>a.espacios.map(x=>({id:`${huellaActual||'ejemplo'}:${x.fila}`,fila:x.fila,plan:a.plan,semestre:a.semestre,codigo:a.codigo,asignatura:a.asignatura,area:a.area,ubicacion:x.ubicacion,semanas:x.semanas,horasSemanales:x.horasSemanales,maxDiarias:x.maxDiarias,totalDeclarado:x.totalDeclarado,salaIds:[]})));
+    const filas=resultado.asignaturas.flatMap(a=>a.espacios.map(x=>({id:`${huellaActual||'ejemplo'}:${x.fila}`,fila:x.fila,plan:a.plan,semestre:a.semestre,codigo:a.codigo,asignatura:a.asignatura,area:a.area,horasTotales:a.horasTotales,ubicacion:x.ubicacion,semanas:x.semanas,horasSemanales:x.horasSemanales,maxDiarias:x.maxDiarias,totalDeclarado:x.totalDeclarado,salaIds:[]})));
     if(filas.length>5000||filas.some(f=>[f.plan,f.semestre,f.codigo,f.asignatura,f.area,f.ubicacion].some(v=>String(v||'').length>500))){mostrarEstado('El archivo supera los límites de conservación segura (5.000 filas o 500 caracteres por campo).',true);return;}
     if(resultado.alertas?.some(a=>a.tipo==='fila_incompleta')){mostrarEstado('Hay filas incompletas. Corrige el archivo antes de guardar para evitar omitir información.',true);return;}
     const previo=almacen();
@@ -139,7 +144,7 @@
     }
     if(!data().gestorSecciones){mostrarEstado('No se pudo acceder a la temporada actual. Recarga la aplicación.',true);return;}
     pushUndo?.({tipo:'distribución',resumen:'Actualizar recomendaciones de espacios'});
-    data().gestorSecciones.distribucionEspacios={version:1,archivo,hoja:hojaActual,huellaArchivo:huellaActual,filas,observaciones:notas};
+    window.PlanhorDistribucionEspacios.establecerDistribucion(data(),{version:1,archivo,hoja:hojaActual,huellaArchivo:huellaActual,filas,observaciones:notas});
     await persistir('Recomendaciones guardadas.');cargarGuardados();render();return;
    }
    if(action?.dataset.distAccion==='optimizador'){irOptimizador?.();return;}

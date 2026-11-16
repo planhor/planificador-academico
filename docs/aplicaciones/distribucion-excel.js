@@ -155,12 +155,20 @@
   const cd=concat(centrales),end=new Uint8Array(22);put32(end,0,0x06054b50);put16(end,8,archivos.length);put16(end,10,archivos.length);put32(end,12,cd.length);put32(end,16,offset);return concat([...partes,cd,end]);
  }
  function letraColumna(n){let s='';while(n){n--;s=String.fromCharCode(65+n%26)+s;n=Math.floor(n/26);}return s;}
- function crearPlantilla(){
+ function crearPlantilla(datos=[]){
   const headers=['Área','TFL','Plan Código','Programa de Estudio','Semestre','Código de Asignatura','Asignatura','Área Formación','Tipo Asignatura','Estrategias Didacticas','Estrategias Metodologicas','HH Totales','HH Presencial','HH Online','HH Sincronicas','HH Asincronicas','HH Aula','HH Laboratorio','HH Taller','HH Terreno','HH Campo Clinico','Ubicación','HH x Semana','Max HH Diarias',...Array.from({length:19},(_,i)=>'HH S'+(i+1)),'Observación'];
   const celdas=headers.map((h,i)=>'<c r="'+letraColumna(i+1)+'1" t="inlineStr"><is><t>'+xmlText(h)+'</t></is></c>').join('');
   const instrucciones=['Plantilla de distribución semanal de espacios','Completa una fila por asignatura y ubicación. Mantén el plan completo y el semestre.','S1–S18 indican las horas recomendadas por semana para esa ubicación. Las celdas vacías se interpretan como 0.','HH S19 (columna AQ) es el total de la ubicación, no una semana adicional. En AQ2 puedes escribir =SUMA(Y2:AP2) y copiar la fórmula hacia abajo.','Una asignatura puede tener varias filas si usa diferentes ubicaciones. Esta plantilla no asigna ni reserva salas.','La columna AR se reserva para observaciones por sección al exportar los hallazgos.'];
   const filasAyuda=instrucciones.map((s,i)=>'<row r="'+(i+1)+'"><c r="A'+(i+1)+'" t="inlineStr"><is><t>'+xmlText(s)+'</t></is></c></row>').join('');
-  const sheet1='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:AR1"/><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetData><row r="1">'+celdas+'</row></sheetData></worksheet>';
+  if(!Array.isArray(datos)||datos.length>5000)fail('La distribución supera el límite de 5.000 filas.');
+  const filasDatos=datos.map((f,i)=>{
+   const n=i+2,v=[];v[0]=f.area;v[2]=f.plan;v[4]=f.semestre;v[5]=f.codigo;v[6]=f.asignatura;v[11]=f.horasTotales;v[21]=f.ubicacion;v[22]=f.horasSemanales;v[23]=f.maxDiarias;
+   if(!Array.isArray(f.semanas)||f.semanas.length!==18)fail('Una fila no contiene las 18 semanas requeridas.');
+   f.semanas.forEach((x,j)=>{v[24+j]=x;});v[42]=f.totalDeclarado??(f.semanas.every(x=>typeof x==='number')?f.semanas.reduce((a,b)=>a+b,0):null);
+   const cs=v.map((x,j)=>{if(x===null||x===undefined||x==='')return '';const ref=letraColumna(j+1)+n;if(typeof x==='number'&&Number.isFinite(x))return '<c r="'+ref+'"><v>'+x+'</v></c>';return '<c r="'+ref+'" t="inlineStr"><is><t xml:space="preserve">'+xmlText(x)+'</t></is></c>';}).join('');
+   return '<row r="'+n+'">'+cs+'</row>';
+  }).join('');
+  const sheet1='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:AR'+(datos.length+1)+'"/><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetData><row r="1">'+celdas+'</row>'+filasDatos+'</sheetData></worksheet>';
   const sheet2='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:A'+instrucciones.length+'"/><cols><col min="1" max="1" width="110" customWidth="1"/></cols><sheetData>'+filasAyuda+'</sheetData></worksheet>';
   const archivos=[
    ['[Content_Types].xml','<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>'],

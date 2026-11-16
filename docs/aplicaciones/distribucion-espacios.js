@@ -92,13 +92,28 @@
   return {estado:sinSalaAsignada.length?'revision_parcial':'coincide',pendientes,distintos,coincidentes,espaciosSinSalaAsignada:sinSalaAsignada};
  }
  const identificador=v=>texto(v).normalize('NFC').toLocaleUpperCase('es');
+ // La fuente única vive en la raíz, separada de gestorSecciones: las versiones
+ // anteriores reconstruyen el Gestor y descartarían campos desconocidos allí.
+ function obtenerDistribucion(data,temporadaId){
+  const id=String(temporadaId??data?.sel?.temporadaId??'');
+  const coleccion=data?.distribucionesEspaciosPorTemporada;
+  if(!id||!coleccion||typeof coleccion!=='object'||Array.isArray(coleccion))return null;
+  return Object.prototype.hasOwnProperty.call(coleccion,id)?coleccion[id]:null;
+ }
+ function establecerDistribucion(data,valor,temporadaId){
+  const id=String(temporadaId??data?.sel?.temporadaId??'');
+  if(!data||typeof data!=='object'||!id||['__proto__','prototype','constructor'].includes(id))throw new Error('No hay una temporada válida para guardar recomendaciones.');
+  let coleccion=data.distribucionesEspaciosPorTemporada;
+  if(!coleccion||typeof coleccion!=='object'||Array.isArray(coleccion))coleccion=data.distribucionesEspaciosPorTemporada=Object.create(null);
+  if(valor===null)delete coleccion[id];else Object.defineProperty(coleccion,id,{value:valor,writable:true,enumerable:true,configurable:true});
+ }
  function espaciosSinRelacion(data,filas){
   const disponibles=new Set((data.salas||[]).filter(s=>!s.esVirtual&&!['__tro2__','__virtual__'].includes(String(s.id))).map(s=>String(s.id)));
-  return (filas||data?.gestorSecciones?.distribucionEspacios?.filas||[]).filter(f=>!(f.salaIds||[]).some(id=>disponibles.has(String(id))));
+  return (filas||obtenerDistribucion(data)?.filas||[]).filter(f=>!(f.salaIds||[]).some(id=>disponibles.has(String(id))));
  }
  const nivelClave=v=>{const t=clave(v),m=t.match(/^(?:n|nivel)?\s*(\d+)$/);return m?String(Number(m[1])):t;};
  function obtenerSeguimiento(data){
-  const registros=data?.gestorSecciones?.distribucionEspacios?.filas||[], observaciones=data?.gestorSecciones?.distribucionEspacios?.observaciones||[];
+  const distribucion=obtenerDistribucion(data),registros=distribucion?.filas||[], observaciones=distribucion?.observaciones||[];
   const grupos=new Map();
   for(const f of registros){const k=JSON.stringify([identificador(f.plan),nivelClave(f.semestre),identificador(f.codigo)]);if(!grupos.has(k))grupos.set(k,[]);grupos.get(k).push(f);}
   const resultado=[];
@@ -129,5 +144,5 @@
   }
   return resultado;
  }
- window.PlanhorDistribucionEspacios=Object.freeze({detectarColumnas,analizar,evaluarSeccion,obtenerSeguimiento,espaciosSinRelacion});
+ window.PlanhorDistribucionEspacios=Object.freeze({detectarColumnas,analizar,evaluarSeccion,obtenerDistribucion,establecerDistribucion,obtenerSeguimiento,espaciosSinRelacion});
 })();

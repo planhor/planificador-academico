@@ -1371,7 +1371,7 @@
             ].filter(Boolean);
             const explicacion=textoExplicacionAuto(plan.explicacionAuto);
             const nota=String(plan.nota||'').trim();
-            const fuente=data.gestorSecciones?.distribucionEspacios;
+            const fuente=window.PlanhorDistribucionEspacios?.obtenerDistribucion?.(data);
             if(cacheRecomendacionesTooltip.fuente!==fuente||cacheRecomendacionesTooltip.revision!==data._revisionId||cacheRecomendacionesTooltip.datos!==data){cacheRecomendacionesTooltip={fuente,revision:data._revisionId,datos:data,porBloque:new Map()};}
             const claveRecomendacion=JSON.stringify([secId,plan.asignaturaId]);
             if(fuente?.filas?.length&&!cacheRecomendacionesTooltip.porBloque.has(claveRecomendacion)){

@@ -41,3 +41,7 @@ test('la plantilla contiene las 18 semanas y S19, con instrucciones y sin filas 
  assert.equal(r.hoja,'Distribución');assert.equal(r.filas.length,1);assert.equal(r.filas[0][24],'HH S1');assert.equal(r.filas[0][41],'HH S18');assert.equal(r.filas[0][42],'HH S19');assert.equal(r.filas[0][43],'Observación');
  const ayuda=await leerFilas({archivo:plantilla,hoja:'Instrucciones'});assert.ok(ayuda.filas.some(f=>String(f[0]).includes('SUMA(Y2:AP2)')));
 });
+test('el archivo exportado conserva los campos recomendados y se puede volver a leer',async()=>{
+ const r=await leerFilas({archivo:crearPlantilla([{area:'Técnica',plan:'P-1',semestre:'2',codigo:'A01',asignatura:'Control',horasTotales:72,ubicacion:'Laboratorio',horasSemanales:4,maxDiarias:4,semanas:[4,...Array(17).fill(0)],totalDeclarado:4}])});
+ assert.equal(r.filas[1][0],'Técnica');assert.equal(r.filas[1][2],'P-1');assert.equal(r.filas[1][11],72);assert.equal(r.filas[1][21],'Laboratorio');assert.equal(r.filas[1][24],4);assert.equal(r.filas[1][42],4);
+});

@@ -41,3 +41,14 @@ test('sync fusiona filas y observaciones independientes e identifica conflictos 
  const uno=structuredClone(base);uno.filas[0].salaIds=['s4'];
  assert.ok(sync.fusionarTresVias(wrap(base),wrap(uno),wrap(otro)).conflictos.length>0);
 });
+test('la distribución raíz sobrevive restauración y fusión con edición de cliente anterior',()=>{
+ const {limpiarImportado}=cargarModulo('utils.js','PlanificadorUtils'),sync=cargarSyncPrueba(),distribucion=muestra();
+ const base={distribucionesEspaciosPorTemporada:{t1:distribucion},temporadaData:{t1:{gestorSecciones:{filas:[]}}},secciones:[{id:'s1',nombre:'D-1'}]};
+ const limpio=limpiarImportado(structuredClone(base));
+ assert.deepEqual(JSON.parse(JSON.stringify(limpio.distribucionesEspaciosPorTemporada.t1)),distribucion);
+ const local=structuredClone(base),remoto=structuredClone(base);local.secciones[0].nombre='D-2';
+ const merged=sync.fusionarTresVias(base,local,remoto);
+ assert.equal(merged.conflictos.length,0);
+ assert.deepEqual(JSON.parse(JSON.stringify(merged.fusion.distribucionesEspaciosPorTemporada.t1)),distribucion);
+ assert.equal(merged.fusion.secciones[0].nombre,'D-2');
+});

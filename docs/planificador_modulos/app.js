@@ -131,6 +131,8 @@ get vincularSeccionAGrupo(){return vincularSeccionAGrupo;},
     function snapshotUndo(){
         const snap={};
         CAMPOS_UNDO.forEach(k=>{ snap[k]=JSON.parse(JSON.stringify(data?.[k] ?? (Array.isArray(data?.[k])?[]:null))); });
+        const id=data.sel?.temporadaId,distribucion=window.PlanhorDistribucionEspacios?.obtenerDistribucion(data,id);
+        if(id)snap._distribucionTemporada={id,valor:distribucion?JSON.parse(JSON.stringify(distribucion)):null};
         return snap;
     }
     function restaurarSnapshotUndo(snap){
@@ -138,6 +140,7 @@ get vincularSeccionAGrupo(){return vincularSeccionAGrupo;},
         CAMPOS_UNDO.forEach(k=>{
             if(Object.prototype.hasOwnProperty.call(snap,k)) data[k]=JSON.parse(JSON.stringify(snap[k]));
         });
+        if(snap._distribucionTemporada)window.PlanhorDistribucionEspacios?.establecerDistribucion(data,snap._distribucionTemporada.valor,snap._distribucionTemporada.id);
     }
     function describirAccionUndo(meta={}){
         return limpiarTexto(meta.resumen||meta.tipo||'Última acción',120) || 'Última acción';
