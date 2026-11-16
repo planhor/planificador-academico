@@ -13,7 +13,7 @@
  };
  function create({container,asegurarXLSX,getData,guardar,pushUndo,irPlanificador,irOptimizador}={}){
   if(!container)throw new Error('Falta el contenedor de distribución de espacios.');
-  let resultado=null,archivo='',filtro='',plan='',semana=1,seleccion=null,pagina=1,preview=false,temporadaActual='',hojaActual='',huellaActual='';
+  let resultado=null,archivo='',filtro='',plan='',semana=1,seleccion=null,pagina=1,preview=false,temporadaActual='',hojaActual='',huellaActual='',catalogoAbierto=false;
   container.innerHTML=`<section class="gestor-card distribucion-espacios" aria-label="Distribución semanal de espacios">
    <div class="distribucion-encabezado"><div><strong>Distribución semanal de espacios</strong><p>Consulta recomendaciones y revisa su relación con salas y secciones.</p></div><div><button type="button" class="btn" data-dist-accion="plantilla">Crear archivo de importación</button><button type="button" class="btn" data-dist-accion="archivo">Importar archivo</button><button type="button" class="btn" data-dist-accion="copiar">Copiar desde temporada</button><button type="button" class="btn" data-dist-accion="exportar-archivo">Exportar archivo</button><button type="button" class="btn" data-dist-accion="exportar">Exportar observaciones</button><button type="button" class="btn" data-dist-accion="ejemplo">Ver ejemplo ficticio</button></div><input type="file" data-dist-archivo accept=".xlsx,.xls,.csv" hidden><input type="file" data-dist-original accept=".xlsx" hidden></div>
    <div data-dist-cuerpo><p class="distribucion-vacio">Selecciona un archivo para revisarlo. La vista previa no guarda cambios.</p></div>
@@ -36,7 +36,7 @@
   function detalle(a){
    const avisos=a.alertas||[];
    const filaEspacio=e=>`<tr><th scope="row">${html(e.ubicacion)}</th><td>${html(valor(e.horasSemanales))}</td><td>${html(valor(e.maxDiarias))}</td>${e.semanas.map((v,i)=>`<td${i+1===semana?' class="distribucion-semana-actual"':''}>${html(valor(v))}</td>`).join('')}<td>${html(valor(e.totalCalculado))}</td></tr>`;
-   const relacion=preview?'':`<h4>Relacionar espacios con salas</h4><p>La relación es informativa y no asigna ni reserva salas.</p>${a.espacios.map(e=>`<details><summary>${html(e.ubicacion)} · ${(e.salaIds||[]).length} sala(s) relacionada(s)</summary><div class="distribucion-salas">${(data().salas||[]).filter(s=>!s.esVirtual&&!['__virtual__','__tro2__'].includes(String(s.id))).map(s=>`<div><label><input type="checkbox" data-dist-vinculo="${html(e.id)}" value="${html(s.id)}" ${(e.salaIds||[]).map(String).includes(String(s.id))?'checked':''}> ${html(s.nombre)}${s.nombreDescriptivo?' · '+html(s.nombreDescriptivo):''}</label> ${(e.salaIds||[]).map(String).includes(String(s.id))&&s.nombreDescriptivo?`<button type="button" class="btn" data-dist-renombrar="${html(e.id)}" data-sala="${html(s.id)}">Cambiar nombre descriptivo</button>`:''}</div>`).join('')||'No hay salas disponibles.'}</div></details>`).join('')}`;
+   const relacion=preview?'':'<p>Las salas se relacionan una sola vez en «Relacionar espacios», para todas las asignaturas de la temporada.</p>';
    const seguimiento=preview?[]:(window.PlanhorDistribucionEspacios.obtenerSeguimiento(data()).filter(x=>claveGrupo(x)===claveGrupo(a)));
    const secciones=seguimiento.length?`<h4>Seguimiento por sección · referencia S1</h4><p>El estado compara las salas asignadas con las relacionadas; no verifica cantidades de horas ni la ejecución real de semanas posteriores.</p>${seguimiento.map(s=>`<div class="distribucion-seccion"><strong>${html(s.seccionNombre||'Sección no identificada')}</strong> · ${html(nombres[s.estado]||s.estado)}${s.motivo?` · ${html(s.motivo)}`:''}<br><small>Recomendado: ${html((s.espaciosRecomendados||[]).join(', ')||'—')} · Salas asignadas: ${html((s.salasAsignadas||[]).join(', ')||'—')}</small>${s.seccionId?`<div><button type="button" class="btn" data-dist-plan-seccion="${html(s.seccionId)}" data-asignatura="${html(s.asignaturaId)}">Abrir Planificador</button> <button type="button" class="btn" data-dist-accion="optimizador">Abrir Optimizador</button></div>${a.espacios.map(e=>{const o=(s.observaciones||[]).find(x=>String(x.filaId)===String(e.id));return `<label>Observación · ${html(e.ubicacion)}<textarea class="form-input" maxlength="500" data-dist-nota-fila="${html(e.id)}" data-dist-nota-seccion="${html(s.seccionId)}" placeholder="Explica aquí si no fue posible seguir la recomendación">${html(o?.texto||'')}</textarea></label>`;}).join('')}`:''}</div>`).join('')}`:'';
    return `<section class="distribucion-detalle"><div class="distribucion-detalle-cabecera"><div><strong>${html(a.codigo)} · ${html(a.asignatura||'Sin nombre')}</strong><small>${html(a.plan)} · semestre ${html(a.semestre)}</small></div><button type="button" class="btn" data-dist-accion="cerrar">Cerrar detalle</button></div>
@@ -60,8 +60,17 @@
     return `<button type="button" class="distribucion-fila" data-dist-indice="${i}"><span><strong>${html(a.codigo)} · ${html(a.asignatura||'Sin nombre')}</strong><small>${html(a.plan)} · semestre ${html(a.semestre)}</small></span><span>${html(resumen)}</span><span>${a.alertas.length?`${a.alertas.length} observación(es)`:'Ver semanas'}</span></button>`;
    }).join('');
    const item=seleccion===null?null:resultado.asignaturas[seleccion];
+   const catalogo=preview?[]:window.PlanhorDistribucionEspacios.catalogoEspacios(almacen()?.filas||[]);
+   const salas=(data().salas||[]).filter(s=>!s.esVirtual&&!['__virtual__','__tro2__'].includes(String(s.id)));
+   const catalogoHTML=preview?'':`<details data-dist-catalogo ${catalogoAbierto?'open':''}><summary><strong>Relacionar espacios</strong> · ${catalogo.length} espacios</summary><p>Asocia cada nombre una vez. Esta relación no asigna ni reserva salas.</p><div class="dist-catalogo-lista">${catalogo.map((g,i)=>{
+    const nombreSala=id=>salas.find(s=>String(s.id)===String(id))?.nombre||'Sala no disponible ('+id+')';
+    if(g.conflicto){const detalle=g.variantes.map(v=>v.map(nombreSala).join(', ')).join(' / ');return `<div class="dist-catalogo-item"><strong>${html(g.nombre)}</strong><span>Hay relaciones diferentes: ${html(detalle)}</span><button type="button" class="btn" data-dist-unificar="${i}">Revisar y unificar</button></div>`;}
+    const asignadas=g.salas.map((id,n)=>`<div class="dist-sala-vinculada"><span>${html(g.nombre)} (${n+1}) · ${html(nombreSala(id))}</span><button type="button" class="btn" data-dist-renombrar="${html(g.filas[0].id)}" data-sala="${html(id)}">Cambiar nombre descriptivo</button><button type="button" class="btn" data-dist-quitar="${i}" data-sala="${html(id)}" aria-label="Quitar ${html(nombreSala(id))}">Quitar</button></div>`).join('');
+    const opciones=salas.filter(s=>!g.salas.includes(String(s.id))).map(s=>`<option value="${html(s.id)}">${html(s.nombre)}${s.nombreDescriptivo?' · '+html(s.nombreDescriptivo):''}</option>`).join('');
+    return `<div class="dist-catalogo-item"><strong>${html(g.nombre)}</strong>${asignadas||'<span>Sin sala relacionada</span>'}<div class="dist-vincular"><select class="form-select" data-dist-elegir="${i}" aria-label="Sala para ${html(g.nombre)}"><option value="">Seleccionar sala</option>${opciones}</select><button type="button" class="btn" data-dist-agregar="${i}">Relacionar</button></div></div>`;
+   }).join('')}</div></details>`;
    el.innerHTML=`<p class="distribucion-resumen"><strong>${html(archivo)}</strong> · ${resultado.filasLeidas} filas · ${resultado.asignaturas.length} asignaturas por plan y semestre · ${totalAlertas(resultado)} observaciones del archivo</p><p class="distribucion-nota">${preview?'Vista previa sin guardar.':'Recomendaciones de la temporada activa.'} S1 es la referencia para la semana ideal.</p>${preview?'<button type="button" class="btn btn-primary" data-dist-accion="guardar-importacion">Guardar recomendaciones</button> <button type="button" class="btn" data-dist-accion="cancelar-importacion">Cancelar</button>':''}
-    ${resultado.alertas?.length?`<details class="distribucion-alerta"><summary>${resultado.alertas.length} observación(es) generales</summary><ul>${resultado.alertas.map(a=>`<li>${html(textoAlerta(a))}</li>`).join('')}</ul></details>`:''}
+    ${resultado.alertas?.length?`<details class="distribucion-alerta"><summary>${resultado.alertas.length} observación(es) generales</summary><ul>${resultado.alertas.map(a=>`<li>${html(textoAlerta(a))}</li>`).join('')}</ul></details>`:''}${catalogoHTML}
     <div class="distribucion-filtros"><label>Plan<select class="form-select" data-dist-plan><option value="">Todos los planes</option>${planes.map(p=>`<option value="${html(p)}"${p===plan?' selected':''}>${html(p)}</option>`).join('')}</select></label><label>Semana<select class="form-select" data-dist-semana>${Array.from({length:18},(_,i)=>`<option value="${i+1}"${i+1===semana?' selected':''}>S${i+1}${i===0?' · referencia':''}</option>`).join('')}</select></label><label>Buscar asignatura<input type="search" class="form-input" data-dist-busqueda value="${html(filtro)}" placeholder="Código, nombre o plan"></label></div>
     <p class="distribucion-conteo">${filtradas.length} asignatura(s) · Página ${pagina} de ${paginas}</p><div class="distribucion-lista">${lista||'<p>No hay coincidencias.</p>'}</div><div class="distribucion-paginacion"><button type="button" class="btn" data-dist-accion="anterior" ${pagina===1?'disabled':''}>Anterior</button><button type="button" class="btn" data-dist-accion="siguiente" ${pagina===paginas?'disabled':''}>Siguiente</button></div>${item?detalle(item):''}`;
   }
@@ -142,12 +151,34 @@
      const ids=new Map();for(const f of filas){const antes=anteriores.get(clave(f));if(antes){f.salaIds=[...(antes.salaIds||[])];ids.set(String(antes.id),f.id);}}
      notas=notas.map(o=>({...o,id:`${ids.get(String(o.filaId))||o.filaId}:${o.seccionId}`,filaId:ids.get(String(o.filaId))||o.filaId}));
     }
+    for(const grupo of window.PlanhorDistribucionEspacios.catalogoEspacios(filas))if(!grupo.conflicto&&grupo.salas.length)window.PlanhorDistribucionEspacios.establecerSalasEspacio(filas,grupo.nombre,grupo.salas);
     if(!data().gestorSecciones){mostrarEstado('No se pudo acceder a la temporada actual. Recarga la aplicación.',true);return;}
     pushUndo?.({tipo:'distribución',resumen:'Actualizar recomendaciones de espacios'});
     window.PlanhorDistribucionEspacios.establecerDistribucion(data(),{version:1,archivo,hoja:hojaActual,huellaArchivo:huellaActual,filas,observaciones:notas});
     await persistir('Recomendaciones guardadas.');cargarGuardados();render();return;
    }
    if(action?.dataset.distAccion==='optimizador'){irOptimizador?.();return;}
+   const cambio=e.target.closest('[data-dist-agregar],[data-dist-quitar],[data-dist-unificar]');
+   if(cambio){
+    const store=almacen(),indice=Number(cambio.dataset.distAgregar??cambio.dataset.distQuitar??cambio.dataset.distUnificar),g=window.PlanhorDistribucionEspacios.catalogoEspacios(store?.filas||[])[indice];if(!g)return;
+    let ids=[...g.salas];
+    if(cambio.hasAttribute('data-dist-unificar')){
+     ids=[...new Set(g.variantes.flat())];const detalle=ids.map(id=>(data().salas||[]).find(s=>String(s.id)===id)?.nombre||id).join(', ');
+     if(!confirm(`Hay relaciones distintas para «${g.nombre}». ¿Conservar todas estas salas y compartirlas entre sus asignaturas?\n${detalle}\nEl orden se tomará de los registros existentes.`))return;
+    }else if(g.conflicto){mostrarEstado('Revisa primero las relaciones diferentes de este espacio.',true);return;}
+    else if(cambio.hasAttribute('data-dist-quitar'))ids=ids.filter(id=>id!==cambio.dataset.sala);
+    else{
+     const id=q(`[data-dist-elegir="${indice}"]`)?.value;if(!id){mostrarEstado('Selecciona una sala para relacionar.',true);return;}
+     const sala=(data().salas||[]).find(s=>String(s.id)===id);if(!sala)return;ids.push(id);
+     pushUndo?.({tipo:'distribución',resumen:'Relacionar espacio con sala'});
+     window.PlanhorDistribucionEspacios.establecerSalasEspacio(store.filas,g.nombre,ids);
+     if(!sala.nombreDescriptivo&&g.nombre.length<=250&&confirm(`¿Añadir «${g.nombre}» como nombre descriptivo de ${sala.nombre}? No cambia su identificador ni sus demás datos.`))sala.nombreDescriptivo=g.nombre;
+     await persistir('Relación actualizada para todas las asignaturas.');const idx=seleccion;cargarGuardados();seleccion=idx;catalogoAbierto=true;render();return;
+    }
+    pushUndo?.({tipo:'distribución',resumen:'Actualizar relación de espacio'});
+    window.PlanhorDistribucionEspacios.establecerSalasEspacio(store.filas,g.nombre,ids);
+    await persistir('Relación actualizada para todas las asignaturas.');const idx=seleccion;cargarGuardados();seleccion=idx;catalogoAbierto=true;render();return;
+   }
    const cambiarNombre=e.target.closest('[data-dist-renombrar]');if(cambiarNombre){const f=almacen()?.filas?.find(x=>String(x.id)===cambiarNombre.dataset.distRenombrar),s=(data().salas||[]).find(x=>String(x.id)===cambiarNombre.dataset.sala);if(f&&s&&String(f.ubicacion).length>250){mostrarEstado('El nombre propuesto supera 250 caracteres; edítalo en Salas.',true);return;}if(f&&s&&confirm(`¿Reemplazar el nombre descriptivo de ${s.nombre}?\nActual: ${s.nombreDescriptivo}\nNuevo: ${f.ubicacion}\nEl identificador y otros datos no cambian.`)){pushUndo?.({tipo:'sala',resumen:'Cambiar nombre descriptivo'});s.nombreDescriptivo=String(f.ubicacion);await persistir('Nombre descriptivo actualizado.');const idx=seleccion;cargarGuardados();seleccion=idx;render();}return;}
    const ir=e.target.closest('[data-dist-plan-seccion]');if(ir){irPlanificador?.(ir.dataset.distPlanSeccion,{asignaturaId:ir.dataset.asignatura});return;}
    if(action?.dataset.distAccion==='anterior'){pagina=Math.max(1,pagina-1);seleccion=null;render();return;}
@@ -168,13 +199,6 @@
    }
    if(e.target.matches('[data-dist-plan]')){plan=e.target.value;seleccion=null;pagina=1;render();return;}
    if(e.target.matches('[data-dist-semana]')){semana=Number(e.target.value)||1;render();}
-   if(e.target.matches('[data-dist-vinculo]')){
-    const f=almacen()?.filas?.find(x=>String(x.id)===e.target.dataset.distVinculo),s=(data().salas||[]).find(x=>String(x.id)===e.target.value);if(!f||!s)return;
-    pushUndo?.({tipo:'distribución',resumen:'Relacionar espacio con sala'});
-    const ids=new Set((f.salaIds||[]).map(String));if(e.target.checked)ids.add(String(s.id));else ids.delete(String(s.id));f.salaIds=[...ids];
-    if(e.target.checked&&!s.nombreDescriptivo&&String(f.ubicacion).length<=250&&confirm(`¿Añadir «${f.ubicacion}» como nombre descriptivo de ${s.nombre}? No cambia su identificador ni sus demás datos.`))s.nombreDescriptivo=String(f.ubicacion);
-    await persistir('Relación actualizada.');const idx=seleccion;cargarGuardados();seleccion=idx;render();return;
-   }
    if(e.target.matches('[data-dist-nota-fila]')){
     const store=almacen(),filaId=e.target.dataset.distNotaFila,seccionId=e.target.dataset.distNotaSeccion,nota=e.target.value.replace(/[\u0000-\u001f\u007f]+/g,' ').trim();if(!store)return;
     const id=`${filaId}:${seccionId}`,index=store.observaciones.findIndex(o=>o.id===id);
@@ -186,9 +210,10 @@
    }
   };
   const alInput=e=>{if(!e.target.matches('[data-dist-busqueda]'))return;filtro=e.target.value;pagina=1;const pos=e.target.selectionStart;render();const nuevo=q('[data-dist-busqueda]');nuevo?.focus();nuevo?.setSelectionRange(pos,pos);};
-  container.addEventListener('click',alClick);container.addEventListener('change',alChange);container.addEventListener('input',alInput);
+  const alToggle=e=>{if(e.target.matches?.('[data-dist-catalogo]'))catalogoAbierto=e.target.open;};
+  container.addEventListener('click',alClick);container.addEventListener('change',alChange);container.addEventListener('input',alInput);container.addEventListener('toggle',alToggle,true);
   cargarGuardados();render();
-  return {cargarFilas, getResultado:()=>resultado, refrescar(){if(!preview||String(data().sel?.temporadaId||'')!==temporadaActual)cargarGuardados();render();}, abrirDetalle({plan:p,semestre:s,codigo:c}){cargarGuardados();filtro='';plan='';seleccion=resultado?.asignaturas?.findIndex(a=>normal(a.plan)===normal(p)&&normal(a.semestre)===normal(s)&&normal(a.codigo)===normal(c))??-1;if(seleccion<0)seleccion=null;render();q('.distribucion-detalle')?.scrollIntoView({block:'start'});}, destroy(){container.removeEventListener('click',alClick);container.removeEventListener('change',alChange);container.removeEventListener('input',alInput);container.innerHTML='';}};
+  return {cargarFilas, getResultado:()=>resultado, refrescar(){if(!preview||String(data().sel?.temporadaId||'')!==temporadaActual)cargarGuardados();render();}, abrirDetalle({plan:p,semestre:s,codigo:c}){cargarGuardados();filtro='';plan='';seleccion=resultado?.asignaturas?.findIndex(a=>normal(a.plan)===normal(p)&&normal(a.semestre)===normal(s)&&normal(a.codigo)===normal(c))??-1;if(seleccion<0)seleccion=null;render();q('.distribucion-detalle')?.scrollIntoView({block:'start'});}, destroy(){container.removeEventListener('click',alClick);container.removeEventListener('change',alChange);container.removeEventListener('input',alInput);container.removeEventListener('toggle',alToggle,true);container.innerHTML='';}};
  }
  window.PlanhorDistribucionEspaciosUI=Object.freeze({create});
 })();

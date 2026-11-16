@@ -5,7 +5,7 @@ const vm = require('node:vm');
 const path = require('node:path');
 const contexto = {window:{}};
 vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../docs/aplicaciones/distribucion-espacios.js'),'utf8'),contexto);
-const {analizar,evaluarSeccion,obtenerSeguimiento,espaciosSinRelacion}=contexto.window.PlanhorDistribucionEspacios;
+const {analizar,evaluarSeccion,obtenerSeguimiento,espaciosSinRelacion,catalogoEspacios,establecerSalasEspacio}=contexto.window.PlanhorDistribucionEspacios;
 const semanas=(primera)=>[primera,...Array(17).fill(0)];
 const espacios=[{ubicacion:'Laboratorio',semanas:semanas(4),salaIds:['1']},{ubicacion:'Taller',semanas:semanas(2),salaIds:['2']}];
 const salas=[{id:'1',nombre:'101'},{id:'2',nombre:'102'},{id:'3',nombre:'103'},{id:'4',nombre:'TRO2'}];
@@ -45,4 +45,26 @@ test('TRO2 y recursos eliminados siempre quedan pendientes',()=>{
  const s=[{id:'__tro2__',nombre:'TRO2 (Terreno)',ilimitada:true}];
  assert.equal(evaluarSeccion([{ubicacion:'Lab',semanas:semanas(4),salaIds:['__tro2__']}],[],s).estado,'sin_relacion');
  assert.equal(evaluarSeccion([{ubicacion:'Lab',semanas:semanas(4),salaIds:['1']}],[{salaId:'__tro2__'}],[...s,{id:'1',nombre:'101'}]).estado,'sala_pendiente');
+});
+test('una asociación se comparte por nombre, conserva el orden y se renumera al quitar',()=>{
+ const filas=[{ubicacion:'Laboratorio A',salaIds:[]},{ubicacion:' laboratorio a ',salaIds:[]},{ubicacion:'Laboratorio B',salaIds:[]}];
+ establecerSalasEspacio(filas,'Laboratorio A',['228']);establecerSalasEspacio(filas,'Laboratorio A',['228','230']);establecerSalasEspacio(filas,'Laboratorio B',['228']);
+ assert.equal(JSON.stringify(filas.map(f=>f.salaIds)),JSON.stringify([['228','230'],['228','230'],['228']]));
+ establecerSalasEspacio(filas,'Laboratorio A',['230']);
+ assert.equal(JSON.stringify(catalogoEspacios(filas)[0].salas),JSON.stringify(['230']));
+ assert.equal(JSON.stringify(filas[2].salaIds),JSON.stringify(['228']));
+});
+test('relaciones históricas distintas quedan en conflicto sin unir ni perder datos',()=>{
+ const filas=[{ubicacion:'Laboratorio',salaIds:['228']},{ubicacion:'Laboratorio',salaIds:['230']},{ubicacion:'Laboratorio',salaIds:[]}];
+ const antes=JSON.stringify(filas),grupo=catalogoEspacios(filas)[0];
+ assert.equal(grupo.conflicto,true);assert.equal(JSON.stringify(filas),antes);assert.equal(grupo.variantes.length,2);
+});
+test('una relación histórica y filas vacías se reconocen sin modificar datos',()=>{
+ const filas=[{ubicacion:'Laboratorio',salaIds:['228']},{ubicacion:'LABORATORIO',salaIds:[]}],antes=JSON.stringify(filas);
+ const g=catalogoEspacios(filas)[0];assert.equal(g.conflicto,false);assert.equal(JSON.stringify(g.salas),JSON.stringify(['228']));assert.equal(JSON.stringify(filas),antes);
+});
+test('cuenta nombres únicos sin relación y distingue los conflictos',()=>{
+ const d={sel:{temporadaId:'t'},salas:[{id:'1',nombre:'101'},{id:'2',nombre:'102'}],distribucionesEspaciosPorTemporada:{t:{filas:[{ubicacion:'Taller',salaIds:[]},{ubicacion:'TALLER',salaIds:[]},{ubicacion:'Lab',salaIds:['1']},{ubicacion:'LAB',salaIds:['2']}]}}};
+ assert.equal(espaciosSinRelacion(d).length,1);assert.equal(espaciosSinRelacion(d)[0].ubicacion,'Taller');
+ assert.equal(catalogoEspacios(d.distribucionesEspaciosPorTemporada.t.filas).filter(g=>g.conflicto).length,1);
 });

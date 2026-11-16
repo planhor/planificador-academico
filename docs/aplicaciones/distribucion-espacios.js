@@ -107,13 +107,34 @@
   if(!coleccion||typeof coleccion!=='object'||Array.isArray(coleccion))coleccion=data.distribucionesEspaciosPorTemporada=Object.create(null);
   if(valor===null)delete coleccion[id];else Object.defineProperty(coleccion,id,{value:valor,writable:true,enumerable:true,configurable:true});
  }
+ function claveEspacio(v){return texto(v).normalize('NFC').replace(/\s+/g,' ').toLocaleUpperCase('es');}
+ function catalogoEspacios(filas){
+  const grupos=new Map();
+  for(const f of filas||[]){const key=claveEspacio(f.ubicacion);if(!key)continue;if(!grupos.has(key))grupos.set(key,{clave:key,nombre:texto(f.ubicacion),filas:[],salas:[],conflicto:false,variantes:[]});grupos.get(key).filas.push(f);}
+  for(const g of grupos.values()){
+   const variantes=new Map();
+   for(const f of g.filas){const ids=[...new Set((f.salaIds||[]).map(String).filter(Boolean))];if(!ids.length)continue;const firma=JSON.stringify([...ids].sort());if(!variantes.has(firma))variantes.set(firma,ids);}
+   g.variantes=[...variantes.values()];g.conflicto=g.variantes.length>1;g.salas=g.conflicto?[]:(g.variantes[0]||[]);
+  }
+  return [...grupos.values()].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es',{numeric:true,sensitivity:'base'}));
+ }
+ function establecerSalasEspacio(filas,espacio,ids){
+  const key=claveEspacio(espacio),lista=[...new Set((ids||[]).map(String).filter(Boolean))];
+  if(!key)throw new Error('Falta el nombre del espacio.');
+  let count=0;for(const f of filas||[])if(claveEspacio(f.ubicacion)===key){f.salaIds=[...lista];count++;}
+  if(!count)throw new Error('No se encontró el espacio.');
+  return count;
+ }
  function espaciosSinRelacion(data,filas){
   const disponibles=new Set((data.salas||[]).filter(s=>!s.esVirtual&&!['__tro2__','__virtual__'].includes(String(s.id))).map(s=>String(s.id)));
-  return (filas||obtenerDistribucion(data)?.filas||[]).filter(f=>!(f.salaIds||[]).some(id=>disponibles.has(String(id))));
+  const todos=catalogoEspacios(obtenerDistribucion(data)?.filas||[]),filtro=filas?new Set(filas.map(f=>claveEspacio(f.ubicacion))):null;
+  return todos.filter(g=>(!filtro||filtro.has(g.clave))&&!g.conflicto&&!g.salas.some(id=>disponibles.has(String(id)))).map(g=>({ubicacion:g.nombre,conflicto:false}));
  }
  const nivelClave=v=>{const t=clave(v),m=t.match(/^(?:n|nivel)?\s*(\d+)$/);return m?String(Number(m[1])):t;};
  function obtenerSeguimiento(data){
   const distribucion=obtenerDistribucion(data),registros=distribucion?.filas||[], observaciones=distribucion?.observaciones||[];
+  const catalogo=new Map(catalogoEspacios(registros).map(g=>[g.clave,g]));
+  const sinRelacion=new Set(espaciosSinRelacion(data).map(x=>claveEspacio(x.ubicacion)));
   const grupos=new Map();
   for(const f of registros){const k=JSON.stringify([identificador(f.plan),nivelClave(f.semestre),identificador(f.codigo)]);if(!grupos.has(k))grupos.set(k,[]);grupos.get(k).push(f);}
   const resultado=[];
@@ -121,7 +142,11 @@
    const primero=filas[0],carreras=(data.carreras||[]).filter(c=>identificador(c.codigo)===identificador(primero.plan));
    const niveles=(data.niveles||[]).filter(n=>carreras.some(c=>String(c.id)===String(n.carreraId))&&nivelClave(n.nombre)===nivelClave(primero.semestre));
    const asignaturas=(data.asignaturas||[]).filter(a=>identificador(a.codigo)===identificador(primero.codigo));
-   const base={plan:primero.plan,semestre:primero.semestre,codigo:primero.codigo,asignatura:primero.asignatura,filas,espaciosRecomendados:filas.filter(f=>Number(f.semanas?.[0])>0).map(f=>`${f.ubicacion} (${f.semanas[0]} HH recomendadas)`),espaciosSinRelacion:espaciosSinRelacion(data,filas).map(f=>f.ubicacion)};
+   const base={plan:primero.plan,semestre:primero.semestre,codigo:primero.codigo,asignatura:primero.asignatura,filas,espaciosRecomendados:filas.filter(f=>Number(f.semanas?.[0])>0).map(f=>{
+    const g=catalogo.get(claveEspacio(f.ubicacion)),salas=g?.salas||[];
+    const nombre=g?.conflicto?`${f.ubicacion} · relaciones por revisar`:salas.length?salas.map((id,i)=>`${f.ubicacion} (${i+1}) · ${(data.salas||[]).find(s=>String(s.id)===id)?.nombre||'Sala no disponible'}`).join(', '):f.ubicacion;
+    return `${nombre} (${f.semanas[0]} HH recomendadas)`;
+   }),espaciosSinRelacion:[...new Set(filas.filter(f=>sinRelacion.has(claveEspacio(f.ubicacion))).map(f=>f.ubicacion))]};
    if(carreras.length!==1||asignaturas.length!==1||niveles.length!==1){resultado.push({...base,estado:'sin_datos',motivo:'No se pudo identificar de forma única el plan, nivel y asignatura.',seccionId:'',seccionNombre:'',asignaturaId:''});continue;}
    const asignaturaId=asignaturas[0].id;
    const secciones=(data.secciones||[]).filter(s=>niveles.some(n=>String(n.id)===String(s.nivelId))).filter(s=>{
@@ -136,7 +161,9 @@
      const ids=[g.asignaturaId,...(g.asignaturasEquivalentesIds||[])].map(String);
      return (data.planificaciones||[]).filter(p=>String(p.seccionId)===String(g.seccionMadreId)&&ids.includes(String(p.asignaturaId)));
     });
-    const planes=[...propios,...heredados],estado=evaluarSeccion(filas,planes,data.salas||[],1);
+    const planes=[...propios,...heredados],activos=filas.filter(f=>Number(f.semanas?.[0])>0),conflicto=activos.some(f=>catalogo.get(claveEspacio(f.ubicacion))?.conflicto);
+    const efectivas=filas.map(f=>({...f,salaIds:catalogo.get(claveEspacio(f.ubicacion))?.salas||[]}));
+    const estado=conflicto?{estado:'sin_datos',motivo:'Hay relaciones diferentes para un mismo espacio; revísalas en Relacionar espacios.'}:evaluarSeccion(efectivas,planes,data.salas||[],1);
     const espaciosRecomendados=base.espaciosRecomendados;
     const salasAsignadas=[...new Set(planes.filter(p=>p.tipoPresencial!==false).map(p=>(data.salas||[]).find(s=>String(s.id)===String(p.salaId))?.nombre||'Sin sala'))];
     resultado.push({...base,...estado,espaciosSinRelacion:base.espaciosSinRelacion,seccionId:sec.id,seccionNombre:sec.nombre||'',asignaturaId,espaciosRecomendados,salasAsignadas,observaciones:observaciones.filter(o=>String(o.seccionId)===String(sec.id)&&filas.some(f=>String(f.id)===String(o.filaId)))});
@@ -144,5 +171,5 @@
   }
   return resultado;
  }
- window.PlanhorDistribucionEspacios=Object.freeze({detectarColumnas,analizar,evaluarSeccion,obtenerDistribucion,establecerDistribucion,obtenerSeguimiento,espaciosSinRelacion});
+ window.PlanhorDistribucionEspacios=Object.freeze({detectarColumnas,analizar,evaluarSeccion,obtenerDistribucion,establecerDistribucion,obtenerSeguimiento,espaciosSinRelacion,claveEspacio,catalogoEspacios,establecerSalasEspacio});
 })();

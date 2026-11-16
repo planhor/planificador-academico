@@ -545,7 +545,8 @@ function renderDashboard(){
             // Las relaciones y observaciones pueden cambiar sin variar los conteos generales.
             const resumenEspacios=seguimiento.reduce((cuentas,x)=>(cuentas[x.estado]=(cuentas[x.estado]||0)+1,cuentas),{});
             const sinRelacion=window.PlanhorDistribucionEspacios?.espaciosSinRelacion?.(data)?.length||0;
-            const firmaDashboard=shared.firmaDatosReporte()+'|'+JSON.stringify(resumenEspacios)+'|'+sinRelacion;
+            const conflictosEspacios=window.PlanhorDistribucionEspacios?.catalogoEspacios?.(window.PlanhorDistribucionEspacios.obtenerDistribucion(data)?.filas||[]).filter(g=>g.conflicto).length||0;
+            const firmaDashboard=shared.firmaDatosReporte()+'|'+JSON.stringify(resumenEspacios)+'|'+sinRelacion+'|'+conflictosEspacios;
             if(cont.dataset.dashboardFirma===firmaDashboard && cont.innerHTML.trim()) return;
             const cfg=data.configuracion.dashboard||{};
             const p=shared.ctx.getPlanificaciones();
@@ -555,6 +556,7 @@ function renderDashboard(){
                 cards.push({t:'Espacios: salas coincidentes',v:contar('coincide'),report:'seguimientoEspacios'});
                 cards.push({t:'Espacios: salas distintas',v:contar('sala_distinta'),c:'var(--warning)',report:'seguimientoEspacios'});
                 cards.push({t:'Espacios sin sala relacionada',v:sinRelacion,c:'var(--warning)',report:'seguimientoEspacios'});
+                if(conflictosEspacios)cards.push({t:'Espacios con relaciones por revisar',v:conflictosEspacios,c:'var(--warning)',report:'seguimientoEspacios'});
                 cards.push({t:'Espacios: sala pendiente',v:contar('sala_pendiente'),c:'var(--warning)',report:'seguimientoEspacios'});
                 if(contar('revision_parcial')) cards.push({t:'Espacios: revisión parcial',v:contar('revision_parcial'),c:'var(--warning)',report:'seguimientoEspacios'});
             }
