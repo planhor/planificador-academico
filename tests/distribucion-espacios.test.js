@@ -48,11 +48,13 @@ test('TRO2 y recursos eliminados siempre quedan pendientes',()=>{
 });
 test('una asociación se comparte por nombre, conserva el orden y se renumera al quitar',()=>{
  const filas=[{ubicacion:'Laboratorio A',salaIds:[]},{ubicacion:' laboratorio a ',salaIds:[]},{ubicacion:'Laboratorio B',salaIds:[]}];
- establecerSalasEspacio(filas,'Laboratorio A',['228']);establecerSalasEspacio(filas,'Laboratorio A',['228','230']);establecerSalasEspacio(filas,'Laboratorio B',['228']);
- assert.equal(JSON.stringify(filas.map(f=>f.salaIds)),JSON.stringify([['228','230'],['228','230'],['228']]));
+ establecerSalasEspacio(filas,'Laboratorio A',['228']);establecerSalasEspacio(filas,'Laboratorio A',['228','230']);
+ assert.throws(()=>establecerSalasEspacio(filas,'Laboratorio B',['228']),/ya está relacionada/);
+ assert.equal(JSON.stringify(filas[2].salaIds),'[]');
+ assert.equal(JSON.stringify(filas.map(f=>f.salaIds)),JSON.stringify([['228','230'],['228','230'],[]]));
  establecerSalasEspacio(filas,'Laboratorio A',['230']);
  assert.equal(JSON.stringify(catalogoEspacios(filas)[0].salas),JSON.stringify(['230']));
- assert.equal(JSON.stringify(filas[2].salaIds),JSON.stringify(['228']));
+ establecerSalasEspacio(filas,'Laboratorio B',['228']);assert.equal(JSON.stringify(filas[2].salaIds),JSON.stringify(['228']));
 });
 test('relaciones históricas distintas quedan en conflicto sin unir ni perder datos',()=>{
  const filas=[{ubicacion:'Laboratorio',salaIds:['228']},{ubicacion:'Laboratorio',salaIds:['230']},{ubicacion:'Laboratorio',salaIds:[]}];
@@ -67,4 +69,19 @@ test('cuenta nombres únicos sin relación y distingue los conflictos',()=>{
  const d={sel:{temporadaId:'t'},salas:[{id:'1',nombre:'101'},{id:'2',nombre:'102'}],distribucionesEspaciosPorTemporada:{t:{filas:[{ubicacion:'Taller',salaIds:[]},{ubicacion:'TALLER',salaIds:[]},{ubicacion:'Lab',salaIds:['1']},{ubicacion:'LAB',salaIds:['2']}]}}};
  assert.equal(espaciosSinRelacion(d).length,1);assert.equal(espaciosSinRelacion(d)[0].ubicacion,'Taller');
  assert.equal(catalogoEspacios(d.distribucionesEspaciosPorTemporada.t.filas).filter(g=>g.conflicto).length,1);
+});
+test('conflictos históricos entre espacios se identifican y se pueden corregir sin borrar datos',()=>{
+ const filas=[{ubicacion:'Lab',salaIds:['1','2']},{ubicacion:'Taller',salaIds:['1']}],antes=JSON.stringify(filas),grupos=catalogoEspacios(filas);
+ assert.equal(JSON.stringify(grupos.map(g=>g.salasDuplicadas)),JSON.stringify([['1'],['1']]));assert.equal(JSON.stringify(filas),antes);
+ establecerSalasEspacio(filas,'Taller',[]);assert.equal(JSON.stringify(filas[0].salaIds),JSON.stringify(['1','2']));assert.equal(catalogoEspacios(filas)[0].salasDuplicadas.length,0);
+});
+
+test('busca por código y nombre, prioriza plan y nivel sin alterar datos',()=>{
+ const buscar=contexto.window.PlanhorDistribucionEspacios.buscarDistribucionesBloque;
+ const filas=[{codigo:'ABC',asignatura:'Redes',plan:'P1',semestre:'1',ubicacion:'Lab',semanas:semanas(4)},{codigo:'ABC',asignatura:'Redes',plan:'P2',semestre:'1',ubicacion:'Taller',semanas:semanas(2)}];
+ const data={sel:{temporadaId:'t'},asignaturas:[{id:'a',codigo:'abc',nombre:'Redes'}],secciones:[{id:'s',nivelId:'n'}],niveles:[{id:'n',nombre:'N1',carreraId:'c'}],carreras:[{id:'c',codigo:'P1'}],distribucionesEspaciosPorTemporada:{t:{filas}}},antes=JSON.stringify(data);
+ let r=buscar(data,{asignaturaId:'a',seccionId:'s'});assert.equal(r.seleccionExacta,true);assert.equal(r.grupos[0].plan,'P1');assert.equal(JSON.stringify(data),antes);
+ data.secciones.push({id:'destino',nivelId:'n2'});data.niveles.push({id:'n2',nombre:'N1',carreraId:'c2'});data.carreras.push({id:'c2',codigo:'P2'});r=buscar(data,{asignaturaId:'a',seccionId:'s'},{seccionId:'destino'});assert.equal(r.grupos[0].plan,'P2');
+ data.asignaturas[0].nombre='Otro nombre';assert.equal(buscar(data,{asignaturaId:'a',seccionId:'s'}).estado,'nombre_diferente');
+ data.asignaturas[0].nombre='Redes';data.carreras[0].codigo='P3';r=buscar(data,{asignaturaId:'a',seccionId:'s'});assert.equal(r.seleccionExacta,false);assert.equal(r.grupos.length,2);
 });

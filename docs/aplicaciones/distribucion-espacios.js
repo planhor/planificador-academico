@@ -116,14 +116,37 @@
    for(const f of g.filas){const ids=[...new Set((f.salaIds||[]).map(String).filter(Boolean))];if(!ids.length)continue;const firma=JSON.stringify([...ids].sort());if(!variantes.has(firma))variantes.set(firma,ids);}
    g.variantes=[...variantes.values()];g.conflicto=g.variantes.length>1;g.salas=g.conflicto?[]:(g.variantes[0]||[]);
   }
+  const propietarios=new Map();
+  for(const g of grupos.values())for(const id of new Set(g.variantes.flat())){if(!propietarios.has(id))propietarios.set(id,[]);propietarios.get(id).push(g);}
+  for(const g of grupos.values())g.salasDuplicadas=[...new Set(g.variantes.flat())].filter(id=>(propietarios.get(id)||[]).length>1);
   return [...grupos.values()].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es',{numeric:true,sensitivity:'base'}));
  }
- function establecerSalasEspacio(filas,espacio,ids){
+ function validarSalasEspacio(filas,espacio,ids){
   const key=claveEspacio(espacio),lista=[...new Set((ids||[]).map(String).filter(Boolean))];
   if(!key)throw new Error('Falta el nombre del espacio.');
+  const anteriores=new Set((filas||[]).filter(f=>claveEspacio(f.ubicacion)===key).flatMap(f=>(f.salaIds||[]).map(String)));
+  for(const f of filas||[])if(claveEspacio(f.ubicacion)!==key&&(f.salaIds||[]).some(id=>lista.includes(String(id))&&!anteriores.has(String(id))))throw new Error(`La sala ya está relacionada con «${texto(f.ubicacion)}». Quita primero esa relación.`);
+  return lista;
+ }
+ function establecerSalasEspacio(filas,espacio,ids){
+  const lista=validarSalasEspacio(filas,espacio,ids),key=claveEspacio(espacio);
   let count=0;for(const f of filas||[])if(claveEspacio(f.ubicacion)===key){f.salaIds=[...lista];count++;}
   if(!count)throw new Error('No se encontró el espacio.');
   return count;
+ }
+ function buscarDistribucionesBloque(data,plan,{seccionId}={}){
+  const asig=(data?.asignaturas||[]).find(a=>String(a.id)===String(plan?.asignaturaId));
+  const registros=obtenerDistribucion(data)?.filas||[];
+  if(!asig?.codigo||!asig?.nombre)return {estado:'sin_asignatura',grupos:[]};
+  const codigo=identificador(asig.codigo),nombre=clave(asig.nombre);
+  const candidatos=registros.filter(f=>identificador(f.codigo)===codigo&&clave(f.asignatura)===nombre);
+  if(!candidatos.length)return {estado:registros.some(f=>identificador(f.codigo)===codigo)?'nombre_diferente':'sin_distribucion',grupos:[]};
+  const sec=(data.secciones||[]).find(s=>String(s.id)===String(seccionId??plan.seccionId));
+  const nivel=(data.niveles||[]).find(n=>String(n.id)===String(sec?.nivelId));
+  const carrera=(data.carreras||[]).find(c=>String(c.id)===String(nivel?.carreraId));
+  const grupos=new Map();for(const f of candidatos){const k=JSON.stringify([identificador(f.plan),nivelClave(f.semestre)]);if(!grupos.has(k))grupos.set(k,{plan:f.plan,semestre:f.semestre,codigo:f.codigo,asignatura:f.asignatura,filas:[]});grupos.get(k).filas.push(f);}
+  const todos=[...grupos.values()],coinciden=carrera?.codigo&&nivel?.nombre?todos.filter(g=>identificador(g.plan)===identificador(carrera.codigo)&&nivelClave(g.semestre)===nivelClave(nivel.nombre)):[];
+  return {estado:'ok',grupos:coinciden.length?coinciden:todos,seleccionExacta:coinciden.length===1};
  }
  function espaciosSinRelacion(data,filas){
   const disponibles=new Set((data.salas||[]).filter(s=>!s.esVirtual&&!['__tro2__','__virtual__'].includes(String(s.id))).map(s=>String(s.id)));
@@ -144,7 +167,7 @@
    const asignaturas=(data.asignaturas||[]).filter(a=>identificador(a.codigo)===identificador(primero.codigo));
    const base={plan:primero.plan,semestre:primero.semestre,codigo:primero.codigo,asignatura:primero.asignatura,filas,espaciosRecomendados:filas.filter(f=>Number(f.semanas?.[0])>0).map(f=>{
     const g=catalogo.get(claveEspacio(f.ubicacion)),salas=g?.salas||[];
-    const nombre=g?.conflicto?`${f.ubicacion} · relaciones por revisar`:salas.length?salas.map((id,i)=>`${f.ubicacion} (${i+1}) · ${(data.salas||[]).find(s=>String(s.id)===id)?.nombre||'Sala no disponible'}`).join(', '):f.ubicacion;
+    const nombre=(g?.conflicto||g?.salasDuplicadas?.length)?`${f.ubicacion} · relaciones por revisar`:salas.length?salas.map((id,i)=>`${f.ubicacion} (${i+1}) · ${(data.salas||[]).find(s=>String(s.id)===id)?.nombre||'Sala no disponible'}`).join(', '):f.ubicacion;
     return `${nombre} (${f.semanas[0]} HH recomendadas)`;
    }),espaciosSinRelacion:[...new Set(filas.filter(f=>sinRelacion.has(claveEspacio(f.ubicacion))).map(f=>f.ubicacion))]};
    if(carreras.length!==1||asignaturas.length!==1||niveles.length!==1){resultado.push({...base,estado:'sin_datos',motivo:'No se pudo identificar de forma única el plan, nivel y asignatura.',seccionId:'',seccionNombre:'',asignaturaId:''});continue;}
@@ -161,9 +184,9 @@
      const ids=[g.asignaturaId,...(g.asignaturasEquivalentesIds||[])].map(String);
      return (data.planificaciones||[]).filter(p=>String(p.seccionId)===String(g.seccionMadreId)&&ids.includes(String(p.asignaturaId)));
     });
-    const planes=[...propios,...heredados],activos=filas.filter(f=>Number(f.semanas?.[0])>0),conflicto=activos.some(f=>catalogo.get(claveEspacio(f.ubicacion))?.conflicto);
+    const planes=[...propios,...heredados],activos=filas.filter(f=>Number(f.semanas?.[0])>0),conflicto=activos.some(f=>catalogo.get(claveEspacio(f.ubicacion))?.conflicto||catalogo.get(claveEspacio(f.ubicacion))?.salasDuplicadas?.length);
     const efectivas=filas.map(f=>({...f,salaIds:catalogo.get(claveEspacio(f.ubicacion))?.salas||[]}));
-    const estado=conflicto?{estado:'sin_datos',motivo:'Hay relaciones diferentes para un mismo espacio; revísalas en Relacionar espacios.'}:evaluarSeccion(efectivas,planes,data.salas||[],1);
+    const estado=conflicto?{estado:'sin_datos',motivo:'Hay relaciones de salas que requieren revisión en Relacionar espacios.'}:evaluarSeccion(efectivas,planes,data.salas||[],1);
     const espaciosRecomendados=base.espaciosRecomendados;
     const salasAsignadas=[...new Set(planes.filter(p=>p.tipoPresencial!==false).map(p=>(data.salas||[]).find(s=>String(s.id)===String(p.salaId))?.nombre||'Sin sala'))];
     resultado.push({...base,...estado,espaciosSinRelacion:base.espaciosSinRelacion,seccionId:sec.id,seccionNombre:sec.nombre||'',asignaturaId,espaciosRecomendados,salasAsignadas,observaciones:observaciones.filter(o=>String(o.seccionId)===String(sec.id)&&filas.some(f=>String(f.id)===String(o.filaId)))});
@@ -171,5 +194,5 @@
   }
   return resultado;
  }
- window.PlanhorDistribucionEspacios=Object.freeze({detectarColumnas,analizar,evaluarSeccion,obtenerDistribucion,establecerDistribucion,obtenerSeguimiento,espaciosSinRelacion,claveEspacio,catalogoEspacios,establecerSalasEspacio});
+ window.PlanhorDistribucionEspacios=Object.freeze({detectarColumnas,analizar,evaluarSeccion,obtenerDistribucion,establecerDistribucion,obtenerSeguimiento,buscarDistribucionesBloque,espaciosSinRelacion,claveEspacio,catalogoEspacios,validarSalasEspacio,establecerSalasEspacio});
 })();

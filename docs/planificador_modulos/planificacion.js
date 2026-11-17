@@ -2033,6 +2033,7 @@
                         <div class="action-popup-submenu-panel">
                             <button id="popupPrepararBloque">Seleccionar bloque</button>
                             <button id="popupIrSeccion">Abrir en Secciones</button>
+                            <button id="popupDistribucionSemanal">Abrir distribución semanal</button>
                             <button id="popupBuscarId" ${idGestor?'':'disabled'}>Buscar ID sección</button>
                             ${mostrarExterna?`<button id="popupIrIdPendiente" ${idGestor?'':'disabled'}>Ir a ID pendiente</button>`:''}
                         </div>
@@ -2044,6 +2045,7 @@
                         <button type="button">Acciones ›</button>
                         <div class="action-popup-submenu-panel">
                             <button id="popupIrSeccion">Abrir en Secciones</button>
+                            <button id="popupDistribucionSemanal">Abrir distribución semanal</button>
                             <button id="popupBuscarId" ${idGestor?'':'disabled'}>Buscar ID sección</button>
                             ${mostrarExterna?`<button id="popupIrIdPendiente" ${idGestor?'':'disabled'}>Ir a ID pendiente</button>`:''}
                         </div>
@@ -2071,6 +2073,7 @@
                     cerrarPopupAccion();
                 };
             }
+            popup.querySelector('#popupDistribucionSemanal')?.addEventListener('click',()=>{cerrarPopupAccion();window.PlanhorDistribucionEspaciosUI?.abrirDesdeBloque({data:getData(),plan,seccionId:getData().sel?.seccionId||plan.seccionId,cerrar:()=>ctx.cerrarModal()});});
             popup.querySelector('#popupIrSeccion')?.addEventListener('click',()=>{ cerrarPopupAccion(); ctx.irASeccionesDesdeGestor?.({seccionId:secVistaId||plan.seccionId,asignaturaId:plan.asignaturaId,idGestor}); });
             popup.querySelector('#popupBuscarId')?.addEventListener('click',()=>{ cerrarPopupAccion(); ctx.irAGestorId?.(idGestor); });
             popup.querySelector('#popupIrIdPendiente')?.addEventListener('click',()=>{ cerrarPopupAccion(); ctx.irAGestorId?.(idGestor); });
@@ -2277,6 +2280,7 @@
                     <button type="button">Acciones ›</button>
                     <div class="action-popup-submenu-panel">
                         <button id="popupIrMadre">Ir a sección de origen</button>
+                        <button id="popupDistribucionSemanal">Abrir distribución semanal</button>
                         <button id="popupVerVinculadas">${esElectiva?'Ver destinos':'Ver secciones vinculadas'}</button>
                         <button id="popupBuscarId" ${idGestor?'':'disabled'}>Buscar ID sección</button>
                         <button id="popupIrIdPendiente" ${idGestor?'':'disabled'}>Ir a ID pendiente</button>
@@ -2286,6 +2290,7 @@
             posicionarPopupEnPuntero(popup,cell,evento);
             popupState._popupAbierto=popup; popupState._popupCell=cell;
             requestAnimationFrame(()=>{ if(window._kbInitPopup) window._kbInitPopup(); });
+            popup.querySelector('#popupDistribucionSemanal')?.addEventListener('click',()=>{cerrarPopupAccion();window.PlanhorDistribucionEspaciosUI?.abrirDesdeBloque({data:getData(),plan,seccionId:getData().sel?.seccionId||plan.seccionId,cerrar:()=>ctx.cerrarModal()});});
             popup.querySelector('#popupIrMadre').onclick=()=>{
                 data.sel.seccionId=plan.seccionId;
                 const madre=data.secciones.find(s=>s.id===plan.seccionId);

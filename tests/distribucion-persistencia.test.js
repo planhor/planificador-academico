@@ -43,6 +43,7 @@ test('sync fusiona filas y observaciones independientes e identifica conflictos 
 });
 test('la distribución raíz sobrevive restauración y fusión con edición de cliente anterior',()=>{
  const {limpiarImportado}=cargarModulo('utils.js','PlanificadorUtils'),sync=cargarSyncPrueba(),distribucion=muestra();
+ distribucion.tablaOriginal={encabezados:['Plan','S1'],filas:[{fila:2,celdas:['PLAN-1',4]}]};
  const base={distribucionesEspaciosPorTemporada:{t1:distribucion},temporadaData:{t1:{gestorSecciones:{filas:[]}}},secciones:[{id:'s1',nombre:'D-1'}]};
  const limpio=limpiarImportado(structuredClone(base));
  assert.deepEqual(JSON.parse(JSON.stringify(limpio.distribucionesEspaciosPorTemporada.t1)),distribucion);
