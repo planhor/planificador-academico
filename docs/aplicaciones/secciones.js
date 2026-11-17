@@ -300,6 +300,29 @@ async function desvincularFusionAsignatura(seccionId,asignaturaId,opciones={}){
             shared.ctx.toast('Fusión desvinculada. La asignatura se planificará aparte.','success');
         }
 
+// Referencia de solo lectura: no crea grupos ni modifica planificación.
+function referenciaMadreExterna(asignatura,seccion){
+            const data=shared.getData(),rel=(data.asignaturaSeccion||[]).find(r=>r.asignaturaId===asignatura.id&&r.seccionId===seccion.id);
+            if(!rel?.idGestor||rel.fusionDesvinculada||!asignatura.codigo)return null;
+            const gestor=data.gestorSecciones||{},cargaId=gestor.ultimaCargaId;
+            if(!cargaId)return null;
+            const norm=v=>String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toUpperCase();
+            const id=String(rel.idGestor).trim(),codigo=norm(asignatura.codigo);
+            const ids=(gestor.ids||[]).filter(x=>String(x.cargaId)===String(cargaId)&&String(x.idSeccion).trim()===id&&norm(x.asignaturaCodigo)===codigo);
+            if(ids.length!==1||ids[0].estado!=='pendiente_externa'||!ids[0].madreDetectada)return null;
+            const filas=(gestor.filas||[]).filter(f=>String(f.cargaId)===String(cargaId)&&String(f.idSeccion).trim()===id&&norm(f.codigoAsignatura)===codigo);
+            const madres=filas.filter(f=>norm(f.tipo).includes('PLANIFICADA')&&norm(f.seccion)===norm(ids[0].madreDetectada));
+            const madre=madres.length===1?madres[0]:null;
+            const total=madre&&Number.isInteger(Number(madre.alumnosTotales))&&Number(madre.alumnosTotales)>0?Number(madre.alumnosTotales):null;
+            const nivel=(data.niveles||[]).find(n=>n.id===seccion.nivelId),carrera=(data.carreras||[]).find(c=>c.id===nivel?.carreraId);
+            const numeroNivel=v=>String(v??'').match(/\d+/)?.[0]||'';
+            const jornada=shared.jornadaSeccion(seccion),jornadaFila=v=>{const t=norm(v);return !t?'':(/VESP|NOCHE|NOCT/.test(t)?'vespertina':(/DIURN|DIA/.test(t)?'diurna':''));};
+            const aportes=carrera?.codigo&&numeroNivel(nivel?.nombre)?filas.filter(f=>norm(f.tipo).includes('FUSION')&&norm(f.programaPlan)===norm(carrera.codigo)&&numeroNivel(f.nivel)===numeroNivel(nivel.nombre)&&jornadaFila(f.jornada)===jornada):[];
+            const aporte=aportes.length===1&&Number.isInteger(Number(aportes[0].alumnos))&&Number(aportes[0].alumnos)>0?Number(aportes[0].alumnos):null;
+            const carga=(gestor.cargas||[]).find(c=>String(c.id)===String(cargaId));
+            return {madre:ids[0].madreDetectada,total,aporte,plan:carrera?.codigo||'',archivo:carga?.archivo||''};
+        }
+
 function resumenAlumnosGrupoDictacion(grupo){
             if(!grupo) return {total:0, base:0, vinculados:0, sobrecupo:false};
             const base=Number(grupo.alumnosBase)||0;
@@ -323,6 +346,11 @@ function renderAlumnosDictacion(asignatura,seccion){
             const marca=String(rel?.marcaGestor||grupo?.marcaGestor||'').toUpperCase();
             const editarBtn=` <button class="btn btn-xs btn-editar-alumnos-dictacion" data-asig="${shared.ctx.escapeAttr(asignatura.id)}">Editar</button>`;
             if(!grupo){
+                const externo=referenciaMadreExterna(asignatura,seccion);
+                if(externo){
+                    const partes=[externo.total?`${externo.total} alumnos en la dictación (Gestor)`:'Total de alumnos no verificable en el Gestor',externo.aporte?`${externo.aporte} de ${externo.plan} (referencia por plan y nivel)`:'',`ID: ${idGestor}`];
+                    return `<span class="dictation-meta" title="${shared.ctx.escapeAttr(externo.archivo?'Fuente: '+externo.archivo:'Referencia de la última carga del Gestor')}">${shared.ctx.escapeHTML(partes.filter(Boolean).join(' · '))}${editarBtn}</span>`;
+                }
                 const texto=[marca?`Marca: ${marca}`:'','Sin datos de alumnos', idGestor?`ID: ${idGestor}`:''].filter(Boolean).join(' · ');
                 return `<span class="dictation-meta muted" ${idGestor?`title="ID Gestor: ${shared.ctx.escapeAttr(idGestor)}"`:''}>${shared.ctx.escapeHTML(texto)}${editarBtn}</span>`;
             }
@@ -432,6 +460,10 @@ function renderEstadoDictacion(asignatura,seccion){
                 return `<span class="dictation-status own">Se dicta aquí</span>
                     ${desvinculada?`<span class="dictation-status detached">Fusión desvinculada</span>`:''}
                     ${vinculadas.length?`<small>Compartida con: ${shared.ctx.escapeHTML(vinculadas.join(', '))}</small>`:'<small>Sin secciones vinculadas.</small>'}`;
+            }
+            const externo=referenciaMadreExterna(asignatura,seccion);
+            if(externo){
+                return `<span class="dictation-status linked">Madre externa pendiente</span><small>${shared.ctx.escapeHTML(externo.madre)} · referencia del Gestor</small>`;
             }
             if(relBase?.fusionDesvinculada){
                 return `<span class="dictation-status own">Se dicta aquí</span>
@@ -1358,6 +1390,6 @@ function mostrarResultadoImportacionSecciones(resumen){
             document.querySelectorAll('.btn-revisar-carrera-importada').forEach(btn=>btn.addEventListener('click',()=>shared.abrirModalCarrera(btn.dataset.id)));
             shared.ctx.toast(resumen.alertas.length?'Secciones importadas con alertas':'Secciones importadas correctamente',resumen.alertas.length?'warning':'success');
         }
-        return {renderCarreras, nombreSeccion, nombreAsignatura, asignaturasDeNivel, asignaturaAplicaSeccion, agregarAsignaturaSeccion, quitarAsignaturaSeccion, gruposCompatiblesParaVincular, grupoCoincideAsignatura, gruposDeAsignaturaSeccion, crearGrupoPropioPorDesvinculacion, desvincularFusionAsignatura, resumenAlumnosGrupoDictacion, renderAlumnosDictacion, renderHistorialFusionDictacion, relacionAsignaturaSeccion, componentesSubseccion, renderSubseccionesAsignatura, renderEstadoDictacion, renderAccionesDictacion, abrirConfigSubseccionesAsignatura, asegurarGrupoParaAlumnos, abrirEditarAlumnosDictacion, contextoDestinoElectiva, vinculosElectivosSeccion, renderElectivasVinculadasSeccion, abrirGestionDictacionSeccion, ofertasElectivas, abrirVincularElectivaSeccion, quitarVinculoElectivo, desvincularFusionDesdeMadre, abrirGestionCompartidas, abrirVincularDictacion, abrirCompartirDictacion, abrirModalCarrera, guardarCarrera, abrirModalNivel, guardarNivel, abrirModalSeccion, guardarSeccion, filasAyudaSecciones, crearPlantillaImportacionSecciones, crearPlantillaAlumnosRealesNivel, exportarArchivoSecciones, abrirImportacionSecciones, leerArchivoSecciones, normalizarSiNo, normalizarJornadaImportacion, normalizarTipoSeccionImportacion, resolverEspecialidadExistente, importarSeccionesDesdeFilas, mostrarResultadoImportacionSecciones};
+        return {referenciaMadreExterna, renderCarreras, nombreSeccion, nombreAsignatura, asignaturasDeNivel, asignaturaAplicaSeccion, agregarAsignaturaSeccion, quitarAsignaturaSeccion, gruposCompatiblesParaVincular, grupoCoincideAsignatura, gruposDeAsignaturaSeccion, crearGrupoPropioPorDesvinculacion, desvincularFusionAsignatura, resumenAlumnosGrupoDictacion, renderAlumnosDictacion, renderHistorialFusionDictacion, relacionAsignaturaSeccion, componentesSubseccion, renderSubseccionesAsignatura, renderEstadoDictacion, renderAccionesDictacion, abrirConfigSubseccionesAsignatura, asegurarGrupoParaAlumnos, abrirEditarAlumnosDictacion, contextoDestinoElectiva, vinculosElectivosSeccion, renderElectivasVinculadasSeccion, abrirGestionDictacionSeccion, ofertasElectivas, abrirVincularElectivaSeccion, quitarVinculoElectivo, desvincularFusionDesdeMadre, abrirGestionCompartidas, abrirVincularDictacion, abrirCompartirDictacion, abrirModalCarrera, guardarCarrera, abrirModalNivel, guardarNivel, abrirModalSeccion, guardarSeccion, filasAyudaSecciones, crearPlantillaImportacionSecciones, crearPlantillaAlumnosRealesNivel, exportarArchivoSecciones, abrirImportacionSecciones, leerArchivoSecciones, normalizarSiNo, normalizarJornadaImportacion, normalizarTipoSeccionImportacion, resolverEspecialidadExistente, importarSeccionesDesdeFilas, mostrarResultadoImportacionSecciones};
     }};
 })();
