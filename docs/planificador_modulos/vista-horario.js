@@ -191,38 +191,54 @@
             const areas=[...new Set(data.carreras.map(areaCarrera))].sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:'base'}));
             return [...areas.filter(a=>!especialidad||a===especialidad).map(a=>({id:prefijoNN+a,nombre:`NN · ${a}`})),...(!especialidad?[{id:vistaNNTransversal,nombre:'NN · Transversales'}]:[])];
         }
-        function planesDocenteVista(data,id){
+        function indiceVinculosNN(data){
+            const indice=new Map();
+            (data.vinculosElectivos||[]).forEach(v=>{
+                const origen=String(v.seccionOrigenId??'');
+                const asignatura=String(v.asignaturaId??'');
+                if(!indice.has(origen)) indice.set(origen,new Map());
+                const porAsignatura=indice.get(origen);
+                if(!porAsignatura.has(asignatura)) porAsignatura.set(asignatura,[]);
+                porAsignatura.get(asignatura).push(v);
+            });
+            return indice;
+        }
+        function planesDocenteVista(data,id,indice){
             if(!esVistaNN(id)) return data.planificaciones.filter(p=>mismoId(p.docenteId,id));
             const transversal=id===vistaNNTransversal;
             const area=transversal?'':id.slice(prefijoNN.length);
+            if(!transversal) indice=indice||indiceVinculosNN(data);
             return data.planificaciones.filter(p=>{
                 if(!mismoId(p.docenteId,ctx.DOCENTE_NN_ID)) return false;
                 const asig=data.asignaturas.find(a=>mismoId(a.id,p.asignaturaId));
                 if(transversal ? asig?.area!=='transversal' : !['especialidad','electiva'].includes(asig?.area)) return false;
                 if(transversal) return true;
-                return idsSeccionesNN(p,data).some(secId=>areaCarrera(contextoSeccion(secId,data).carrera)===area);
+                return idsSeccionesNN(p,data,indice).some(secId=>areaCarrera(contextoSeccion(secId,data).carrera)===area);
             });
         }
-        function idsSeccionesNN(p,data){
+        function idsSeccionesNN(p,data,indice){
             const ids=[p.seccionId];
             (data.gruposDictacion||[]).filter(g=>mismoId(g.seccionMadreId,p.seccionId)&&[g.asignaturaId,...(g.asignaturasEquivalentesIds||[])].some(a=>mismoId(a,p.asignaturaId))).forEach(g=>ids.push(...(g.seccionesVinculadasIds||[])));
-            (data.vinculosElectivos||[]).filter(v=>mismoId(v.seccionOrigenId,p.seccionId)&&mismoId(v.asignaturaId,p.asignaturaId)).forEach(v=>ids.push(v.seccionDestinoId));
+            const vinculos=(indice||indiceVinculosNN(data)).get(String(p.seccionId??''))?.get(String(p.asignaturaId??''))||[];
+            vinculos.forEach(v=>ids.push(v.seccionDestinoId));
             return ids.filter(id=>id!=null&&id!=='');
         }
-        function seccionesNN(p,data){
-            return [...new Set(idsSeccionesNN(p,data).map(id=>data.secciones.find(sec=>mismoId(sec.id,id))?.nombre||String(id)).filter(Boolean))].join(', ');
+        function seccionesNN(p,data,indice){
+            return [...new Set(idsSeccionesNN(p,data,indice).map(id=>data.secciones.find(sec=>mismoId(sec.id,id))?.nombre||String(id)).filter(Boolean))].join(', ');
         }
-        function textoNN(p,data){
+        function textoNN(p,data,indice){
             const a=data.asignaturas.find(x=>mismoId(x.id,p.asignaturaId));
             const sec=data.secciones.find(x=>mismoId(x.id,p.seccionId));
             const sala=data.salas.find(x=>mismoId(x.id,p.salaId));
-            return [[a?.codigo,a?.nombre].filter(Boolean).join(' - '),nombreComponente(p,data),seccionesNN(p,data)||sec?.nombre||'Sin sección',sala?.nombre||'Sin sala'].filter(Boolean).join(' · ');
+            return [[a?.codigo,a?.nombre].filter(Boolean).join(' - '),nombreComponente(p,data),seccionesNN(p,data,indice)||sec?.nombre||'Sin sección',sala?.nombre||'Sin sala'].filter(Boolean).join(' · ');
         }
-        function matrizNN(planes,data){
-            return [['Horario',...ctx.DIAS],...ctx.BLOQUES.map(b=>[`B${b.n} ${b.inicio}-${b.fin}`,...ctx.DIAS.map((_,d)=>planes.filter(p=>Number(p.dia)===d&&Number(p.bloque)===b.n).map(p=>textoNN(p,data)).join('\n'))])];
+        function matrizNN(planes,data,indice){
+            indice=indice||indiceVinculosNN(data);
+            return [['Horario',...ctx.DIAS],...ctx.BLOQUES.map(b=>[`B${b.n} ${b.inicio}-${b.fin}`,...ctx.DIAS.map((_,d)=>planes.filter(p=>Number(p.dia)===d&&Number(p.bloque)===b.n).map(p=>textoNN(p,data,indice)).join('\n'))])];
         }
-        function detalleNN(planes,data){
-            return [['Día','Bloque','Asignatura / secciones / sala'],...planes.map(p=>[ctx.DIAS[p.dia]||'',`B${p.bloque}`,textoNN(p,data)])];
+        function detalleNN(planes,data,indice){
+            indice=indice||indiceVinculosNN(data);
+            return [['Día','Bloque','Asignatura / secciones / sala'],...planes.map(p=>[ctx.DIAS[p.dia]||'',`B${p.bloque}`,textoNN(p,data,indice)])];
         }
         function hojaHorarioVista(planes,tipo,id,data){
             const esNN=esVistaNN(id);
@@ -235,12 +251,13 @@
             });
             return ws;
         }
-        function llenarCeldaVista(cell,planes,tipo,data,esNN){
+        function llenarCeldaVista(cell,planes,tipo,data,esNN,indice){
             if(!planes.length) return;
             if(!esNN){llenarCeldaPlanificada(cell,planes[0],tipo,data);return;}
+            indice=indice||indiceVinculosNN(data);
             cell.classList.add('vista-nn-coincidencias');
             if(planes.length>1){cell.dataset.coincidencias=String(planes.length);cell.tabIndex=0;cell.setAttribute('aria-label',`${planes.length} asignaturas coincidentes; desplázate para verlas`);}
-            planes.forEach(plan=>{const item=document.createElement('div');item.className='grid-cell';llenarCeldaPlanificada(item,plan,'docente',data);item.title=textoNN(plan,data);const vinculadas=seccionesNN(plan,data);const linea=item.lastElementChild;if(linea&&vinculadas) linea.textContent=vinculadas;cell.appendChild(item);});
+            planes.forEach(plan=>{const item=document.createElement('div');item.className='grid-cell';llenarCeldaPlanificada(item,plan,'docente',data);item.title=textoNN(plan,data,indice);const vinculadas=seccionesNN(plan,data,indice);const linea=item.lastElementChild;if(linea&&vinculadas) linea.textContent=vinculadas;cell.appendChild(item);});
         }
 
         function getVistaActual(){
@@ -811,8 +828,9 @@
             grid.className='schedule-grid';
             if(!entId) return;
             let planes;
+            const indiceNN=tipo==='docente'&&esVistaNN(entId)?indiceVinculosNN(data):null;
             if(tipo==='seccion') planes=planesVisiblesSeccion(entId);
-            else if(tipo==='docente') planes=planesDocenteVista(data,entId);
+            else if(tipo==='docente') planes=planesDocenteVista(data,entId,indiceNN);
             else planes=data.planificaciones.filter(p=>p.salaId===entId);
             if(filtroAdicional && entId2){
                 if(filtroAdicional==='seccion') planes=planes.filter(p=>p.seccionId===entId2);
@@ -826,7 +844,7 @@
                 ctx.DIAS.forEach((d,di)=>{
                     const cell=document.createElement('div'); cell.className='grid-cell';
                     const matches=planes.filter(p=>Number(p.dia)===di&&Number(p.bloque)===b.n);
-                    llenarCeldaVista(cell,matches,tipo,data,tipo==='docente'&&esVistaNN(entId));
+                    llenarCeldaVista(cell,matches,tipo,data,tipo==='docente'&&esVistaNN(entId),indiceNN);
                     grid.appendChild(cell);
                 });
             });

@@ -48,3 +48,21 @@ test('electiva vinculada aparece una vez con destino en vista y Excel y en ambas
  assert.equal(api.planesDocenteVista(data,api.prefijoNN+'Robótica').filter(p=>p.id==='pe').length,1);
  assert.equal(JSON.stringify(data),conGrupo);
 });
+
+
+test('selección NN masiva recorre vínculos de forma acotada y refleja cambios',()=>{
+ const {api,data}=fixture(); let lecturas=0;
+ data.gruposDictacion=[];
+ data.asignaturas=[{id:7,area:'electiva',codigo:'E',nombre:'Electiva'}];
+ data.planificaciones=Array.from({length:3000},(_,i)=>({id:'p'+i,docenteId:'nn',seccionId:'s1',asignaturaId:'7',dia:0,bloque:1}));
+ data.vinculosElectivos=Array.from({length:10000},(_,i)=>({get seccionOrigenId(){lecturas++;return i<2?'s1':'otra'},asignaturaId:i<2?7:'otra',seccionDestinoId:'s2'}));
+ const inicio=performance.now();
+ const seleccion=api.planesDocenteVista(data,api.prefijoNN+'Robótica');
+ const duracion=performance.now()-inicio;
+ assert.equal(seleccion.length,3000);
+ assert.match(api.detalleNN([seleccion[0]],data)[1][2],/S1, S2/);
+ console.log(`NN masiva: ${lecturas} lecturas de origen, ${duracion.toFixed(1)} ms`);
+ assert.ok(lecturas<=20000,`recorridos repetidos: ${lecturas} lecturas`);
+ data.vinculosElectivos=[];
+ assert.equal(api.planesDocenteVista(data,api.prefijoNN+'Robótica').length,0);
+});
