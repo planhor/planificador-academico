@@ -200,15 +200,17 @@
                 const asig=data.asignaturas.find(a=>mismoId(a.id,p.asignaturaId));
                 if(transversal ? asig?.area!=='transversal' : !['especialidad','electiva'].includes(asig?.area)) return false;
                 if(transversal) return true;
-                const secciones=[p.seccionId];
-                (data.gruposDictacion||[]).filter(g=>mismoId(g.seccionMadreId,p.seccionId)&&[g.asignaturaId,...(g.asignaturasEquivalentesIds||[])].some(a=>mismoId(a,p.asignaturaId))).forEach(g=>secciones.push(...(g.seccionesVinculadasIds||[])));
-                return secciones.some(secId=>areaCarrera(contextoSeccion(secId,data).carrera)===area);
+                return idsSeccionesNN(p,data).some(secId=>areaCarrera(contextoSeccion(secId,data).carrera)===area);
             });
         }
-        function seccionesNN(p,data){
+        function idsSeccionesNN(p,data){
             const ids=[p.seccionId];
             (data.gruposDictacion||[]).filter(g=>mismoId(g.seccionMadreId,p.seccionId)&&[g.asignaturaId,...(g.asignaturasEquivalentesIds||[])].some(a=>mismoId(a,p.asignaturaId))).forEach(g=>ids.push(...(g.seccionesVinculadasIds||[])));
-            return [...new Set(ids.map(id=>data.secciones.find(sec=>mismoId(sec.id,id))?.nombre||String(id)).filter(Boolean))].join(', ');
+            (data.vinculosElectivos||[]).filter(v=>mismoId(v.seccionOrigenId,p.seccionId)&&mismoId(v.asignaturaId,p.asignaturaId)).forEach(v=>ids.push(v.seccionDestinoId));
+            return ids.filter(id=>id!=null&&id!=='');
+        }
+        function seccionesNN(p,data){
+            return [...new Set(idsSeccionesNN(p,data).map(id=>data.secciones.find(sec=>mismoId(sec.id,id))?.nombre||String(id)).filter(Boolean))].join(', ');
         }
         function textoNN(p,data){
             const a=data.asignaturas.find(x=>mismoId(x.id,p.asignaturaId));
