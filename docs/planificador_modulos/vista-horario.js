@@ -184,6 +184,63 @@
             }
         }
 
+        const prefijoNN='__vista_nn_area__:';
+        const vistaNNTransversal='__vista_nn_transversal__';
+        function esVistaNN(id){return typeof id==='string'&&(id===vistaNNTransversal||id.startsWith(prefijoNN));}
+        function opcionesNN(data, especialidad){
+            const areas=[...new Set(data.carreras.map(areaCarrera))].sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:'base'}));
+            return [...areas.filter(a=>!especialidad||a===especialidad).map(a=>({id:prefijoNN+a,nombre:`NN · ${a}`})),...(!especialidad?[{id:vistaNNTransversal,nombre:'NN · Transversales'}]:[])];
+        }
+        function planesDocenteVista(data,id){
+            if(!esVistaNN(id)) return data.planificaciones.filter(p=>mismoId(p.docenteId,id));
+            const transversal=id===vistaNNTransversal;
+            const area=transversal?'':id.slice(prefijoNN.length);
+            return data.planificaciones.filter(p=>{
+                if(!mismoId(p.docenteId,ctx.DOCENTE_NN_ID)) return false;
+                const asig=data.asignaturas.find(a=>mismoId(a.id,p.asignaturaId));
+                if(asig?.area!==(transversal?'transversal':'especialidad')) return false;
+                if(transversal) return true;
+                const secciones=[p.seccionId];
+                (data.gruposDictacion||[]).filter(g=>mismoId(g.seccionMadreId,p.seccionId)&&[g.asignaturaId,...(g.asignaturasEquivalentesIds||[])].some(a=>mismoId(a,p.asignaturaId))).forEach(g=>secciones.push(...(g.seccionesVinculadasIds||[])));
+                return secciones.some(secId=>areaCarrera(contextoSeccion(secId,data).carrera)===area);
+            });
+        }
+        function seccionesNN(p,data){
+            const ids=[p.seccionId];
+            (data.gruposDictacion||[]).filter(g=>mismoId(g.seccionMadreId,p.seccionId)&&[g.asignaturaId,...(g.asignaturasEquivalentesIds||[])].some(a=>mismoId(a,p.asignaturaId))).forEach(g=>ids.push(...(g.seccionesVinculadasIds||[])));
+            return [...new Set(ids.map(id=>data.secciones.find(sec=>mismoId(sec.id,id))?.nombre||String(id)).filter(Boolean))].join(', ');
+        }
+        function textoNN(p,data){
+            const a=data.asignaturas.find(x=>mismoId(x.id,p.asignaturaId));
+            const sec=data.secciones.find(x=>mismoId(x.id,p.seccionId));
+            const sala=data.salas.find(x=>mismoId(x.id,p.salaId));
+            return [[a?.codigo,a?.nombre].filter(Boolean).join(' - '),seccionesNN(p,data)||sec?.nombre||'Sin sección',sala?.nombre||'Sin sala'].join(' · ');
+        }
+        function matrizNN(planes,data){
+            return [['Horario',...ctx.DIAS],...ctx.BLOQUES.map(b=>[`B${b.n} ${b.inicio}-${b.fin}`,...ctx.DIAS.map((_,d)=>planes.filter(p=>Number(p.dia)===d&&Number(p.bloque)===b.n).map(p=>textoNN(p,data)).join('\n'))])];
+        }
+        function detalleNN(planes,data){
+            return [['Día','Bloque','Asignatura / secciones / sala'],...planes.map(p=>[ctx.DIAS[p.dia]||'',`B${p.bloque}`,textoNN(p,data)])];
+        }
+        function hojaHorarioVista(planes,tipo,id,data){
+            const esNN=esVistaNN(id);
+            const matriz=esNN?matrizNN(planes,data):ctx.generarMatriz(planes,tipo);
+            const ws=ctx.formatearHojaHorario(XLSX.utils.aoa_to_sheet(matriz));
+            if(esNN) ws['!rows']=matriz.map((fila,i)=>{
+                if(i===0) return {hpt:24};
+                const lineas=fila.slice(1).map(valor=>String(valor).split('\n').reduce((n,linea)=>n+Math.max(1,Math.ceil(linea.length/30)),0));
+                return {hpt:Math.min(409,Math.max(38,Math.max(1,...lineas)*20))};
+            });
+            return ws;
+        }
+        function llenarCeldaVista(cell,planes,tipo,data,esNN){
+            if(!planes.length) return;
+            if(!esNN){llenarCeldaPlanificada(cell,planes[0],tipo,data);return;}
+            cell.classList.add('vista-nn-coincidencias');
+            if(planes.length>1){cell.dataset.coincidencias=String(planes.length);cell.tabIndex=0;cell.setAttribute('aria-label',`${planes.length} asignaturas coincidentes; desplázate para verlas`);}
+            planes.forEach(plan=>{const item=document.createElement('div');item.className='grid-cell';llenarCeldaPlanificada(item,plan,'docente',data);item.title=textoNN(plan,data);const vinculadas=seccionesNN(plan,data);const linea=item.lastElementChild;if(linea&&vinculadas) linea.textContent=vinculadas;cell.appendChild(item);});
+        }
+
         function getVistaActual(){
             const data = getData();
             const tipo=document.getElementById('vistaTipo').value, entId=entidadSeleccionada;
@@ -199,7 +256,8 @@
                 const s=data.secciones.find(x=>x.id===entId);
                 if(s) nombre=s.nombre;
             }else if(tipo==='docente'){
-                planes=data.planificaciones.filter(p=>p.docenteId===entId);
+                planes=planesDocenteVista(data,entId);
+                if(esVistaNN(entId)) nombre=entId===vistaNNTransversal?'NN_Transversales':'NN_'+entId.slice(prefijoNN.length);
                 const d=data.docentes.find(x=>x.id===entId);
                 if(d) nombre=d.id===ctx.DOCENTE_NN_ID?'Pendiente_Docente_NN':d.apellido+'_'+d.nombre;
             }else{
@@ -212,7 +270,7 @@
                 else if(filtroAdicional==='docente') planes=planes.filter(p=>p.docenteId===entId2);
                 else if(filtroAdicional==='sala') planes=planes.filter(p=>p.salaId===entId2);
             }
-            return { data, tipo, planes, nombre };
+            return { data, tipo, planes, nombre, esNN:tipo==='docente'&&esVistaNN(entId) };
         }
 
         async function confirmarExportacionVistaGeneral(vista, formato){
@@ -358,6 +416,7 @@
             titulo.textContent=vista.nombre.replaceAll('_',' ')+' · '+ctx.getTemporadaLabel();
             const grid=document.createElement('div');
             grid.className='schedule-grid schedule-grid-export';
+            if(vista.esNN){grid.style.gridAutoRows='auto';grid.classList.add('vista-nn-export');}
             const h=document.createElement('div');
             h.className='grid-header';
             h.textContent='Horario';
@@ -376,8 +435,8 @@
                 ctx.DIAS.forEach((d,di)=>{
                     const cell=document.createElement('div');
                     cell.className='grid-cell';
-                    const plan=vista.planes.find(p=>p.dia===di&&p.bloque===b.n);
-                    if(plan) llenarCeldaPlanificada(cell,plan,vista.tipo,vista.data);
+                    const matches=vista.planes.filter(p=>Number(p.dia)===di&&Number(p.bloque)===b.n);
+                    llenarCeldaVista(cell,matches,vista.tipo,vista.data,vista.esNN);
                     grid.appendChild(cell);
                 });
             });
@@ -416,10 +475,10 @@
             if(tipo==='seccion') return data.secciones.map(s=>({id:s.id,nombre:s.nombre}));
             if(tipo==='docente') {
                 const esp=document.getElementById('vistaEspecialidadDocente')?.value||'';
-                return data.docentes
+                return [...opcionesNN(data,esp),...data.docentes
                     .filter(d=>d.id!==ctx.DOCENTE_NN_ID)
                     .filter(d=>!esp || (d.especialidad||'Sin especialidad')===esp)
-                    .map(d=>({id:d.id,nombre:`${d.nombre} ${d.apellido}${d.especialidad?` [${d.especialidad}]`:''}`}));
+                    .map(d=>({id:d.id,nombre:`${d.nombre} ${d.apellido}${d.especialidad?` [${d.especialidad}]`:''}`}))];
             }
             return data.salas.filter(s=>s.id!==ctx.SALA_VIRTUAL_ID&&s.id!==ctx.SALA_TRO2_ID).map(s=>({id:s.id,nombre:s.nombre}));
         }
@@ -676,7 +735,7 @@
             const esDocente=document.getElementById('vistaTipo')?.value==='docente';
             grupo.style.display=esDocente?'block':'none';
             const actual=sel.value;
-            const especialidades=[...new Set(data.docentes.filter(d=>d.id!==ctx.DOCENTE_NN_ID).map(d=>d.especialidad||'Sin especialidad'))].sort((a,b)=>a.localeCompare(b));
+            const especialidades=[...new Set([...data.docentes.filter(d=>d.id!==ctx.DOCENTE_NN_ID).map(d=>d.especialidad||'Sin especialidad'),...data.carreras.map(areaCarrera)])].sort((a,b)=>a.localeCompare(b));
             sel.innerHTML='<option value="">Todas</option>'+especialidades.map(e=>ctx.optionHTML(e,e,actual===e)).join('');
             if(actual&&especialidades.includes(actual)) sel.value=actual;
         }
@@ -692,7 +751,7 @@
             }
             const opciones=getOpcionesVista(tipo||document.getElementById('vistaFiltroAdicional')?.value||tipoActivo);
             resultados.innerHTML='';
-            opciones.slice(0,10).forEach(o=>{
+            opciones.slice(0,50).forEach(o=>{
                 const li=document.createElement('li'); li.textContent=o.nombre;
                 li.onclick=()=>{
                     if(targetKey==='principal') entidadSeleccionada=o.id;
@@ -722,7 +781,7 @@
             if(!filter){mostrarOpcionesVista(inputId, resultadosId, targetKey, tipo, clearId); return;}
             const filtradas=opciones.filter(o=>o.nombre.toLowerCase().includes(filter));
             if(filtradas.length===0){resultados.classList.remove('show');return;}
-            filtradas.slice(0,10).forEach(o=>{
+            filtradas.slice(0,50).forEach(o=>{
                 const li=document.createElement('li'); li.textContent=o.nombre;
                 li.onclick=()=>{
                     if(targetKey==='principal') entidadSeleccionada=o.id;
@@ -741,6 +800,8 @@
             const filtroAdicional=document.getElementById('vistaFiltroAdicional')?.value||'', entId2=entidadSeleccionada2;
             if(!grid) return;
             grid.innerHTML='';
+            const resumenNN=document.getElementById('vistaResumenNN');
+            if(resumenNN){resumenNN.style.display='none';resumenNN.textContent='';}
             if(tipo==='general'){
                 construirVistaGeneral();
                 return;
@@ -749,22 +810,21 @@
             if(!entId) return;
             let planes;
             if(tipo==='seccion') planes=planesVisiblesSeccion(entId);
-            else if(tipo==='docente') planes=data.planificaciones.filter(p=>p.docenteId===entId);
+            else if(tipo==='docente') planes=planesDocenteVista(data,entId);
             else planes=data.planificaciones.filter(p=>p.salaId===entId);
             if(filtroAdicional && entId2){
                 if(filtroAdicional==='seccion') planes=planes.filter(p=>p.seccionId===entId2);
                 else if(filtroAdicional==='docente') planes=planes.filter(p=>p.docenteId===entId2);
                 else if(filtroAdicional==='sala') planes=planes.filter(p=>p.salaId===entId2);
             }
+            if(resumenNN&&tipo==='docente'&&esVistaNN(entId)){resumenNN.textContent=`${planes.length} bloque(s) planificados · ${planes.length*18} HH semestrales de referencia`;resumenNN.style.display='flex';}
             grid.appendChild(ctx.createHeader());
             ctx.BLOQUES.forEach(b=>{
                 grid.appendChild(ctx.createTimeCell(b));
                 ctx.DIAS.forEach((d,di)=>{
                     const cell=document.createElement('div'); cell.className='grid-cell';
-                    const plan=planes.find(p=>p.dia===di&&p.bloque===b.n);
-                    if(plan){
-                        llenarCeldaPlanificada(cell,plan,tipo,data);
-                    }
+                    const matches=planes.filter(p=>Number(p.dia)===di&&Number(p.bloque)===b.n);
+                    llenarCeldaVista(cell,matches,tipo,data,tipo==='docente'&&esVistaNN(entId));
                     grid.appendChild(cell);
                 });
             });
@@ -821,27 +881,28 @@
                 if(!entId) return ctx.toast('Seleccione una entidad','error');
                 let planes, nombre;
                 if(tipo==='seccion'){ planes=planesVisiblesSeccion(entId); const s=data.secciones.find(x=>x.id===entId); nombre=s?s.nombre:'Seccion'; }
-                else if(tipo==='docente'){ planes=ctx.getPlanificaciones().filter(p=>p.docenteId===entId); const d=data.docentes.find(x=>x.id===entId); nombre=d?(d.id===ctx.DOCENTE_NN_ID?'Pendiente_Docente_NN':d.apellido+'_'+d.nombre):'Docente'; }
+                else if(tipo==='docente'){ planes=planesDocenteVista(data,entId); const d=data.docentes.find(x=>x.id===entId); nombre=esVistaNN(entId)?(entId===vistaNNTransversal?'NN_Transversales':'NN_'+entId.slice(prefijoNN.length)):(d?(d.id===ctx.DOCENTE_NN_ID?'Pendiente_Docente_NN':d.apellido+'_'+d.nombre):'Docente'); }
                 else{ planes=ctx.getPlanificaciones().filter(p=>p.salaId===entId); const s=data.salas.find(x=>x.id===entId); nombre=s?s.nombre:'Sala'; }
+                if(tipo==='docente'&&esVistaNN(entId)){const vista=getVistaActual();planes=vista.planes;nombre=vista.nombre;}
                 const tl=ctx.getTemporadaLabel();
                 const usarCompatible=data.configuracion.exportacionExcel==='html';
                 if(usarCompatible || !window.XLSX || !window.XLSX.utils || !window.XLSX.writeFile){
                     if(!usarCompatible){
                         const cargado=ctx.asegurarXLSX ? await ctx.asegurarXLSX() : false;
                         if(cargado && window.XLSX?.utils && window.XLSX.writeFile){
-                            const wb=XLSX.utils.book_new(), ws=ctx.formatearHojaHorario(XLSX.utils.aoa_to_sheet(ctx.generarMatriz(planes,tipo)));
-                            XLSX.utils.book_append_sheet(wb,ws,'Horario'); XLSX.writeFile(wb,`${nombre}_${tl}.xlsx`,{bookSST:true,cellStyles:true}); ctx.toast('Vista exportada a Excel','success');
+                            const wb=XLSX.utils.book_new(), ws=hojaHorarioVista(planes,tipo,entId,data);
+                            XLSX.utils.book_append_sheet(wb,ws,'Horario'); if(esVistaNN(entId)) XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(detalleNN(planes,data)),'Detalle NN'); XLSX.writeFile(wb,`${nombre}_${tl}.xlsx`,{bookSST:true,cellStyles:true}); ctx.toast('Vista exportada a Excel','success');
                             return;
                         }
                         const decision=await ctx.resolverFallbackExcel();
                         if(decision!=='html') return;
                     }
-                    ctx.descargarTablaExcel(`${nombre}_${tl}.xls`, [{nombre:'Horario', matriz:ctx.generarMatriz(planes,tipo)}]);
+                    ctx.descargarTablaExcel(`${nombre}_${tl}.xls`, [{nombre:'Horario', matriz:(esVistaNN(entId)?matrizNN(planes,data):ctx.generarMatriz(planes,tipo))},...(esVistaNN(entId)?[{nombre:'Detalle NN',matriz:detalleNN(planes,data)}]:[])]);
                     ctx.toast('Vista exportada a Excel','success');
                     return;
                 }
-                const wb=XLSX.utils.book_new(), ws=ctx.formatearHojaHorario(XLSX.utils.aoa_to_sheet(ctx.generarMatriz(planes,tipo)));
-                XLSX.utils.book_append_sheet(wb,ws,'Horario'); XLSX.writeFile(wb,`${nombre}_${tl}.xlsx`,{bookSST:true,cellStyles:true}); ctx.toast('Vista exportada a Excel','success');
+                const wb=XLSX.utils.book_new(), ws=hojaHorarioVista(planes,tipo,entId,data);
+                XLSX.utils.book_append_sheet(wb,ws,'Horario'); if(esVistaNN(entId)) XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(detalleNN(planes,data)),'Detalle NN'); XLSX.writeFile(wb,`${nombre}_${tl}.xlsx`,{bookSST:true,cellStyles:true}); ctx.toast('Vista exportada a Excel','success');
             }catch(error){
                 reportarErrorExportacion(error,'Exportar vista a Excel');
             }
@@ -975,7 +1036,13 @@
                 const imgData=canvas.toDataURL('image/jpeg',0.95);
                 const {jsPDF}=window.jspdf; const doc=new jsPDF('landscape','mm','a4');
                 const imgW=297, imgH=canvas.height*imgW/canvas.width;
-                doc.addImage(imgData,'JPEG',0,0,imgW,Math.min(imgH,210));
+                if(vista.esNN && imgH>210){
+                    const paginas=Math.ceil(imgH/210);
+                    for(let pagina=0;pagina<paginas;pagina++){
+                        if(pagina) doc.addPage('a4','landscape');
+                        doc.addImage(imgData,'JPEG',0,-pagina*210,imgW,imgH);
+                    }
+                }else doc.addImage(imgData,'JPEG',0,0,imgW,Math.min(imgH,210));
                 doc.save(vista.nombre+'_'+tl+'.pdf'); ctx.toast('PDF exportado','success');
             }catch(error){
                 reportarErrorExportacion(error,'Exportar vista a PDF');

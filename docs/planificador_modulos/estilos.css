@@ -1226,3 +1226,19 @@ body { font-family:var(--font); background:var(--bg); color:var(--text); min-hei
         scroll-behavior:auto !important;
     }
 }
+
+/* Horario docente NN: conservar todas las clases coincidentes. */
+#vistaGrid .vista-nn-coincidencias,.schedule-grid-export .vista-nn-coincidencias { display:flex; flex-direction:column; gap:2px; overflow:auto; padding:2px; }
+#vistaGrid .vista-nn-coincidencias > .grid-cell,.schedule-grid-export .vista-nn-coincidencias > .grid-cell { flex:0 0 auto; min-height:32px; width:100%; }
+.schedule-grid-export .vista-nn-coincidencias { overflow:visible; }
+
+#contenidoPrincipal #panelVistaHorarios[data-screen-fit=true] #vistaGrid .vista-nn-coincidencias { overflow-y:auto !important; }
+#contenidoPrincipal #panelVistaHorarios[data-screen-fit=true] #vistaGrid .vista-nn-coincidencias > .grid-cell { height:auto !important; min-height:32px !important; max-height:none !important; overflow:visible !important; }
+.schedule-grid-export.vista-nn-export .vista-nn-coincidencias { height:auto; min-height:62px; max-height:none; overflow:visible; }
+.schedule-grid-export.vista-nn-export .vista-nn-coincidencias > .grid-cell { height:auto; min-height:62px; max-height:none; overflow:visible; }
+
+#vistaGrid .vista-nn-coincidencias[data-coincidencias]::before { content:attr(data-coincidencias) " clases ↓"; position:sticky; top:0; align-self:flex-end; z-index:2; font-size:.55rem; line-height:1; padding:2px 3px; background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:3px; margin-bottom:-12px; pointer-events:none; }
+#contenidoPrincipal #panelVistaHorarios[data-screen-fit=true] #vistaGrid .vista-nn-coincidencias { touch-action:pan-y; overscroll-behavior:contain; }
+
+#vistaGrid .vista-nn-coincidencias,.schedule-grid-export .vista-nn-coincidencias { justify-content:flex-start; }
+.schedule-grid-export.vista-nn-export .vista-nn-coincidencias .grid-cell :is(span,small) { white-space:normal; overflow:visible; text-overflow:clip; overflow-wrap:anywhere; }
