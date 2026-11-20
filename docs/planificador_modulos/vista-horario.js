@@ -198,7 +198,7 @@
             return data.planificaciones.filter(p=>{
                 if(!mismoId(p.docenteId,ctx.DOCENTE_NN_ID)) return false;
                 const asig=data.asignaturas.find(a=>mismoId(a.id,p.asignaturaId));
-                if(asig?.area!==(transversal?'transversal':'especialidad')) return false;
+                if(transversal ? asig?.area!=='transversal' : !['especialidad','electiva'].includes(asig?.area)) return false;
                 if(transversal) return true;
                 const secciones=[p.seccionId];
                 (data.gruposDictacion||[]).filter(g=>mismoId(g.seccionMadreId,p.seccionId)&&[g.asignaturaId,...(g.asignaturasEquivalentesIds||[])].some(a=>mismoId(a,p.asignaturaId))).forEach(g=>secciones.push(...(g.seccionesVinculadasIds||[])));
@@ -214,7 +214,7 @@
             const a=data.asignaturas.find(x=>mismoId(x.id,p.asignaturaId));
             const sec=data.secciones.find(x=>mismoId(x.id,p.seccionId));
             const sala=data.salas.find(x=>mismoId(x.id,p.salaId));
-            return [[a?.codigo,a?.nombre].filter(Boolean).join(' - '),seccionesNN(p,data)||sec?.nombre||'Sin sección',sala?.nombre||'Sin sala'].join(' · ');
+            return [[a?.codigo,a?.nombre].filter(Boolean).join(' - '),nombreComponente(p,data),seccionesNN(p,data)||sec?.nombre||'Sin sección',sala?.nombre||'Sin sala'].filter(Boolean).join(' · ');
         }
         function matrizNN(planes,data){
             return [['Horario',...ctx.DIAS],...ctx.BLOQUES.map(b=>[`B${b.n} ${b.inicio}-${b.fin}`,...ctx.DIAS.map((_,d)=>planes.filter(p=>Number(p.dia)===d&&Number(p.bloque)===b.n).map(p=>textoNN(p,data)).join('\n'))])];
